@@ -12,5 +12,5 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='refresh'),
     path('api-auth/', include('rest_framework.urls')),
     path('api/login/', LoginView.as_view(), name='login'),
-    path('api/dashboard/', DashboardView.as_view(), name='dashboard'),    
+    # path('api/dashboard/', DashboardView.as_view(), name='dashboard'),    
 ]
