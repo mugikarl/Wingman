@@ -18,13 +18,13 @@ const App = () => {
           <Routes>
             {/* Default route is Dashboard */}
             <Route path="/" element={<Dashboard />} />
-          <Route path="/login" element={<Login />} />
+            <Route path="/login" element={<Login />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/order" element={<Order />} />
             <Route path="/staffprofile" element={<StaffProfile />} />
             {/* Stockout routes */}
             <Route path="/menu" element={<Menu />} />
-            <Route path="/stockin" element={<StockIn />} />      
+            <Route path="/stockin" element={<StockIn />} />
           </Routes>
         </div>
       </div>

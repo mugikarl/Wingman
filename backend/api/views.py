@@ -20,32 +20,66 @@ def fetch_data(request):
     
 class LoginView(APIView):
     def post(self, request):
+        print("Request data:", request.data)  # Log incoming data
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
             username = serializer.validated_data['username']
             password = serializer.validated_data['password']
+            print(f"Username: {username}, Password: {password}")  # Log credentials
             user = authenticate(request, username=username, password=password)
             if user is not None:
-                # Query Supabase for the Employee record
-                employee_data = supabase.table("api_employee").select("*").eq("username", username).execute()
-                if employee_data.data:
-                    employee = employee_data.data[0]
-                    # Query Supabase for the EmployeeRole records using the join table
-                    role_data = supabase.table("api_employee_role").select(
-                        "api_employeerole (role_name)"
-                    ).eq("employee_id", employee["id"]).execute()
-                    roles = [role["api_employeerole"]["role_name"] for role in role_data.data]
-                    # Check if the user has the admin role
-                    if "admin" in roles:
-                        login(request, user)
-                        return Response({"message": "Login successful"}, status=status.HTTP_200_OK)
-                    else:
-                        return Response({"error": "You do not have admin privileges"}, status=status.HTTP_403_FORBIDDEN)
-                else:
-                    return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+                print("User authenticated successfully.")
+                ...
             else:
+                print("Invalid credentials.")
                 return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            print("Serializer errors:", serializer.errors)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# class LoginView(APIView):
+#     def post(self, request):
+        
+        # serializer = LoginSerializer(data=request.data)
+        # if serializer.is_valid():
+        #     username = serializer.validated_data['username']
+        #     password = serializer.validated_data['password']
+        #     print(f"user: {username}, pass: {password}")
+        #     user = authenticate(request, username=username, password=password)
+        #     if user is not None:
+        #         # Query Supabase for the Employee record
+        #         employee = Employee.objects.filter(user=user).first()
+        #         if employee and employee.role.filter(role_name='Admin').exists():
+        #             login(request,user)
+        #             return Response({"message:": "Login Successful"}, status=status.HTTP_200_OK)
+        #         else:
+        #             return Response({"error":"You do not have admin privileges"}, status=status.HTTP_403_FORBIDDEN)
+        #     else:
+        #         return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+        # else:
+        #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            
+
+        #         employee_data = supabase.table("api_employee").select("*").eq("username", username).execute()
+        #         if employee_data.data:
+        #             employee = employee_data.data[0]
+        #             # Query Supabase for the EmployeeRole records using the join table
+        #             role_data = supabase.table("api_employee_role").select(
+        #                 "api_employeerole (role_name)"
+        #             ).eq("employee_id", employee["id"]).execute()
+        #             roles = [role["api_employeerole"]["role_name"] for role in role_data.data]
+        #             # Check if the user has the admin role
+        #             if "Admin" in roles:
+        #                 login(request, user)
+        #                 return Response({"message": "Login successful"}, status=status.HTTP_200_OK)
+        #             else:
+        #                 return Response({"error": "You do not have admin privileges"}, status=status.HTTP_403_FORBIDDEN)
+        #         else:
+        #             return Response({"error": "Employee not found"}, status=status.HTTP_404_NOT_FOUND)
+        #     else:
+        #         return Response({"error": "Invalid aaas"}, status=status.HTTP_401_UNAUTHORIZED)
+        # return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # class DashboardView(APIView):
 #     def get(self, request):
