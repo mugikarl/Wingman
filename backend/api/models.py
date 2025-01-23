@@ -16,6 +16,7 @@ class EmployeeStatus(models.Model):
         return self.status_name
     
 class Employee(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)  # Link to User model
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     middle_initial = models.CharField(max_length=3, null=True, blank=True)
@@ -33,6 +34,18 @@ class Employee(models.Model):
         full_name = f"{self.last_name}, {self.first_name}"
         return full_name
     
+    def save(self, *args, **kwargs):
+        if not self.user:  # Create a User instance if it doesn't exist
+            user = User.objects.create_user(
+                username=self.username,
+                password=self.passcode,
+                email=self.email,
+                first_name=self.first_name,
+                last_name=self.last_name
+            )
+            self.user = user
+        super().save(*args, **kwargs)
+        
 # Generate a 6-digit numeric passcode
 # import random
 # passcode = f"{random.randint(100000, 999999)}"
