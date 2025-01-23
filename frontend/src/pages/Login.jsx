@@ -1,15 +1,45 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const Login = () => {
-  const navigate = useNavigate();
+  const [username, setUsername] = useState("");
+  const [passcode, setPasscode] = useState("");
 
-  // Handle form submission (you can add actual login logic here)
-  const handleSubmit = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    // Redirect to another page after successful login (e.g., dashboard)
-    navigate("/dashboard"); // Modify as needed
+    console.log("Login form submitted");
+    console.log("Username entered:", username);
+    console.log("Passcode entered:", passcode);
+    try {
+      const response = await axios.post("http://127.0.0.1:8000/api/login/", {
+        username,
+        passcode,
+      });
+      console.log("Response from server:", response.data);
+      if (response.data.message === "Login successful") {
+        alert("Login successful");
+        window.location.href = "/admin";
+      } else {
+        console.error(
+          "Error during login:",
+          error.response?.data || error.message
+        );
+        alert(response.data.error);
+      }
+    } catch (error) {
+      alert("Invalid boo");
+    }
   };
+
+  // const navigate = useNavigate();
+
+  // // Handle form submission (you can add actual login logic here)
+  // const handleSubmit = (e) => {
+  //   e.preventDefault();
+  //   // Redirect to another page after successful login (e.g., dashboard)
+  //   navigate("/dashboard"); // Modify as needed
+  // };
 
   return (
     <div className="bg-[#FFCF03] h-screen flex flex-col justify-center">
@@ -29,7 +59,7 @@ const Login = () => {
 
         {/* Bottom Section: Login Form */}
         <div className="p-6">
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleLogin}>
             {/* Username Field */}
             <div className="relative mb-4">
               <div className="flex items-center border rounded-[15px] border-gray-300">
@@ -42,6 +72,8 @@ const Login = () => {
                 <input
                   type="text"
                   placeholder="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="w-full py-2 px-3 focus:outline-none rounded-r-[15px]"
                 />
               </div>
@@ -58,7 +90,9 @@ const Login = () => {
                 <div className="h-full w-[1px] bg-gray-300"></div>
                 <input
                   type="password"
-                  placeholder="Password"
+                  placeholder="Passcode"
+                  value={passcode}
+                  onChange={(e) => setPasscode(e.target.value)}
                   className="w-full py-2 px-3 focus:outline-none rounded-r-[15px]"
                 />
               </div>

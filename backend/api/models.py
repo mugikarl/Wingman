@@ -44,7 +44,18 @@ class Employee(models.Model):
                 last_name=self.last_name
             )
             self.user = user
+        
+        if self.role.filter(role_name='Admin').exists():
+            self.user.is_staff = True
+            self.user.is_superuser = True
+        else:
+            self.user.is_staff = False
+            self.user.is_superuser = False
+
+        self.user.save()
         super().save(*args, **kwargs)
+
+
         
 # Generate a 6-digit numeric passcode
 # import random
