@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import AddProfile from "./AddProfile"; // Import the AddProfile component
+import AddProfile from "../components/popups/AddProfile"; // Import the AddProfile component
 
 const StaffProfile = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);

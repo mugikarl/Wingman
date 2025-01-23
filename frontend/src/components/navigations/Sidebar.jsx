@@ -39,7 +39,7 @@ const Sidebar = () => {
         </Link>
         <Link to="/login">
           <button className="flex items-center justify-center bg-white text-[#FFCF03] p-2 rounded-lg shadow hover:shadow-lg w-full">
-            <span>Login</span>
+            <span>Admin Mode</span>
           </button>
         </Link>
         

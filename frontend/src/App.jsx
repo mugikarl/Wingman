@@ -1,13 +1,13 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Sidebar from "./components/Sidebar";
-import Inventory from "./components/Inventory";
-import StaffProfile from "./components/StaffProfile";
-import Login from "./components/Login";
-import Dashboard from "./components/Dashboard";
-import Menu from "./components/Menu";
-import StockIn from "./components/StockIn";
-import Order from "./components/Order";
+import Sidebar from "./components/navigations/Sidebar";
+import Inventory from "./pages/Inventory";
+import StaffProfile from "./pages/StaffProfile";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import Menu from "./pages/Menu";
+import StockIn from "./components/popups/StockIn";
+import Order from "./pages/Order";
 
 const App = () => {
   return (
