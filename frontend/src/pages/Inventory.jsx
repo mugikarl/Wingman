@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import NewProduct from "./Newproduct"; // Import NewProduct component
+import NewProduct from "../components/popups/Newproduct"; // Import NewProduct component
 
 const Inventory = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
