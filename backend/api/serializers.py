@@ -12,9 +12,9 @@ from .models import *
 #         user = User.objects.create_user(**validated_data)
 #         return user
 
-class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
-    password = serializers.CharField(write_only=True)
+# class LoginSerializer(serializers.Serializer):
+#     username = serializers.CharField()
+#     password = serializers.CharField(write_only=True)
 
 # class EmployeeSerializer(serializers.ModelSerializer):
 #     user = UserSerializer()

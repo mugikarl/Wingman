@@ -1,7 +1,17 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
-const Sidebar = () => {
+const Sidebar = ({ isAdmin, setIsAdmin }) => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("role");
+    setIsAdmin(false);
+    navigate("/login");
+  };
+
   return (
     <div className="w-1/8 bg-[#FFCF03] flex flex-col justify-between items-center py-4">
       {/* Buttons */}
@@ -37,11 +47,21 @@ const Sidebar = () => {
             <span className="text-white">Sales</span>
           </button>
         </Link>
-        <Link to="/login">
-          <button className="flex items-center justify-center bg-white text-[#FFCF03] p-2 rounded-lg shadow hover:shadow-lg w-full">
-            <span>Admin Mode</span>
+
+        {isAdmin ? (
+          <button
+            onClick={handleLogout}
+            className="flex items-center justify-center bg-white text-[#FFCF03] p-2 rounded-lg shadow hover:shadow-lg w-full"
+          >
+            <span>Logout</span>
           </button>
-        </Link>
+        ) : (
+          <Link to="/login">
+            <button className="flex items-center justify-center bg-white text-[#FFCF03] p-2 rounded-lg shadow hover:shadow-lg w-full">
+              <span>Login</span>
+            </button>
+          </Link>
+        )}
         
         {/* Add other buttons similarly */}
       </div>
