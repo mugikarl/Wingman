@@ -2,44 +2,35 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-const Login = () => {
-  const [username, setUsername] = useState("");
-  const [passcode, setPasscode] = useState("");
+const Login = ({ setIsAdmin }) => {
+  const [username, setUsername] = useState('');
+  const [passcode, setPasscode] = useState('');
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    console.log("Login form submitted");
-    console.log("Username entered:", username);
-    console.log("Passcode entered:", passcode);
     try {
       const response = await axios.post("http://127.0.0.1:8000/api/login/", {
         username,
         passcode,
       });
-      console.log("Response from server:", response.data);
-      if (response.data.message === "Login successful") {
-        alert("Login successful");
-        window.location.href = "/admin";
-      } else {
-        console.error(
-          "Error during login:",
-          error.response?.data || error.message
-        );
-        alert(response.data.error);
-      }
+      console.log("Login successful:", response.data);
+  
+      // Save tokens, role, and admin ID to local storage
+      localStorage.setItem("access_token", response.data.access_token);
+      localStorage.setItem("refresh_token", response.data.refresh_token);
+      localStorage.setItem("role", "Admin");
+      localStorage.setItem("admin_id", response.data.admin_id); // Save admin ID (employee ID)
+  
+      // Set admin state to true
+      setIsAdmin(true);
+  
+      // Navigate to dashboard with admin ID in the URL
+      navigate(`/dashboard-admin/${response.data.admin_id}`);
     } catch (error) {
-      alert("Invalid boo");
+      console.error("Login failed:", error);
     }
   };
-
-  // const navigate = useNavigate();
-
-  // // Handle form submission (you can add actual login logic here)
-  // const handleSubmit = (e) => {
-  //   e.preventDefault();
-  //   // Redirect to another page after successful login (e.g., dashboard)
-  //   navigate("/dashboard"); // Modify as needed
-  // };
 
   return (
     <div className="bg-[#FFCF03] h-screen flex flex-col justify-center">
@@ -89,7 +80,7 @@ const Login = () => {
                 />
                 <div className="h-full w-[1px] bg-gray-300"></div>
                 <input
-                  type="password"
+                  type={"password"} // Change type based on state
                   placeholder="Passcode"
                   value={passcode}
                   onChange={(e) => setPasscode(e.target.value)}
