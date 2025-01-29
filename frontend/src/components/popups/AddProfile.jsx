@@ -127,8 +127,22 @@ const AddProfile = ({ isOpen, closeModal }) => {
                   <label htmlFor="role3" className="text-sm">Staff</label>
                 </div>
               </div>
+              <div className="flex flex-col space-y-2">
+              <label className="text-sm font-medium">Status</label>
+              <div className="flex space-x-4">
+                <div className="flex items-center space-x-2">
+                  <input type="checkbox" id="role1" />
+                  <label htmlFor="role1" className="text-sm">Employed</label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input type="checkbox" id="role2" />
+                  <label htmlFor="role2" className="text-sm">Resigned</label>
+                </div>
+              </div>
+              </div>
             </div>
           </div>
+          
         </div>
 
         {/* Modal Footer */}
