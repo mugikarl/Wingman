@@ -1,8 +1,23 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import AddProfile from "../components/popups/AddProfile"; // Import the AddProfile component
 
 const StaffProfile = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [employees, setEmployees] = useState([]);
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+  const fetchEmployees = async () => {
+    try {
+      const response = await axios.get("http://127.0.0.1:8000/fetch-data/");
+      setEmployees(response.data);
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+    }
+  };
 
   const openModal = () => {
     setIsModalOpen(true);
@@ -51,24 +66,48 @@ const StaffProfile = () => {
           </thead>
           <tbody>
             {/* Example Row */}
-            <tr className="bg-[#FFEEA6] border-b">
-              <td className="p-2">Data 1</td>
-              <td className="p-2">Data 2</td>
-              <td className="p-2">Data 3</td>
-              <td className="p-2">
-                <button className="bg-blue-500 text-white p-1 rounded shadow">Time In</button>
-              </td>
-              <td className="p-2">
-                <button className="bg-red-500 text-white p-1 rounded shadow">Time Out</button>
-              </td>
-            </tr>
+            {employees.length > 0 ? (
+              employees.map((employee) => (
+                <tr key={employee.id} className="bg-[#FFEEA6] border-b">
+                  <td className="p-2">{employee.id}</td>
+                  <td className="p-2">
+                    {employee.first_name} {employee.last_name}
+                  </td>
+                  <td className="p-2">
+                    {employee.roles.length > 0
+                      ? employee.roles.join(", ")
+                      : "No Role"}
+                  </td>
+                  <td className="p-2">
+                    <button className="bg-blue-500 text-white p-1 rounded shadow">
+                      Time In
+                    </button>
+                  </td>
+                  <td className="p-2">
+                    <button className="bg-red-500 text-white p-1 rounded shadow">
+                      Time Out
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td className="p-2 text-center" colSpan="5">
+                  Loading...
+                </td>
+              </tr>
+            )}
             {/* Repeat rows dynamically */}
           </tbody>
         </table>
       </div>
 
       {/* Add Profile Modal */}
-      <AddProfile isOpen={isModalOpen} closeModal={closeModal} />
+      <AddProfile
+        isOpen={isModalOpen}
+        closeModal={closeModal}
+        fetchEmployees={fetchEmployees}
+      />
     </div>
   );
 };

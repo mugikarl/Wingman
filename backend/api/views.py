@@ -17,13 +17,42 @@ from .supabase_client import supabase
 from django.views.decorators.csrf import csrf_exempt
 import json
 
+# def fetch_data(request):
+#     try:
+#         response = supabase.table('api_employee').select('*').execute()
+#         data = response.data  # Contains the fetched data
+#         return JsonResponse(data, safe=False)
+#     except Exception as e:
+#         return JsonResponse({'error': str(e)}, status=500)
+
 def fetch_data(request):
     try:
-        response = supabase.table('api_employee').select('*').execute()
-        data = response.data  # Contains the fetched data
-        return JsonResponse(data, safe=False)
+        response = supabase.table("api_employee").select("*, api_employee_role(employeerole_id, api_employeerole(role_name))").execute()
+        employees = response.data  # Contains employees with nested role data
+
+        # Restructure the response for better readability
+        formatted_employees = []
+        for employee in employees:
+            roles = [
+                role_data["api_employeerole"]["role_name"]
+                for role_data in employee.get("api_employee_role", [])
+                if "api_employeerole" in role_data
+            ]
+            formatted_employees.append({
+                "id": employee["id"],
+                "first_name": employee["first_name"],
+                "last_name": employee["last_name"],
+                "email": employee["email"],
+                "username": employee["username"],
+                "contact": employee["contact"],
+                "base_salary": employee["base_salary"],
+                "roles": roles  # List of role names
+            })
+
+        return JsonResponse(formatted_employees, safe=False)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
 
 # def csrf_view(request):
 #     return JsonResponse({"csrfToken": get_token(request)})
@@ -80,3 +109,53 @@ def login_view(request):
         
 def test_connection(request):
     return JsonResponse({"message": "Backend and frontend are connected successfully!"})
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def add_employee(request):
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+        
+        # Extract employee details
+        first_name = data.get("first_name")
+        last_name = data.get("last_name")
+        middle_initial = data.get("middle_initial", "")
+        username = data.get("username")
+        email = data.get("email")
+        contact = data.get("contact")
+        base_salary = data.get("base_salary")
+        passcode = data.get("passcode")
+        roles = data.get("roles", [])  # List of role IDs
+
+        # Hash the password before storing
+        hashed_password = make_password(passcode)
+
+        # Insert employee record
+        response = supabase.table("api_employee").insert({
+            "first_name": first_name,
+            "last_name": last_name,
+            "middle_initial": middle_initial,
+            "username": username,
+            "email": email,
+            "contact": contact,
+            "base_salary": base_salary,
+            "passcode": hashed_password,
+        }).execute()
+
+        if not response.data:
+            return JsonResponse({"error": "Failed to create employee"}, status=500)
+
+        employee_id = response.data[0]["id"]
+
+        # Assign roles
+        role_entries = [{"employee_id": employee_id, "employeerole_id": role_id} for role_id in roles]
+        if role_entries:
+            supabase.table("api_employee_role").insert(role_entries).execute()
+
+        return JsonResponse({"message": "Employee added successfully", "employee_id": employee_id}, status=201)
+    
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
