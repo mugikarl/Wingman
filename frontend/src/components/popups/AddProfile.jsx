@@ -1,7 +1,58 @@
 import React, { useState } from "react";
 
-const AddProfile = ({ isOpen, closeModal }) => {
+const AddProfile = ({ isOpen, closeModal, fetchEmployees }) => {
   if (!isOpen) return null; // Don't render the modal if it's not open
+
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [middleInitial, setMiddleInitial] = useState("");
+  const [contactNumber, setContactNumber] = useState("");
+  const [salary, setSalary] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [selectedRoles, setSelectedRoles] = useState([]);
+
+  const handleRoleChange = (roleId) => {
+    setSelectedRoles((prev) =>
+      prev.includes(roleId)
+        ? prev.filter((id) => id !== roleId)
+        : [...prev, roleId]
+    );
+  };
+
+  const handleSubmit = async () => {
+    const employeeData = {
+      first_name: firstName,
+      last_name: lastName,
+      middle_initial: middleInitial,
+      username,
+      email,
+      contact: contactNumber,
+      base_salary: salary,
+      passcode: password,
+      roles: selectedRoles, // Send selected role IDs
+    };
+
+    try {
+      const response = await fetch("http://localhost:8000/api/add-employee/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(employeeData),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        alert("Employee added successfully!");
+        fetchEmployees();
+        closeModal(); // Close modal after success
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error("Error adding employee:", error);
+    }
+  };
 
   const [passwordVisible, setPasswordVisible] = useState(false);
 
@@ -26,6 +77,8 @@ const AddProfile = ({ isOpen, closeModal }) => {
               <input
                 type="text"
                 id="firstName"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
                 className="p-2 border rounded-lg shadow-sm focus:outline-none"
               />
             </div>
@@ -36,6 +89,8 @@ const AddProfile = ({ isOpen, closeModal }) => {
               <input
                 type="text"
                 id="lastName"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
                 className="p-2 border rounded-lg shadow-sm focus:outline-none"
               />
             </div>
@@ -46,7 +101,9 @@ const AddProfile = ({ isOpen, closeModal }) => {
               <input
                 type="text"
                 id="middleInitial"
-                maxLength={1}
+                value={middleInitial}
+                onChange={(e) => setMiddleInitial(e.target.value)}
+                maxLength={2}
                 className="p-2 border rounded-lg shadow-sm focus:outline-none w-1/4"
               />
             </div>
@@ -57,6 +114,8 @@ const AddProfile = ({ isOpen, closeModal }) => {
               <input
                 type="text"
                 id="contactNumber"
+                value={contactNumber}
+                onChange={(e) => setContactNumber(e.target.value)}
                 className="p-2 border rounded-lg shadow-sm focus:outline-none"
               />
             </div>
@@ -67,6 +126,8 @@ const AddProfile = ({ isOpen, closeModal }) => {
               <input
                 type="text"
                 id="salary"
+                value={salary}
+                onChange={(e) => setSalary(e.target.value)}
                 className="p-2 border rounded-lg shadow-sm focus:outline-none"
               />
             </div>
@@ -81,6 +142,8 @@ const AddProfile = ({ isOpen, closeModal }) => {
               <input
                 type="text"
                 id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="p-2 border rounded-lg shadow-sm focus:outline-none"
               />
             </div>
@@ -91,6 +154,8 @@ const AddProfile = ({ isOpen, closeModal }) => {
               <input
                 type="email"
                 id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="p-2 border rounded-lg shadow-sm focus:outline-none"
               />
             </div>
@@ -101,6 +166,8 @@ const AddProfile = ({ isOpen, closeModal }) => {
               <input
                 type={passwordVisible ? "text" : "password"}
                 id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="p-2 border rounded-lg shadow-sm focus:outline-none"
               />
               <button
@@ -115,16 +182,37 @@ const AddProfile = ({ isOpen, closeModal }) => {
               <label className="text-sm font-medium">Role</label>
               <div className="flex space-x-4">
                 <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="role1" />
-                  <label htmlFor="role1" className="text-sm">Admin</label>
+                  <input
+                    type="checkbox"
+                    id="role1"
+                    checked={selectedRoles.includes(1)}
+                    onChange={() => handleRoleChange(1)}
+                  />
+                  <label htmlFor="role1" className="text-sm">
+                    Admin
+                  </label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="role2" />
-                  <label htmlFor="role2" className="text-sm">Manager</label>
+                  <input
+                    type="checkbox"
+                    id="role2"
+                    checked={selectedRoles.includes(2)}
+                    onChange={() => handleRoleChange(2)}
+                  />
+                  <label htmlFor="role2" className="text-sm">
+                    Kitchen
+                  </label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="role3" />
-                  <label htmlFor="role3" className="text-sm">Staff</label>
+                  <input
+                    type="checkbox"
+                    id="role3"
+                    checked={selectedRoles.includes(3)}
+                    onChange={() => handleRoleChange(3)}
+                  />
+                  <label htmlFor="role3" className="text-sm">
+                    Waiter
+                  </label>
                 </div>
               </div>
               <div className="flex flex-col space-y-2">
@@ -153,7 +241,10 @@ const AddProfile = ({ isOpen, closeModal }) => {
           >
             Cancel
           </button>
-          <button className="bg-green-500 text-white p-2 rounded-lg shadow hover:shadow-lg w-1/3">
+          <button
+            onClick={handleSubmit}
+            className="bg-green-500 text-white p-2 rounded-lg shadow hover:shadow-lg w-1/3"
+          >
             Add
           </button>
         </div>
