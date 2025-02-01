@@ -16,5 +16,9 @@ urlpatterns = [
     # path('api/csrf/', views.csrf_view, name='csrf'),
     path('api/test/', views.test_connection, name='test_connection'),
     # path('api/dashboard/', DashboardView.as_view(), name='dashboard'),  
-    path("api/add-employee/", views.add_employee, name="add_employee"),  
+    path("api/add-employee/", views.add_employee, name="add_employee"),
+    path("api/roles/", views.get_roles, name="get_roles"),
+    path("api/statuses/", views.get_statuses, name="get_statuses"),
+    path("api/edit-employee/<int:employee_id>/", views.edit_employee, name="edit-employee")
+    
 ]

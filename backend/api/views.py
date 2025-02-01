@@ -159,3 +159,101 @@ def add_employee(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+
+def get_roles(request, employee_id=None):
+    if request.method == "GET":
+        try:
+            if employee_id:
+                # Fetch roles assigned to the employee
+                role_response = supabase.table("api_employee_role").select("employeerole_id").eq("employee_id", employee_id).execute()
+
+                if not role_response.data:
+                    return JsonResponse({"error": "No roles assigned to the employee"}, status=404)
+
+                # Get the role names based on role ids
+                roles = []
+                for role in role_response.data:
+                    role_name_response = supabase.table("api_employeerole").select("role_name").eq("id", role["employeerole_id"]).execute()
+
+                    if role_name_response.data:
+                        roles.append(role_name_response.data[0]["role_name"])
+
+                return JsonResponse({"roles": roles}, safe=False)
+            else:
+                # Fetch all available roles
+                roles_response = supabase.table("api_employeerole").select("id, role_name").execute()
+                return JsonResponse(roles_response.data, safe=False)
+
+        except Exception as e:
+            return JsonResponse({"error": f"Something went wrong: {str(e)}"}, status=500)
+
+
+def get_statuses(request, employee_id=None):
+    if request.method == "GET":
+        try:
+            if employee_id:
+                # Fetch status assigned to the employee
+                status_response = supabase.table("api_employee").select("status").eq("id", employee_id).execute()
+
+                if not status_response.data:
+                    return JsonResponse({"error": "No status found for the employee"}, status=404)
+
+                # Get the status name from api_employeestatus
+                status_id = status_response.data[0]["status"]
+                status_name_response = supabase.table("api_employeestatus").select("status_name").eq("id", status_id).execute()
+
+                if not status_name_response.data:
+                    return JsonResponse({"error": "Status name not found"}, status=404)
+
+                return JsonResponse({"status": status_name_response.data[0]["status_name"]})
+
+            else:
+                # Fetch all available statuses
+                statuses_response = supabase.table("api_employeestatus").select("id, status_name").execute()
+                return JsonResponse(statuses_response.data, safe=False)
+
+        except Exception as e:
+            return JsonResponse({"error": f"Something went wrong: {str(e)}"}, status=500)
+
+
+@api_view(['PUT'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def edit_employee(request, employee_id):
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+
+        # Extract updated employee details
+        update_data = {
+            "first_name": data.get("first_name"),
+            "last_name": data.get("last_name"),
+            "middle_initial": data.get("middle_initial", ""),
+            "username": data.get("username"),
+            "email": data.get("email"),
+            "contact": data.get("contact"),
+            "base_salary": data.get("base_salary"),
+            "status": data.get("status")
+        }
+
+        # Update password if provided
+        if "passcode" in data and data["passcode"]:
+            update_data["passcode"] = make_password(data["passcode"])
+
+        # Update employee details
+        supabase.table("api_employee").update(update_data).eq("id", employee_id).execute()
+
+        # Update roles if changed
+        new_roles = set(data.get("roles", []))
+        existing_roles_response = supabase.table("api_employee_role").select("employeerole_id").eq("employee_id", employee_id).execute()
+        existing_roles = {role["employeerole_id"] for role in existing_roles_response.data} if existing_roles_response.data else set()
+
+        if new_roles != existing_roles:
+            supabase.table("api_employee_role").delete().eq("employee_id", employee_id).execute()
+            role_entries = [{"employee_id": employee_id, "employeerole_id": role_id} for role_id in new_roles]
+            if role_entries:
+                supabase.table("api_employee_role").insert(role_entries).execute()
+
+        return JsonResponse({"message": "Employee updated successfully", "employee_id": employee_id}, status=200)
+    
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

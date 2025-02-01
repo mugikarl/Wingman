@@ -8,19 +8,50 @@ const StaffProfile = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [roles, setRoles] = useState([]);
+  const [statuses, setStatuses] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
-
+  // Fetch Employees
   const fetchEmployees = async () => {
     try {
+      setLoading(true);
       const response = await axios.get("http://127.0.0.1:8000/fetch-data/");
       setEmployees(response.data);
     } catch (error) {
       console.error("Error fetching employees:", error);
+    } finally {
+      setLoading(false);
     }
   };
+
+  // // Fetch Roles
+  // const fetchRoles = async () => {
+  //   try {
+  //     const response = await axios.get("http://127.0.0.1:8000/api/roles/");
+  //     setRoles(response.data || []);
+  //   } catch (error) {
+  //     console.error("Error fetching roles:", error);
+  //     setRoles([]);
+  //   }
+  // };
+
+  // // Fetch Statuses
+  // const fetchStatuses = async () => {
+  //   try {
+  //     const response = await axios.get("http://127.0.0.1:8000/api/statuses/");
+  //     setStatuses(response.data || []);
+  //   } catch (error) {
+  //     console.error("Error fetching statuses:", error);
+  //     setStatuses([]);
+  //   }
+  // };
+
+  useEffect(() => {
+    fetchEmployees();
+    // fetchRoles();
+    // fetchStatuses();
+  }, []);
 
   const openAddModal = () => setIsAddModalOpen(true);
   const closeAddModal = () => setIsAddModalOpen(false);
@@ -39,20 +70,11 @@ const StaffProfile = () => {
     <div className="flex-grow p-6">
       {/* Top Section */}
       <div className="flex items-start mb-4 space-x-4">
-        <div className="flex space-x-4">
-          <button className="bg-blue-500 text-white p-2 rounded-lg shadow">
-            Button 1
-          </button>
-          <button
-            onClick={openAddModal} 
-            className="bg-[#E88504] text-white p-2 rounded-lg shadow"
-          >
-            Add New Profile
-          </button>
-          <button className="bg-green-500 text-white p-2 rounded-lg shadow">
-            Button 3
-          </button>
-        </div>
+        <button className="bg-blue-500 text-white p-2 rounded-lg shadow">Button 1</button>
+        <button onClick={openAddModal} className="bg-[#E88504] text-white p-2 rounded-lg shadow">
+          Add New Profile
+        </button>
+        <button className="bg-green-500 text-white p-2 rounded-lg shadow">Button 3</button>
       </div>
 
       {/* Table */}
@@ -72,7 +94,11 @@ const StaffProfile = () => {
             </tr>
           </thead>
           <tbody>
-            {employees.length > 0 ? (
+            {loading ? (
+              <tr>
+                <td className="p-2 text-center" colSpan="5">Loading...</td>
+              </tr>
+            ) : employees.length > 0 ? (
               employees.map((employee) => (
                 <tr
                   key={employee.id}
@@ -80,29 +106,21 @@ const StaffProfile = () => {
                   onClick={() => openEditModal(employee)}
                 >
                   <td className="p-2">{employee.id}</td>
-                  <td className="p-2">
-                    {employee.first_name} {employee.last_name}
-                  </td>
+                  <td className="p-2">{employee.first_name} {employee.last_name}</td>
                   <td className="p-2">
                     {employee.roles.length > 0 ? employee.roles.join(", ") : "No Role"}
                   </td>
                   <td className="p-2">
-                    <button className="bg-blue-500 text-white p-1 rounded shadow">
-                      Time In
-                    </button>
+                    <button className="bg-blue-500 text-white p-1 rounded shadow">Time In</button>
                   </td>
                   <td className="p-2">
-                    <button className="bg-red-500 text-white p-1 rounded shadow">
-                      Time Out
-                    </button>
+                    <button className="bg-red-500 text-white p-1 rounded shadow">Time Out</button>
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td className="p-2 text-center" colSpan="5">
-                  Load
-                </td>
+                <td className="p-2 text-center" colSpan="5">No employees found.</td>
               </tr>
             )}
           </tbody>
@@ -113,12 +131,14 @@ const StaffProfile = () => {
       <AddProfile isOpen={isAddModalOpen} closeModal={closeAddModal} fetchEmployees={fetchEmployees} />
 
       {/* Edit Profile Modal */}
-      {isEditModalOpen && (
+      {isEditModalOpen && selectedEmployee && (
         <EditProfile
           isOpen={isEditModalOpen}
           closeModal={closeEditModal}
           employee={selectedEmployee}
           fetchEmployees={fetchEmployees}
+          roles={roles}
+          statuses={statuses}
         />
       )}
     </div>
