@@ -45,6 +45,9 @@ const App = () => {
             {/* Stockout routes */}
             <Route path="/menu" element={<Menu />} />
             <Route path="/stockin" element={<StockIn />} />
+            {/* Staff Profile routes */}
+           
+
           </Routes>
         </div>
       </div>

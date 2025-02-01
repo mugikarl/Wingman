@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import AddProfile from "../components/popups/AddProfile"; // Import the AddProfile component
+import AddProfile from "../components/popups/AddProfile"; 
+import EditProfile from "../components/popups/EditProfile"; 
 
 const StaffProfile = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [employees, setEmployees] = useState([]);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
 
   useEffect(() => {
     fetchEmployees();
@@ -19,30 +22,34 @@ const StaffProfile = () => {
     }
   };
 
-  const openModal = () => {
-    setIsModalOpen(true);
+  const openAddModal = () => setIsAddModalOpen(true);
+  const closeAddModal = () => setIsAddModalOpen(false);
+
+  const openEditModal = (employee) => {
+    setSelectedEmployee(employee);
+    setIsEditModalOpen(true);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedEmployee(null);
   };
 
   return (
     <div className="flex-grow p-6">
       {/* Top Section */}
       <div className="flex items-start mb-4 space-x-4">
-        {/* Top Buttons */}
         <div className="flex space-x-4">
-          <button className="flex items-center justify-center bg-blue-500 text-white p-2 rounded-lg shadow">
+          <button className="bg-blue-500 text-white p-2 rounded-lg shadow">
             Button 1
           </button>
           <button
-            onClick={openModal} // Open the modal on click
-            className="flex items-center justify-center bg-[#E88504] text-white p-2 rounded-lg shadow"
+            onClick={openAddModal} 
+            className="bg-[#E88504] text-white p-2 rounded-lg shadow"
           >
             Add New Profile
           </button>
-          <button className="flex items-center justify-center bg-green-500 text-white p-2 rounded-lg shadow">
+          <button className="bg-green-500 text-white p-2 rounded-lg shadow">
             Button 3
           </button>
         </div>
@@ -65,18 +72,19 @@ const StaffProfile = () => {
             </tr>
           </thead>
           <tbody>
-            {/* Example Row */}
             {employees.length > 0 ? (
               employees.map((employee) => (
-                <tr key={employee.id} className="bg-[#FFEEA6] border-b">
+                <tr
+                  key={employee.id}
+                  className="bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
+                  onClick={() => openEditModal(employee)}
+                >
                   <td className="p-2">{employee.id}</td>
                   <td className="p-2">
                     {employee.first_name} {employee.last_name}
                   </td>
                   <td className="p-2">
-                    {employee.roles.length > 0
-                      ? employee.roles.join(", ")
-                      : "No Role"}
+                    {employee.roles.length > 0 ? employee.roles.join(", ") : "No Role"}
                   </td>
                   <td className="p-2">
                     <button className="bg-blue-500 text-white p-1 rounded shadow">
@@ -93,21 +101,26 @@ const StaffProfile = () => {
             ) : (
               <tr>
                 <td className="p-2 text-center" colSpan="5">
-                  Loading...
+                  Load
                 </td>
               </tr>
             )}
-            {/* Repeat rows dynamically */}
           </tbody>
         </table>
       </div>
 
       {/* Add Profile Modal */}
-      <AddProfile
-        isOpen={isModalOpen}
-        closeModal={closeModal}
-        fetchEmployees={fetchEmployees}
-      />
+      <AddProfile isOpen={isAddModalOpen} closeModal={closeAddModal} fetchEmployees={fetchEmployees} />
+
+      {/* Edit Profile Modal */}
+      {isEditModalOpen && (
+        <EditProfile
+          isOpen={isEditModalOpen}
+          closeModal={closeEditModal}
+          employee={selectedEmployee}
+          fetchEmployees={fetchEmployees}
+        />
+      )}
     </div>
   );
 };
