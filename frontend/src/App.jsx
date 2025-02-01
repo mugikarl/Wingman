@@ -8,6 +8,8 @@ import Dashboard from "./pages/Dashboard";
 import Menu from "./pages/Menu";
 import StockIn from "./components/popups/StockIn";
 import Order from "./pages/Order";
+import Sales from "./pages/Sales"
+import SalesCalendar from "./pages/SalesCalendar"
 import AdminRoute from "./components/AdminRoute";
 import TestConnection from "./pages/TestConnection";
 
@@ -42,11 +44,13 @@ const App = () => {
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/order" element={<Order />} />
             <Route path="/staffprofile" element={<StaffProfile />} />
+            <Route path="/sales" element={<Sales />} />
             {/* Stockout routes */}
             <Route path="/menu" element={<Menu />} />
             <Route path="/stockin" element={<StockIn />} />
             {/* Staff Profile routes */}
-           
+            {/* Sales routes */}
+            <Route path="/salescalendar" element={<SalesCalendar />} />
 
           </Routes>
         </div>

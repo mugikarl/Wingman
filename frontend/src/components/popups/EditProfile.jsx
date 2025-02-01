@@ -10,11 +10,14 @@ const EditProfile = ({ isOpen, closeModal, fetchEmployees, employee }) => {
   const [salary, setSalary] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [status, setStatus] = useState("");
   const [isEditMode, setIsEditMode] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
 
+
+  
   const togglePasswordVisibility = () => {
     setPasswordVisible(!passwordVisible);
   };
@@ -182,15 +185,15 @@ const EditProfile = ({ isOpen, closeModal, fetchEmployees, employee }) => {
               />
             </div>
             <div className="flex flex-col space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
+              <label htmlFor="password" className="text-sm font-medium">
+                Password
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email"
-                className="p-2 border rounded-lg"
+                type={passwordVisible ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                className="p-2 border rounded-lg shadow-sm focus:outline-none"
                 disabled={!isEditMode}
               />
               <button
