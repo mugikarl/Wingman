@@ -49,31 +49,38 @@ const Inventory = () => {
 
           {/* Side Buttons with Image and Text */}
           <div className="w-1/2 grid grid-cols-4 gap-4">
+            {/* New Product Button */}
             <button
               onClick={openModal}
-              className="flex flex-col items-center bg-[#E88504] p-2 rounded-lg shadow min-w-[25%]"
+              className="flex flex-col items-center justify-center bg-[#E88504] p-4 rounded-lg shadow hover:shadow-lg w-full h-28"
             >
               <img src="/images/stockout/cart.png" alt="New Product" className="w-10 h-10 mb-2" />
               <span className="text-white">New Product</span>
             </button>
+
+            {/* Other Buttons */}
             <Link to="/menu">
-              <button className="flex flex-col items-center bg-[#E88504] p-2 rounded-lg shadow min-w-[25%]">
+              <button className="flex flex-col items-center justify-center bg-[#E88504] p-4 rounded-lg shadow hover:shadow-lg w-full h-28">
                 <img src="/images/stockout/menu.png" alt="Menu" className="w-10 h-10 mb-2" />
                 <span className="text-white">Menu</span>
               </button>
             </Link>
+
             <Link to="/stockin">
-              <button className="flex flex-col items-center bg-[#00BA34] p-2 rounded-lg shadow min-w-[25%]">
+              <button className="flex flex-col items-center justify-center bg-[#00BA34] p-4 rounded-lg shadow hover:shadow-lg w-full h-28">
                 <img src="/images/stockout/stock.png" alt="Stock In" className="w-10 h-10 mb-2" />
                 <span className="text-white">Stock In</span>
               </button>
             </Link>
-            <button className="flex flex-col items-center bg-[#FF0000] p-2 rounded-lg shadow min-w-[25%]">
-              <img src="/images/stockout/trash.png" alt="Disposed" className="w-10 h-10 mb-2" />
-              <span className="text-white">Disposed</span>
-            </button>
+
+            <Link to="/disposeditems">
+              <button className="flex flex-col items-center justify-center bg-[#FF0000] p-4 rounded-lg shadow hover:shadow-lg w-full h-28">
+                <img src="/images/stockout/trash.png" alt="Disposed" className="w-10 h-10 mb-2" />
+                <span className="text-white">Disposed</span>
+              </button>
+            </Link>
           </div>
-        </div>
+          </div>
 
         {/* Table */}
         <div className="overflow-x-auto border rounded-lg shadow">

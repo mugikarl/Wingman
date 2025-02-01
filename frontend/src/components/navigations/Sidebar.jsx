@@ -35,7 +35,7 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
         </Link>
 
         {/* Other Buttons */}
-        <SidebarButton to="/order" imgSrc="/images/order.png" imgAlt="Order" label="Order" />
+        <SidebarButton to="/ordertable" imgSrc="/images/order.png" imgAlt="Order" label="Order" />
         <SidebarButton to="/inventory" imgSrc="/images/inventory.png" imgAlt="Inventory" label="Inventory" />
         <SidebarButton to="/staffprofile" imgSrc="/images/staff.png" imgAlt="Staff Profile" label="Staff Profile" />
         <SidebarButton to="/sales" imgSrc="/images/sales.png" imgAlt="Sales" label="Sales" />

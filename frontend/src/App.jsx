@@ -2,16 +2,20 @@ import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/navigations/Sidebar";
 import Inventory from "./pages/Inventory";
+import DisposedItems from "./pages/DisposedItems";
 import StaffProfile from "./pages/StaffProfile";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Menu from "./pages/Menu";
 import StockIn from "./components/popups/StockIn";
 import Order from "./pages/Order";
+import Ordertable from "./pages/Ordertable";
+import ChooseOrder from "./components/popups/ChooseOrder";
 import Sales from "./pages/Sales"
 import SalesCalendar from "./pages/SalesCalendar"
 import AdminRoute from "./components/AdminRoute";
 import TestConnection from "./pages/TestConnection";
+
 
 const App = () => {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -42,12 +46,16 @@ const App = () => {
             />
             <Route path="/admin/dashboard" element={<Dashboard isAdmin={true} />} />
             <Route path="/inventory" element={<Inventory />} />
-            <Route path="/order" element={<Order />} />
+            <Route path="/ordertable" element={<Ordertable />} />
             <Route path="/staffprofile" element={<StaffProfile />} />
             <Route path="/sales" element={<Sales />} />
-            {/* Stockout routes */}
+            {/* Order routes */}
+            <Route path="/order" element={<Order />} />
+            <Route path="/chooseorder" element={<ChooseOrder />} />
+            {/* Inventory routes */}
             <Route path="/menu" element={<Menu />} />
             <Route path="/stockin" element={<StockIn />} />
+            <Route path="/disposeditems" element={<DisposedItems />} />"
             {/* Staff Profile routes */}
             {/* Sales routes */}
             <Route path="/salescalendar" element={<SalesCalendar />} />
