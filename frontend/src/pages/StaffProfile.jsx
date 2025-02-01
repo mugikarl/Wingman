@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import AddProfile from "../components/popups/AddProfile"; 
 import EditProfile from "../components/popups/EditProfile"; 
@@ -49,9 +50,11 @@ const StaffProfile = () => {
           >
             Add New Profile
           </button>
+          <Link to="/schedule">
           <button className="bg-green-500 text-white p-2 rounded-lg shadow">
-            Button 3
+            Schedule
           </button>
+          </Link>
         </div>
       </div>
 

@@ -4,6 +4,10 @@ import Sidebar from "./components/navigations/Sidebar";
 import Inventory from "./pages/Inventory";
 import DisposedItems from "./pages/DisposedItems";
 import StaffProfile from "./pages/StaffProfile";
+import Schedule from "./pages/schedule";
+import LegendModal from "./components/popups/LegendModal";
+import EmployeeLeave from "./components/popups/EmployeeLeave";
+import Holidays from "./components/popups/Holidays";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Menu from "./pages/Menu";
@@ -15,6 +19,7 @@ import Sales from "./pages/Sales"
 import SalesCalendar from "./pages/SalesCalendar"
 import AdminRoute from "./components/AdminRoute";
 import TestConnection from "./pages/TestConnection";
+
 
 
 const App = () => {
@@ -55,8 +60,12 @@ const App = () => {
             {/* Inventory routes */}
             <Route path="/menu" element={<Menu />} />
             <Route path="/stockin" element={<StockIn />} />
-            <Route path="/disposeditems" element={<DisposedItems />} />"
+            <Route path="/disposeditems" element={<DisposedItems />} />
             {/* Staff Profile routes */}
+            <Route path="/schedule" element={<Schedule />}/>
+            <Route path="/legendmodal" element={<LegendModal />}/>
+            <Route path="/employeeleave" element={<EmployeeLeave />}/>
+            <Route path="/holidays" element={<Holidays />}/>
             {/* Sales routes */}
             <Route path="/salescalendar" element={<SalesCalendar />} />
 
