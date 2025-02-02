@@ -35,22 +35,20 @@ const AddProfile = ({ isOpen, closeModal, fetchEmployees }) => {
     };
 
     try {
-      const response = await fetch("http://localhost:8000/api/add-employee/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(employeeData),
-      });
+      const response = await axios.post(
+        "http://localhost:8000/api/add-employee/",
+        employeeData,
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
 
-      const data = await response.json();
-      if (response.ok) {
-        alert("Employee added successfully!");
-        fetchEmployees();
-        closeModal(); // Close modal after success
-      } else {
-        alert(`Error: ${data.error}`);
-      }
+      alert("Employee added successfully!");
+      fetchEmployees(); // Refresh the table immediately
+      closeModal(); // Close modal after success
     } catch (error) {
       console.error("Error adding employee:", error);
+      alert(`Error: ${error.response?.data?.error || "Something went wrong"}`);
     }
   };
 
@@ -216,21 +214,24 @@ const AddProfile = ({ isOpen, closeModal, fetchEmployees }) => {
                 </div>
               </div>
               <div className="flex flex-col space-y-2">
-              <label className="text-sm font-medium">Status</label>
-              <div className="flex space-x-4">
-                <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="role1" />
-                  <label htmlFor="role1" className="text-sm">Employed</label>
+                <label className="text-sm font-medium">Status</label>
+                <div className="flex space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <input type="checkbox" id="role1" />
+                    <label htmlFor="role1" className="text-sm">
+                      Employed
+                    </label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input type="checkbox" id="role2" />
+                    <label htmlFor="role2" className="text-sm">
+                      Resigned
+                    </label>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <input type="checkbox" id="role2" />
-                  <label htmlFor="role2" className="text-sm">Resigned</label>
-                </div>
-              </div>
               </div>
             </div>
           </div>
-          
         </div>
 
         {/* Modal Footer */}
