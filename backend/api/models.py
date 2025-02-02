@@ -29,7 +29,7 @@ class Employee(models.Model):
     base_salary = models.DecimalField(max_digits=8, decimal_places=2)
 
     role = models.ManyToManyField(EmployeeRole, blank=True)
-    status = models.ForeignKey(EmployeeStatus, null=True, blank=True, on_delete = models.CASCADE)    
+    status = models.ForeignKey(EmployeeStatus, null=True, blank=True, on_delete=models.SET_NULL)    
 
     def save(self, *args, **kwargs):
         if not self.pk:

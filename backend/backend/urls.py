@@ -17,8 +17,8 @@ urlpatterns = [
     path('api/test/', views.test_connection, name='test_connection'),
     # path('api/dashboard/', DashboardView.as_view(), name='dashboard'),  
     path("api/add-employee/", views.add_employee, name="add_employee"),
-    path("api/roles/", views.get_roles, name="get_roles"),
-    path("api/statuses/", views.get_statuses, name="get_statuses"),
-    path("api/edit-employee/<int:employee_id>/", views.edit_employee, name="edit-employee")
-    
+    path("api/delete-employee/<int:employee_id>/", views.delete_employee, name="delete_employee"),
+    # path("api/roles/", views.get_roles, name="get_roles"),
+    # path("api/statuses/", views.get_statuses, name="get_statuses"),
+    path("api/edit-employee/<int:employee_id>", views.edit_employee, name="edit_employee")
 ]

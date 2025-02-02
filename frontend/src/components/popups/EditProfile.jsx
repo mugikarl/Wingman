@@ -13,7 +13,7 @@ const EditProfile = ({ isOpen, closeModal, employee, fetchEmployees, roles, stat
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [status, setStatus] = useState(employee?.status || "");
-  const [selectedRoles, setSelectedRoles] = useState(employee?.roles || []);
+  const [selectedRoles, setSelectedRoles] = useState(employee?.roles?.map(role => role.id) || []);
 
   const togglePasswordVisibility = () => {
     setPasswordVisible(!passwordVisible);
@@ -32,21 +32,32 @@ const EditProfile = ({ isOpen, closeModal, employee, fetchEmployees, roles, stat
       first_name: firstName,
       last_name: lastName,
       middle_initial: middleInitial,
-      username: username,
-      email: email,
+      username,
+      email,
       contact: contactNumber,
       base_salary: salary,
-      status: status,
-      roles: selectedRoles,
-      passcode: password || undefined, // Only update password if provided
+      status: parseInt(status), // Ensure status is sent as a number
+      roles: selectedRoles, // Send role IDs
+      ...(password && { passcode: password }), // Only include password if set
     };
 
     try {
       await axios.put(`http://127.0.0.1:8000/api/edit-employee/${employee.id}/`, updatedEmployeeData);
-      fetchEmployees(); // Refresh employee data after update
-      closeModal(); // Close modal after successful edit
+      fetchEmployees();
+      setIsEditMode(!isEditMode)
     } catch (error) {
       console.error("Error updating employee:", error);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this employee?")) return;
+    try {
+      await axios.delete(`http://127.0.0.1:8000/api/delete-employee/${employee.id}/`);
+      fetchEmployees();
+      closeModal();
+    } catch (error) {
+      console.error("Error deleting employee:", error);
     }
   };
 
@@ -54,14 +65,22 @@ const EditProfile = ({ isOpen, closeModal, employee, fetchEmployees, roles, stat
     isOpen && (
       <div className="fixed inset-0 flex justify-center items-center bg-gray-500 bg-opacity-50 p-4">
         <div className="bg-white rounded-lg p-6 w-8/10 space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between">
             <h2 className="text-2xl font-bold">Edit Staff Profile</h2>
+            <div className="space-x-2">
+            <button
+              onClick={handleDelete}
+              className="bg-red-500 text-white p-2 rounded-lg"
+            >
+              Delete
+            </button>
             <button
               onClick={() => setIsEditMode(!isEditMode)}
               className="bg-blue-500 text-white p-2 rounded-lg"
             >
               {isEditMode ? "Cancel Edit" : "Edit"}
             </button>
+            </div>
           </div>
 
           <div className="flex space-x-4">
@@ -127,7 +146,6 @@ const EditProfile = ({ isOpen, closeModal, employee, fetchEmployees, roles, stat
                   disabled={!isEditMode}
                 />
               </div>
-
               {/* Email */}
               <div className="flex flex-col space-y-2">
                 <label htmlFor="email" className="text-sm font-medium">Email</label>
@@ -139,7 +157,23 @@ const EditProfile = ({ isOpen, closeModal, employee, fetchEmployees, roles, stat
                   disabled={!isEditMode}
                 />
               </div>
-
+              {/* Password */}
+              <div className="flex flex-col space-y-2">
+                <label htmlFor="passcode" className="text-sm font-medium">Passcode</label>
+                <input
+                  type="password"
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="p-2 border rounded-lg"
+                  disabled={!isEditMode}
+                />
+                <button
+                  type="button"
+                  onClick={togglePasswordVisibility}
+                  className="text-blue-500 text-sm"
+                >
+                  {passwordVisible ? "Hide" : "Show"} Passcode
+                </button>
+              </div>
               {/* Roles */}
               <div className="flex flex-col space-y-2">
                 <label className="text-sm font-medium">Roles</label>
@@ -162,7 +196,6 @@ const EditProfile = ({ isOpen, closeModal, employee, fetchEmployees, roles, stat
                   ))}
                 </div>
               </div>
-
               {/* Status */}
               <div className="flex flex-col space-y-2">
                 <label className="text-sm font-medium">Status</label>
@@ -173,14 +206,14 @@ const EditProfile = ({ isOpen, closeModal, employee, fetchEmployees, roles, stat
                         type="radio"
                         name="status"
                         value={statusOption.id}
-                        checked={status === statusOption.id}
-                        onChange={(e) => setStatus(e.target.value)}
+                        checked={parseInt(status) === statusOption.id}
+                        onChange={(e) => setStatus(parseInt(e.target.value))}
                         disabled={!isEditMode}
                         className="hidden"
                       />
                       <div className={`w-5 h-5 border rounded-full flex items-center justify-center 
-                        ${status === statusOption.id ? "bg-green-500 border-green-600" : "border-gray-400 bg-white"}`}>
-                        {status === statusOption.id && <div className="w-3 h-3 bg-white rounded-full"></div>}
+                        ${parseInt(status) === statusOption.id ? "bg-green-500 border-green-600" : "border-gray-400 bg-white"}`}>
+                        {parseInt(status) === statusOption.id && <div className="w-3 h-3 bg-white rounded-full"></div>}
                       </div>
                       <span>{statusOption.status_name}</span>
                     </label>

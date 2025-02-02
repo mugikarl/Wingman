@@ -14,43 +14,26 @@ const StaffProfile = () => {
 
   // Fetch Employees
   const fetchEmployees = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get("http://127.0.0.1:8000/fetch-data/");
-      setEmployees(response.data);
-    } catch (error) {
-      console.error("Error fetching employees:", error);
-    } finally {
-      setLoading(false);
-    }
+  try {
+    setLoading(true);
+    const response = await axios.get("http://127.0.0.1:8000/fetch-data/");
+
+    // Extracting data correctly
+    setEmployees(response.data.employees || []);
+    setRoles(response.data.roles || []);
+    setStatuses(response.data.statuses || []);
+  } catch (error) {
+    console.error("Error fetching employees:", error);
+    setEmployees([]);
+    setRoles([]);
+    setStatuses([]);
+  } finally {
+    setLoading(false);
+  }
   };
-
-  // // Fetch Roles
-  // const fetchRoles = async () => {
-  //   try {
-  //     const response = await axios.get("http://127.0.0.1:8000/api/roles/");
-  //     setRoles(response.data || []);
-  //   } catch (error) {
-  //     console.error("Error fetching roles:", error);
-  //     setRoles([]);
-  //   }
-  // };
-
-  // // Fetch Statuses
-  // const fetchStatuses = async () => {
-  //   try {
-  //     const response = await axios.get("http://127.0.0.1:8000/api/statuses/");
-  //     setStatuses(response.data || []);
-  //   } catch (error) {
-  //     console.error("Error fetching statuses:", error);
-  //     setStatuses([]);
-  //   }
-  // };
 
   useEffect(() => {
     fetchEmployees();
-    // fetchRoles();
-    // fetchStatuses();
   }, []);
 
   const openAddModal = () => setIsAddModalOpen(true);
@@ -108,7 +91,7 @@ const StaffProfile = () => {
                   <td className="p-2">{employee.id}</td>
                   <td className="p-2">{employee.first_name} {employee.last_name}</td>
                   <td className="p-2">
-                    {employee.roles.length > 0 ? employee.roles.join(", ") : "No Role"}
+                    {employee.roles.map((role) => role.role_name).join(", ")}
                   </td>
                   <td className="p-2">
                     <button className="bg-blue-500 text-white p-1 rounded shadow">Time In</button>
@@ -128,8 +111,13 @@ const StaffProfile = () => {
       </div>
 
       {/* Add Profile Modal */}
-      <AddProfile isOpen={isAddModalOpen} closeModal={closeAddModal} fetchEmployees={fetchEmployees} />
-
+      <AddProfile 
+        isOpen={isAddModalOpen} 
+        closeModal={closeAddModal} 
+        fetchEmployees={fetchEmployees} 
+        roles={roles || []}
+        statuses={statuses || []} 
+      />
       {/* Edit Profile Modal */}
       {isEditModalOpen && selectedEmployee && (
         <EditProfile

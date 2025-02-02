@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 
-const AddProfile = ({ isOpen, closeModal, fetchEmployees }) => {
+const AddProfile = ({ isOpen, closeModal, fetchEmployees, roles, statuses }) => {
   if (!isOpen) return null; // Don't render the modal if it's not open
 
   const [firstName, setFirstName] = useState("");
@@ -11,13 +12,19 @@ const AddProfile = ({ isOpen, closeModal, fetchEmployees }) => {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [status, setStatus] = useState("");
   const [selectedRoles, setSelectedRoles] = useState([]);
 
+  const togglePasswordVisibility = () => {
+    setPasswordVisible(!passwordVisible);
+  };
+
   const handleRoleChange = (roleId) => {
-    setSelectedRoles((prev) =>
-      prev.includes(roleId)
-        ? prev.filter((id) => id !== roleId)
-        : [...prev, roleId]
+    setSelectedRoles((prevRoles) =>
+      prevRoles.includes(roleId)
+        ? prevRoles.filter((id) => id !== roleId)
+        : [...prevRoles, roleId]
     );
   };
 
@@ -30,19 +37,13 @@ const AddProfile = ({ isOpen, closeModal, fetchEmployees }) => {
       email,
       contact: contactNumber,
       base_salary: salary,
+      status: parseInt(status),
       passcode: password,
       roles: selectedRoles, // Send selected role IDs
     };
 
     try {
-      const response = await axios.post(
-        "http://localhost:8000/api/add-employee/",
-        employeeData,
-        {
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-
+      await axios.post(`http://127.0.0.1:8000/api/add-employee/`, employeeData);
       alert("Employee added successfully!");
       fetchEmployees(); // Refresh the table immediately
       closeModal(); // Close modal after success
@@ -52,188 +53,150 @@ const AddProfile = ({ isOpen, closeModal, fetchEmployees }) => {
     }
   };
 
-  const [passwordVisible, setPasswordVisible] = useState(false);
-
-  const togglePasswordVisibility = () => {
-    setPasswordVisible(!passwordVisible);
-  };
-
   return (
     <div className="fixed inset-0 flex justify-center items-center bg-gray-500 bg-opacity-50 p-4">
       <div className="bg-white rounded-lg p-6 w-8/10 space-y-4">
         {/* Modal Header */}
         <h2 className="text-2xl font-bold">Add New Staff Profile</h2>
 
-        {/* Staff Profile Form */}
         <div className="flex space-x-4">
-          {/* Left Column */}
-          <div className="flex flex-col space-y-4 w-1/2">
-            <div className="flex flex-col space-y-2">
-              <label htmlFor="firstName" className="text-sm font-medium">
-                First Name
-              </label>
-              <input
-                type="text"
-                id="firstName"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="p-2 border rounded-lg shadow-sm focus:outline-none"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <label htmlFor="lastName" className="text-sm font-medium">
-                Last Name
-              </label>
-              <input
-                type="text"
-                id="lastName"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="p-2 border rounded-lg shadow-sm focus:outline-none"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <label htmlFor="middleInitial" className="text-sm font-medium">
-                Middle Initial
-              </label>
-              <input
-                type="text"
-                id="middleInitial"
-                value={middleInitial}
-                onChange={(e) => setMiddleInitial(e.target.value)}
-                maxLength={2}
-                className="p-2 border rounded-lg shadow-sm focus:outline-none w-1/4"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <label htmlFor="contactNumber" className="text-sm font-medium">
-                Contact Number
-              </label>
-              <input
-                type="text"
-                id="contactNumber"
-                value={contactNumber}
-                onChange={(e) => setContactNumber(e.target.value)}
-                className="p-2 border rounded-lg shadow-sm focus:outline-none"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <label htmlFor="salary" className="text-sm font-medium">
-                Salary
-              </label>
-              <input
-                type="text"
-                id="salary"
-                value={salary}
-                onChange={(e) => setSalary(e.target.value)}
-                className="p-2 border rounded-lg shadow-sm focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Right Column */}
-          <div className="flex flex-col space-y-4 w-1/2">
-            <div className="flex flex-col space-y-2">
-              <label htmlFor="username" className="text-sm font-medium">
-                Username
-              </label>
-              <input
-                type="text"
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="p-2 border rounded-lg shadow-sm focus:outline-none"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="p-2 border rounded-lg shadow-sm focus:outline-none"
-              />
-            </div>
-            <div className="flex flex-col space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Password
-              </label>
-              <input
-                type={passwordVisible ? "text" : "password"}
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="p-2 border rounded-lg shadow-sm focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={togglePasswordVisibility}
-                className="text-blue-500 text-sm"
-              >
-                {passwordVisible ? "Hide" : "Show"} Password
-              </button>
-            </div>
-            <div className="flex flex-col space-y-2">
-              <label className="text-sm font-medium">Role</label>
-              <div className="flex space-x-4">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="role1"
-                    checked={selectedRoles.includes(1)}
-                    onChange={() => handleRoleChange(1)}
-                  />
-                  <label htmlFor="role1" className="text-sm">
-                    Admin
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="role2"
-                    checked={selectedRoles.includes(2)}
-                    onChange={() => handleRoleChange(2)}
-                  />
-                  <label htmlFor="role2" className="text-sm">
-                    Kitchen
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="role3"
-                    checked={selectedRoles.includes(3)}
-                    onChange={() => handleRoleChange(3)}
-                  />
-                  <label htmlFor="role3" className="text-sm">
-                    Waiter
-                  </label>
-                </div>
+            <div className="flex flex-col space-y-4 w-1/2">
+              {/* First Name */}
+              <div className="flex flex-col space-y-2">
+                <label htmlFor="firstName" className="text-sm font-medium">First Name</label>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="p-2 border rounded-lg"
+                />
               </div>
+
+              {/* Last Name */}
+              <div className="flex flex-col space-y-2">
+                <label htmlFor="lastName" className="text-sm font-medium">Last Name</label>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="p-2 border rounded-lg"
+                />
+              </div>
+              {/* Middle Initial */}
+              <div className="flex flex-col space-y-2">
+                <label htmlFor="middleInitial" className="text-sm font-medium">Middle Initial</label>
+                <input
+                  type="text"
+                  value={middleInitial}
+                  onChange={(e) => setMiddleInitial(e.target.value)}
+                  className="p-2 border rounded-lg"
+                />
+              </div>
+              {/* Contact Number */}
+              <div className="flex flex-col space-y-2">
+                <label htmlFor="contactNumber" className="text-sm font-medium">Contact Number</label>
+                <input
+                  type="text"
+                  value={contactNumber}
+                  onChange={(e) => setContactNumber(e.target.value)}
+                  className="p-2 border rounded-lg"
+                />
+              </div>
+              {/* Salary */}
+              <div className="flex flex-col space-y-2">
+                <label htmlFor="salary" className="text-sm font-medium">Salary</label>
+                <input
+                  type="text"
+                  value={salary}
+                  onChange={(e) => setSalary(e.target.value)}
+                  className="p-2 border rounded-lg"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col space-y-4 w-1/2">
+              {/* Username */}
+              <div className="flex flex-col space-y-2">
+                <label htmlFor="username" className="text-sm font-medium">Username</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="p-2 border rounded-lg"
+                />
+              </div>
+              {/* Email */}
+              <div className="flex flex-col space-y-2">
+                <label htmlFor="email" className="text-sm font-medium">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="p-2 border rounded-lg"
+                />
+              </div>
+              {/* Password */}
+              <div className="flex flex-col space-y-2">
+                <label htmlFor="passcode" className="text-sm font-medium">Passcode</label>
+                <input
+                  type="password"
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="p-2 border rounded-lg"
+                />
+                <button
+                  type="button"
+                  onClick={togglePasswordVisibility}
+                  className="text-blue-500 text-sm"
+                >
+                  {passwordVisible ? "Hide" : "Show"} Passcode
+                </button>
+              </div>
+              {/* Roles */}
+              <div className="flex flex-col space-y-2">
+                <label className="text-sm font-medium">Roles</label>
+                <div className="flex flex-wrap gap-2">
+                  {roles.map((role) => (
+                    <label key={role.id} className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedRoles.includes(role.id)}
+                        onChange={() => handleRoleChange(role.id)}
+                        className="hidden"
+                      />
+                      <div className={`w-5 h-5 border rounded-md flex items-center justify-center 
+                        ${selectedRoles.includes(role.id) ? "bg-blue-500 border-blue-600 text-white" : "border-gray-400 bg-white"}`}>
+                        {selectedRoles.includes(role.id) && "✓"}
+                      </div>
+                      <span>{role.role_name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>             
+              {/* Status */}
               <div className="flex flex-col space-y-2">
                 <label className="text-sm font-medium">Status</label>
                 <div className="flex space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <input type="checkbox" id="role1" />
-                    <label htmlFor="role1" className="text-sm">
-                      Employed
+                  {statuses.map((statusOption) => (
+                    <label key={statusOption.id} className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="status"
+                        value={statusOption.id}
+                        checked={parseInt(status) === statusOption.id}
+                        onChange={(e) => setStatus(parseInt(e.target.value))}
+                        className="hidden"
+                      />
+                      <div className={`w-5 h-5 border rounded-full flex items-center justify-center 
+                        ${parseInt(status) === statusOption.id ? "bg-green-500 border-green-600" : "border-gray-400 bg-white"}`}>
+                        {parseInt(status) === statusOption.id && <div className="w-3 h-3 bg-white rounded-full"></div>}
+                      </div>
+                      <span>{statusOption.status_name}</span>
                     </label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input type="checkbox" id="role2" />
-                    <label htmlFor="role2" className="text-sm">
-                      Resigned
-                    </label>
-                  </div>
+                  ))}
                 </div>
               </div>
             </div>
           </div>
-        </div>
-
         {/* Modal Footer */}
         <div className="flex justify-center space-x-4 mt-4">
           <button
