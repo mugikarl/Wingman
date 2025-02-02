@@ -161,7 +161,7 @@ const EditProfile = ({ isOpen, closeModal, employee, fetchEmployees, roles, stat
               <div className="flex flex-col space-y-2">
                 <label htmlFor="passcode" className="text-sm font-medium">Passcode</label>
                 <input
-                  type="password"
+                  type={passwordVisible ? "text" : "password"}
                   onChange={(e) => setPassword(e.target.value)}
                   className="p-2 border rounded-lg"
                   disabled={!isEditMode}

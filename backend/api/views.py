@@ -223,7 +223,7 @@ def edit_employee(request, employee_id):
         base_salary = data.get("base_salary")
         passcode = data.get("passcode")
         roles = data.get("roles", []) # List of role IDs
-        status = data.get("status_id")
+        status_id = data.get("status_id")
         
         # Hash the password before storing
         hashed_password = make_password(passcode)
@@ -237,7 +237,7 @@ def edit_employee(request, employee_id):
             "email": email,
             "contact": contact,
             "base_salary": base_salary,
-            "status_id": status,
+            "status_id": status_id,
             "passcode": hashed_password
         }
 
