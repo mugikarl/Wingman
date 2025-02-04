@@ -172,7 +172,7 @@ const AddProfile = ({ isOpen, closeModal, fetchEmployees, roles, statuses }) => 
                   ))}
                 </div>
               </div>             
-              {/* Status */}
+              {/* Status
               <div className="flex flex-col space-y-2">
                 <label className="text-sm font-medium">Status</label>
                 <div className="flex space-x-4">
@@ -194,7 +194,7 @@ const AddProfile = ({ isOpen, closeModal, fetchEmployees, roles, statuses }) => 
                     </label>
                   ))}
                 </div>
-              </div>
+              </div> */}
             </div>
           </div>
         {/* Modal Footer */}

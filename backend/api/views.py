@@ -164,7 +164,8 @@ def add_employee(request):
             "email": email,
             "contact": contact,
             "base_salary": base_salary,
-            "passcode": hashed_password
+            "passcode": hashed_password,
+            "status_id": 1 #To ensure the employee gets the active role automatically
         }
 
         # Insert employee record
