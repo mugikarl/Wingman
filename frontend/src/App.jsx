@@ -1,22 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/navigations/Sidebar";
+import SidebarEmployee from "./components/navigations/SidebarEmployee";
 import Inventory from "./pages/Inventory";
-import DisposedItems from "./pages/DisposedItems";
+import DisposedItems from "./pages/Inventory/DisposedItems";
 import StaffProfile from "./pages/StaffProfile";
-import Schedule from "./pages/schedule";
+import Schedule from "./pages/Staff Profile/Schedule";
 import LegendModal from "./components/popups/LegendModal";
 import EmployeeLeave from "./components/popups/EmployeeLeave";
 import Holidays from "./components/popups/Holidays";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
-import Menu from "./pages/Menu";
-import StockIn from "./components/popups/StockIn";
-import Order from "./pages/Order";
+import Menu from "./pages/Inventory/Menu";
+import StockIn from "./pages/Inventory/StockIn";
+import Order from "./pages/Order/Order";
 import Ordertable from "./pages/Ordertable";
 import ChooseOrder from "./components/popups/ChooseOrder";
 import Sales from "./pages/Sales"
-import SalesCalendar from "./pages/SalesCalendar"
+import SalesCalendar from "./pages/Sales/SalesCalendar"
 import AdminRoute from "./components/AdminRoute";
 import TestConnection from "./pages/TestConnection";
 

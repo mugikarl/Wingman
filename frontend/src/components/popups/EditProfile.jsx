@@ -79,6 +79,9 @@ const EditProfile = ({ isOpen, closeModal, fetchEmployees, employee }) => {
   return (
     <div className="fixed inset-0 flex justify-center items-center bg-gray-500 bg-opacity-50 p-4">
       <div className="bg-white rounded-lg p-6 w-8/10 space-y-4">
+      <button onClick={closeModal} className="text-gray-500 hover:text-gray-800">
+      &times;
+          </button>
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Edit Staff Profile</h2>
           <button
@@ -256,9 +259,6 @@ const EditProfile = ({ isOpen, closeModal, fetchEmployees, employee }) => {
           </div>
         </div>
         <div className="flex justify-center space-x-4 mt-4">
-          <button onClick={closeModal} className="bg-red-500 text-white p-2 rounded-lg w-1/3">
-            Cancel
-          </button>
           <button
             onClick={handleSubmit}
             className="bg-green-500 text-white p-2 rounded-lg w-1/3"

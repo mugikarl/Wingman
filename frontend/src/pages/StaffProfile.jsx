@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
-import AddProfile from "../components/popups/AddProfile"; 
-import EditProfile from "../components/popups/EditProfile"; 
+import AddProfile from "../components/popups/AddProfile";
+import EditProfile from "../components/popups/EditProfile";
+import Table from "../components/tables/Table";
 
 const StaffProfile = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -36,6 +37,16 @@ const StaffProfile = () => {
     setSelectedEmployee(null);
   };
 
+  const columns = ["ID", "NAME", "ROLE", "TIME IN", "TIME OUT"];
+
+  const data = employees.length > 0 ? employees.map((employee) => [
+    employee.id,
+    `${employee.first_name} ${employee.last_name}`,
+    employee.roles.length > 0 ? employee.roles.join(", ") : "No Role",
+    <button className="bg-blue-500 text-white p-1 rounded shadow">Time In</button>,
+    <button className="bg-red-500 text-white p-1 rounded shadow">Time Out</button>
+  ]) : [];
+
   return (
     <div className="flex-grow p-6">
       {/* Top Section */}
@@ -45,72 +56,25 @@ const StaffProfile = () => {
             Button 1
           </button>
           <button
-            onClick={openAddModal} 
+            onClick={openAddModal}
             className="bg-[#E88504] text-white p-2 rounded-lg shadow"
           >
             Add New Profile
           </button>
           <Link to="/schedule">
-          <button className="bg-green-500 text-white p-2 rounded-lg shadow">
-            Schedule
-          </button>
+            <button className="bg-green-500 text-white p-2 rounded-lg shadow">
+              Schedule
+            </button>
           </Link>
         </div>
       </div>
 
       {/* Table */}
-      <div className="table-container border rounded-lg shadow overflow-x-auto">
-        <table className="table-auto w-full text-left">
-          <thead className="bg-[#FFCF03] font-bold">
-            <tr>
-              <th className="p-1">Employee</th>
-              <th className="p-1">Resigned</th>
-            </tr>
-            <tr>
-              <th className="p-2">ID</th>
-              <th className="p-2">NAME</th>
-              <th className="p-2">ROLE</th>
-              <th className="p-2">TIME IN</th>
-              <th className="p-2">TIME OUT</th>
-            </tr>
-          </thead>
-          <tbody>
-            {employees.length > 0 ? (
-              employees.map((employee) => (
-                <tr
-                  key={employee.id}
-                  className="bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
-                  onClick={() => openEditModal(employee)}
-                >
-                  <td className="p-2">{employee.id}</td>
-                  <td className="p-2">
-                    {employee.first_name} {employee.last_name}
-                  </td>
-                  <td className="p-2">
-                    {employee.roles.length > 0 ? employee.roles.join(", ") : "No Role"}
-                  </td>
-                  <td className="p-2">
-                    <button className="bg-blue-500 text-white p-1 rounded shadow">
-                      Time In
-                    </button>
-                  </td>
-                  <td className="p-2">
-                    <button className="bg-red-500 text-white p-1 rounded shadow">
-                      Time Out
-                    </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td className="p-2 text-center" colSpan="5">
-                  Load
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Table 
+        columns={columns} 
+        data={data} 
+        rowOnClick={(index) => openEditModal(employees[index])} 
+      />
 
       {/* Add Profile Modal */}
       <AddProfile isOpen={isAddModalOpen} closeModal={closeAddModal} fetchEmployees={fetchEmployees} />

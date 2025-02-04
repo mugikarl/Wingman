@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import LegendModal from "../components/popups/LegendModal";
-import EmployeeLeave from "../components/popups/EmployeeLeave";
-import Holidays from "../components/popups/Holidays";
+import LegendModal from "../../components/popups/LegendModal";
+import EmployeeLeave from "../../components/popups/EmployeeLeave";
+import Holidays from "../../components/popups/Holidays";
 
 const Schedule = () => {
   const [isLegendOpen, setIsLegendOpen] = useState(false);

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import NewProduct from "../components/popups/Newproduct"; // Import NewProduct component
+import Table from "../components/tables/Table";
 
 const Inventory = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -12,6 +13,26 @@ const Inventory = () => {
   const closeModal = () => {
     setIsModalOpen(false);
   };
+
+  const columns = ["ID", "PRODUCT NAME", "UNIT", "QUANTITY", "CATEGORY", "STOCK OUT"];
+  const data = [
+    [
+      "1",
+      "Sample Product",
+      "pcs",
+      "10",
+      "Category A",
+      <button className="bg-red-500 text-white p-1 rounded shadow">STOCK OUT</button>
+    ],
+    [
+      "2",
+      "Another Product",
+      "kg",
+      "5",
+      "Category B",
+      <button className="bg-red-500 text-white p-1 rounded shadow">STOCK OUT</button>
+    ]
+  ];
 
   return (
     <div className="min-h-screen w-full bg-[#E2D6D5] flex">
@@ -80,39 +101,14 @@ const Inventory = () => {
               </button>
             </Link>
           </div>
-          </div>
+        </div>
 
         {/* Table */}
-        <div className="overflow-x-auto border rounded-lg shadow">
-          <table className="table-auto w-full text-left">
-            <thead className="bg-[#FFCF03] font-bold">
-              <tr>
-                <th className="p-2">ID</th>
-                <th className="p-2">PRODUCT NAME</th>
-                <th className="p-2">UNIT</th>
-                <th className="p-2">QUANTITY</th>
-                <th className="p-2">CATEGORY</th>
-                <th className="p-2">STOCK OUT</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="bg-[#FFEEA6]">
-                <td className="p-2">Data 1</td>
-                <td className="p-2">Data 2</td>
-                <td className="p-2">Data 3</td>
-                <td className="p-2">Data 4</td>
-                <td className="p-2">Data 5</td>
-                <td className="p-2">
-                  <button className="bg-red-500 text-white p-1 rounded shadow">STOCK OUT</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+        <Table columns={columns} data={data} />
 
-      {/* New Product Modal */}
-      <NewProduct isOpen={isModalOpen} closeModal={closeModal} />
+        {/* New Product Modal */}
+        <NewProduct isOpen={isModalOpen} closeModal={closeModal} />
+      </div>
     </div>
   );
 };
