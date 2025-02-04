@@ -195,7 +195,7 @@ def delete_employee(request, employee_id):
         
         if not response.data:
             return JsonResponse({"error": "Employee not found"}, status=404)
-        
+            
         # Delete associated roles first
         supabase.table("api_employee_role").delete().eq("employee_id", employee_id).execute()
         

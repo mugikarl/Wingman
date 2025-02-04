@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import AddProfile from "../components/popups/AddProfile"; 
-import EditProfile from "../components/popups/EditProfile"; 
+import AddProfile from "../components/popups/AddProfile";
+import EditProfile from "../components/popups/EditProfile";
 
 const StaffProfile = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -11,25 +11,30 @@ const StaffProfile = () => {
   const [roles, setRoles] = useState([]);
   const [statuses, setStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState(1);
 
   // Fetch Employees
   const fetchEmployees = async () => {
-  try {
-    setLoading(true);
-    const response = await axios.get("http://127.0.0.1:8000/fetch-data/");
+    try {
+      setLoading(true);
+      const response = await axios.get("http://127.0.0.1:8000/fetch-data/");
 
-    // Extracting data correctly
-    setEmployees(response.data.employees || []);
-    setRoles(response.data.roles || []);
-    setStatuses(response.data.statuses || []);
-  } catch (error) {
-    console.error("Error fetching employees:", error);
-    setEmployees([]);
-    setRoles([]);
-    setStatuses([]);
-  } finally {
-    setLoading(false);
-  }
+      const sortedEmployees = (response.data.employees || []).sort(
+        (a, b) => a.id - b.id
+      );
+
+      // Extracting data correctly
+      setEmployees(response.data.employees || []);
+      setRoles(response.data.roles || []);
+      setStatuses(response.data.statuses || []);
+    } catch (error) {
+      console.error("Error fetching employees:", error);
+      setEmployees([sortedEmployees]);
+      setRoles([]);
+      setStatuses([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -53,11 +58,40 @@ const StaffProfile = () => {
     <div className="flex-grow p-6">
       {/* Top Section */}
       <div className="flex items-start mb-4 space-x-4">
-        <button className="bg-blue-500 text-white p-2 rounded-lg shadow">Button 1</button>
-        <button onClick={openAddModal} className="bg-[#E88504] text-white p-2 rounded-lg shadow">
+        <button className="bg-blue-500 text-white p-2 rounded-lg shadow">
+          Button 1
+        </button>
+        <button
+          onClick={openAddModal}
+          className="bg-[#E88504] text-white p-2 rounded-lg shadow"
+        >
           Add New Profile
         </button>
-        <button className="bg-green-500 text-white p-2 rounded-lg shadow">Button 3</button>
+        <button className="bg-green-500 text-white p-2 rounded-lg shadow">
+          Button 3
+        </button>
+      </div>
+      <div className="flex items-start mb-4 space-x-4">
+        <button
+          className={`p-2 rounded-lg shadow ${
+            filterStatus === 1
+              ? "bg-blue-700 text-white"
+              : "bg-blue-500 text-gray-200"
+          }`}
+          onClick={() => setFilterStatus(1)}
+        >
+          Active
+        </button>
+        <button
+          className={`p-2 rounded-lg shadow ${
+            filterStatus === 2
+              ? "bg-red-700 text-white"
+              : "bg-red-500 text-gray-200"
+          }`}
+          onClick={() => setFilterStatus(2)}
+        >
+          Inactive
+        </button>
       </div>
 
       {/* Table */}
@@ -79,31 +113,44 @@ const StaffProfile = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td className="p-2 text-center" colSpan="5">Loading...</td>
+                <td className="p-2 text-center" colSpan="5">
+                  Loading...
+                </td>
               </tr>
-            ) : employees.length > 0 ? (
-              employees.map((employee) => (
-                <tr
-                  key={employee.id}
-                  className="bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
-                  onClick={() => openEditModal(employee)}
-                >
-                  <td className="p-2">{employee.id}</td>
-                  <td className="p-2">{employee.first_name} {employee.last_name}</td>
-                  <td className="p-2">
-                    {employee.roles.map((role) => role.role_name).join(", ")}
-                  </td>
-                  <td className="p-2">
-                    <button className="bg-blue-500 text-white p-1 rounded shadow">Time In</button>
-                  </td>
-                  <td className="p-2">
-                    <button className="bg-red-500 text-white p-1 rounded shadow">Time Out</button>
-                  </td>
-                </tr>
-              ))
+            ) : employees.filter((emp) => emp.status === filterStatus).length >
+              0 ? (
+              employees
+                .filter((emp) => emp.status === filterStatus)
+                .map((employee) => (
+                  <tr
+                    key={employee.id}
+                    className="bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
+                    onClick={() => openEditModal(employee)}
+                  >
+                    <td className="p-2">{employee.id}</td>
+                    <td className="p-2">
+                      {employee.first_name} {employee.last_name}
+                    </td>
+                    <td className="p-2">
+                      {employee.roles.map((role) => role.role_name).join(", ")}
+                    </td>
+                    <td className="p-2">
+                      <button className="bg-blue-500 text-white p-1 rounded shadow">
+                        Time In
+                      </button>
+                    </td>
+                    <td className="p-2">
+                      <button className="bg-red-500 text-white p-1 rounded shadow">
+                        Time Out
+                      </button>
+                    </td>
+                  </tr>
+                ))
             ) : (
               <tr>
-                <td className="p-2 text-center" colSpan="5">No employees found.</td>
+                <td className="p-2 text-center" colSpan="5">
+                  No employees found.
+                </td>
               </tr>
             )}
           </tbody>
@@ -111,12 +158,12 @@ const StaffProfile = () => {
       </div>
 
       {/* Add Profile Modal */}
-      <AddProfile 
-        isOpen={isAddModalOpen} 
-        closeModal={closeAddModal} 
-        fetchEmployees={fetchEmployees} 
+      <AddProfile
+        isOpen={isAddModalOpen}
+        closeModal={closeAddModal}
+        fetchEmployees={fetchEmployees}
         roles={roles || []}
-        statuses={statuses || []} 
+        statuses={statuses || []}
       />
       {/* Edit Profile Modal */}
       {isEditModalOpen && selectedEmployee && (
