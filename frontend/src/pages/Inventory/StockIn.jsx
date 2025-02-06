@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import Table from "../components/tables/Table";
+import Table from "../../components/tables/Table";
 
 const StockIn = () => {
   const columns = ["ID", "PRODUCT NAME", "UNIT", "QUANTITY", "TOTAL COST", "ACTION"];
