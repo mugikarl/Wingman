@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import NewProduct from "../components/popups/Newproduct"; // Import NewProduct component
+import NewProduct from "../components/popups/NewProduct";
+import Table from "../components/tables/Table";
 
 const Inventory = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -12,6 +13,26 @@ const Inventory = () => {
   const closeModal = () => {
     setIsModalOpen(false);
   };
+
+  const columns = ["ID", "PRODUCT NAME", "UNIT", "QUANTITY", "CATEGORY", "STOCK OUT"];
+  const data = [
+    [
+      "1",
+      "Sample Product",
+      "pcs",
+      "10",
+      "Category A",
+      <button className="bg-red-500 text-white p-1 rounded shadow">STOCK OUT</button>
+    ],
+    [
+      "2",
+      "Another Product",
+      "kg",
+      "5",
+      "Category B",
+      <button className="bg-red-500 text-white p-1 rounded shadow">STOCK OUT</button>
+    ]
+  ];
 
   return (
     <div className="min-h-screen w-full bg-[#E2D6D5] flex">
@@ -49,63 +70,45 @@ const Inventory = () => {
 
           {/* Side Buttons with Image and Text */}
           <div className="w-1/2 grid grid-cols-4 gap-4">
+            {/* New Product Button */}
             <button
               onClick={openModal}
-              className="flex flex-col items-center bg-[#E88504] p-2 rounded-lg shadow min-w-[25%]"
+              className="flex flex-col items-center justify-center bg-[#E88504] p-4 rounded-lg shadow hover:shadow-lg w-full h-28"
             >
               <img src="/images/stockout/cart.png" alt="New Product" className="w-10 h-10 mb-2" />
               <span className="text-white">New Product</span>
             </button>
+
+            {/* Other Buttons */}
             <Link to="/menu">
-              <button className="flex flex-col items-center bg-[#E88504] p-2 rounded-lg shadow min-w-[25%]">
+              <button className="flex flex-col items-center justify-center bg-[#E88504] p-4 rounded-lg shadow hover:shadow-lg w-full h-28">
                 <img src="/images/stockout/menu.png" alt="Menu" className="w-10 h-10 mb-2" />
                 <span className="text-white">Menu</span>
               </button>
             </Link>
+
             <Link to="/stockin">
-              <button className="flex flex-col items-center bg-[#00BA34] p-2 rounded-lg shadow min-w-[25%]">
+              <button className="flex flex-col items-center justify-center bg-[#00BA34] p-4 rounded-lg shadow hover:shadow-lg w-full h-28">
                 <img src="/images/stockout/stock.png" alt="Stock In" className="w-10 h-10 mb-2" />
                 <span className="text-white">Stock In</span>
               </button>
             </Link>
-            <button className="flex flex-col items-center bg-[#FF0000] p-2 rounded-lg shadow min-w-[25%]">
-              <img src="/images/stockout/trash.png" alt="Disposed" className="w-10 h-10 mb-2" />
-              <span className="text-white">Disposed</span>
-            </button>
+
+            <Link to="/disposeditems">
+              <button className="flex flex-col items-center justify-center bg-[#FF0000] p-4 rounded-lg shadow hover:shadow-lg w-full h-28">
+                <img src="/images/stockout/trash.png" alt="Disposed" className="w-10 h-10 mb-2" />
+                <span className="text-white">Disposed</span>
+              </button>
+            </Link>
           </div>
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto border rounded-lg shadow">
-          <table className="table-auto w-full text-left">
-            <thead className="bg-[#FFCF03] font-bold">
-              <tr>
-                <th className="p-2">ID</th>
-                <th className="p-2">PRODUCT NAME</th>
-                <th className="p-2">UNIT</th>
-                <th className="p-2">QUANTITY</th>
-                <th className="p-2">CATEGORY</th>
-                <th className="p-2">STOCK OUT</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="bg-[#FFEEA6]">
-                <td className="p-2">Data 1</td>
-                <td className="p-2">Data 2</td>
-                <td className="p-2">Data 3</td>
-                <td className="p-2">Data 4</td>
-                <td className="p-2">Data 5</td>
-                <td className="p-2">
-                  <button className="bg-red-500 text-white p-1 rounded shadow">STOCK OUT</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+        <Table columns={columns} data={data} />
 
-      {/* New Product Modal */}
-      <NewProduct isOpen={isModalOpen} closeModal={closeModal} />
+        {/* New Product Modal */}
+        <NewProduct isOpen={isModalOpen} closeModal={closeModal} />
+      </div>
     </div>
   );
 };

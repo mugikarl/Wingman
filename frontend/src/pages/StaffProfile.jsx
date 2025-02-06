@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { Link } from "react-router-dom";
 import AddProfile from "../components/popups/AddProfile";
 import EditProfile from "../components/popups/EditProfile";
 
@@ -67,13 +68,15 @@ const StaffProfile = () => {
         >
           Add New Profile
         </button>
-        <button className="bg-green-500 text-white p-2 rounded-lg shadow">
-          Button 3
-        </button>
+        <Link to="/schedule">
+            <button className="bg-green-500 text-white p-2 rounded-lg shadow">
+              Schedule
+            </button>
+          </Link>
       </div>
-      <div className="flex items-start mb-4 space-x-4">
+      <div>
         <button
-          className={`p-2 rounded-lg shadow ${
+          className={`p-2 shadow w-40 ${
             filterStatus === 1
               ? "bg-blue-700 text-white"
               : "bg-blue-500 text-gray-200"
@@ -83,7 +86,7 @@ const StaffProfile = () => {
           Active
         </button>
         <button
-          className={`p-2 rounded-lg shadow ${
+          className={`p-2 shadow w-40 ${
             filterStatus === 2
               ? "bg-red-700 text-white"
               : "bg-red-500 text-gray-200"
@@ -98,10 +101,6 @@ const StaffProfile = () => {
       <div className="table-container border rounded-lg shadow overflow-x-auto">
         <table className="table-auto w-full text-left">
           <thead className="bg-[#FFCF03] font-bold">
-            <tr>
-              <th className="p-1">Employee</th>
-              <th className="p-1">Resigned</th>
-            </tr>
             <tr>
               <th className="p-2">ID</th>
               <th className="p-2">NAME</th>
