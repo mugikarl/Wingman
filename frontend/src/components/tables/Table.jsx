@@ -11,6 +11,7 @@ const Table = ({ columns, data, rowOnClick }) => {
             ))}
           </tr>
         </thead>
+        
         <tbody>
           {data.length > 0 ? (
             data.map((row, rowIndex) => (
