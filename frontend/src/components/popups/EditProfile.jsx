@@ -83,8 +83,11 @@ const EditProfile = ({
     isOpen && (
       <div className="fixed inset-0 flex justify-center items-center bg-gray-500 bg-opacity-50 p-4">
         <div className="bg-white rounded-lg p-6 w-8/10 space-y-4">
-        <button onClick={closeModal} className="text-gray-500 hover:text-gray-800">
-      &times;
+          <button
+            onClick={closeModal}
+            className="text-gray-500 hover:text-gray-800"
+          >
+            &times;
           </button>
           <div className="flex justify-between">
             <h2 className="text-2xl font-bold">Edit Staff Profile</h2>
@@ -164,7 +167,7 @@ const EditProfile = ({
             </div>
 
             <div className="flex flex-col space-y-4 w-1/2">
-              {/* Username */}
+              {/* Username
               <div className="flex flex-col space-y-2">
                 <label htmlFor="username" className="text-sm font-medium">
                   Username
@@ -176,7 +179,7 @@ const EditProfile = ({
                   className="p-2 border rounded-lg"
                   disabled={!isEditMode}
                 />
-              </div>
+              </div> */}
               {/* Email */}
               <div className="flex flex-col space-y-2">
                 <label htmlFor="email" className="text-sm font-medium">

@@ -3,28 +3,29 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const Login = ({ setIsAdmin }) => {
-  const [username, setUsername] = useState('');
-  const [passcode, setPasscode] = useState('');
+  const [email, setEmail] = useState(""); // Changed from username to email
+  const [passcode, setPasscode] = useState("");
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
+      // Send email and passcode to the login endpoint
       const response = await axios.post("http://127.0.0.1:8000/api/login/", {
-        username,
+        email,
         passcode,
       });
       console.log("Login successful:", response.data);
-  
+
       // Save tokens, role, and admin ID to local storage
       localStorage.setItem("access_token", response.data.access_token);
       localStorage.setItem("refresh_token", response.data.refresh_token);
       localStorage.setItem("role", "Admin");
       localStorage.setItem("admin_id", response.data.admin_id); // Save admin ID (employee ID)
-  
+
       // Set admin state to true
       setIsAdmin(true);
-  
+
       // Navigate to dashboard with admin ID in the URL
       navigate(`/dashboard-admin/${response.data.admin_id}`);
     } catch (error) {
@@ -51,20 +52,20 @@ const Login = ({ setIsAdmin }) => {
         {/* Bottom Section: Login Form */}
         <div className="p-6">
           <form onSubmit={handleLogin}>
-            {/* Username Field */}
+            {/* Email Field */}
             <div className="relative mb-4">
               <div className="flex items-center border rounded-[15px] border-gray-300">
                 <img
                   src="/images/username.png"
-                  alt="Username Icon"
+                  alt="Email Icon"
                   className="h-10 w-10 p-2"
                 />
                 <div className="h-full w-[1px] bg-gray-300"></div>
                 <input
-                  type="text"
-                  placeholder="Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full py-2 px-3 focus:outline-none rounded-r-[15px]"
                 />
               </div>
@@ -80,7 +81,7 @@ const Login = ({ setIsAdmin }) => {
                 />
                 <div className="h-full w-[1px] bg-gray-300"></div>
                 <input
-                  type={"password"} // Change type based on state
+                  type="password"
                   placeholder="Passcode"
                   value={passcode}
                   onChange={(e) => setPasscode(e.target.value)}

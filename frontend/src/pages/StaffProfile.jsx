@@ -20,9 +20,9 @@ const StaffProfile = () => {
       setLoading(true);
       const response = await axios.get("http://127.0.0.1:8000/fetch-data/");
 
-      const sortedEmployees = (response.data.employees || []).sort(
-        (a, b) => a.id - b.id
-      );
+      // const sortedEmployees = (response.data.employees || []).sort(
+      //   (a, b) => a.id - b.id
+      // );
 
       // Extracting data correctly
       setEmployees(response.data.employees || []);
@@ -30,7 +30,7 @@ const StaffProfile = () => {
       setStatuses(response.data.statuses || []);
     } catch (error) {
       console.error("Error fetching employees:", error);
-      setEmployees([sortedEmployees]);
+      //setEmployees([sortedEmployees]);
       setRoles([]);
       setStatuses([]);
     } finally {
@@ -69,10 +69,10 @@ const StaffProfile = () => {
           Add New Profile
         </button>
         <Link to="/schedule">
-            <button className="bg-green-500 text-white p-2 rounded-lg shadow">
-              Schedule
-            </button>
-          </Link>
+          <button className="bg-green-500 text-white p-2 rounded-lg shadow">
+            Schedule
+          </button>
+        </Link>
       </div>
       <div>
         <button
