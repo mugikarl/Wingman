@@ -18,19 +18,18 @@ const StaffProfile = () => {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const response = await axios.get("http://127.0.0.1:8000/fetch-data/");
+      const token = localStorage.getItem("access_token"); // Retrieve token
+      const response = await axios.get("http://127.0.0.1:8000/fetch-data/", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-      // const sortedEmployees = (response.data.employees || []).sort(
-      //   (a, b) => a.id - b.id
-      // );
-
-      // Extracting data correctly
       setEmployees(response.data.employees || []);
       setRoles(response.data.roles || []);
       setStatuses(response.data.statuses || []);
     } catch (error) {
       console.error("Error fetching employees:", error);
-      //setEmployees([sortedEmployees]);
       setRoles([]);
       setStatuses([]);
     } finally {

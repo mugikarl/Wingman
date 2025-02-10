@@ -3,56 +3,73 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const Login = ({ setIsAdmin }) => {
-  const [email, setEmail] = useState(""); // Changed from username to email
+  const [email, setEmail] = useState("");
   const [passcode, setPasscode] = useState("");
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setError("");
+
     try {
-      // Send email and passcode to the login endpoint
-      const response = await axios.post("http://127.0.0.1:8000/api/login/", {
-        email,
-        passcode,
-      });
-      console.log("Login successful:", response.data);
+      const response = await axios.post(
+        "http://localhost:8000/api/login/",
+        { email, passcode },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-      // Save tokens, role, and admin ID to local storage
-      localStorage.setItem("access_token", response.data.access_token);
-      localStorage.setItem("refresh_token", response.data.refresh_token);
-      localStorage.setItem("role", "Admin");
-      localStorage.setItem("admin_id", response.data.admin_id); // Save admin ID (employee ID)
+      console.log("Backend Response:", response.data);
 
-      // Set admin state to true
-      setIsAdmin(true);
+      // Extract the access token from the response.
+      // (Depending on your backend, it might be returned directly in access_token
+      //  or inside a session object.)
+      const access_token =
+        response.data.access_token || response.data.session?.access_token;
+      const is_admin = response.data.is_admin || false;
 
-      // Navigate to dashboard with admin ID in the URL
-      navigate(`/dashboard-admin/${response.data.admin_id}`);
-    } catch (error) {
-      console.error("Login failed:", error);
+      if (!access_token) {
+        throw new Error("No token received from backend");
+      }
+
+      localStorage.setItem("access_token", access_token);
+      axios.defaults.headers.common["Authorization"] = `Bearer ${access_token}`;
+
+      // Proceed only if the user is an admin.
+      if (is_admin) {
+        setIsAdmin(true);
+        localStorage.setItem("role", "Admin");
+        navigate("/dashboard-admin");
+      } else {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        setError("Access denied: Only Admins can log in");
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      // Display the error message returned from the backend, or a generic message.
+      setError(err.response?.data?.error || "Login failed");
     }
   };
 
   return (
     <div className="bg-[#FFCF03] h-screen flex flex-col justify-center">
-      {/* Container */}
       <div className="w-full max-w-md mx-auto rounded-lg">
-        {/* Top Section: Logo */}
         <div className="p-4 flex justify-center">
           <img src="/images/bawkbawk 2.png" alt="Logo" className="h-32" />
         </div>
-
-        {/* Middle Section: App Name */}
         <div className="text-center py-2">
           <h1 className="text-6xl italic font-family['Bangers'] text-outline text-[#E88504] drop-shadow">
             WINGMAN
           </h1>
         </div>
-
-        {/* Bottom Section: Login Form */}
         <div className="p-6">
+          {error && <p style={{ color: "red" }}>{error}</p>}
           <form onSubmit={handleLogin}>
-            {/* Email Field */}
             <div className="relative mb-4">
               <div className="flex items-center border rounded-[15px] border-gray-300">
                 <img
@@ -67,11 +84,10 @@ const Login = ({ setIsAdmin }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full py-2 px-3 focus:outline-none rounded-r-[15px]"
+                  required
                 />
               </div>
             </div>
-
-            {/* Password Field */}
             <div className="relative mb-4">
               <div className="flex items-center border rounded-[15px] border-gray-300">
                 <img
@@ -86,11 +102,10 @@ const Login = ({ setIsAdmin }) => {
                   value={passcode}
                   onChange={(e) => setPasscode(e.target.value)}
                   className="w-full py-2 px-3 focus:outline-none rounded-r-[15px]"
+                  required
                 />
               </div>
             </div>
-
-            {/* Login Button */}
             <button
               type="submit"
               className="w-full bg-[#E88504] text-white font-bold py-2 px-4 rounded-none"

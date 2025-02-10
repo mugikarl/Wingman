@@ -9,13 +9,14 @@ from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
 from django.http import JsonResponse
 from .serializers import *
 from .models import *
-from .supabase_client import supabase
+from .supabase_client import supabase_anon, supabase_service, jwt_secret, validate_jwt
 from django.views.decorators.csrf import csrf_exempt
 import json
+import jwt
 
 # def fetch_data(request):
 #     try:
@@ -25,22 +26,48 @@ import json
 #     except Exception as e:
 #         return JsonResponse({'error': str(e)}, status=500)
 
+# Custom permission: Only allow Supabase-admin users
+# class IsSupabaseAdmin(BasePermission):
+#     def has_permission(self, request, view):
+#         return request.user and request.user.get("user_metadata", {}).get("role") == "admin"
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def fetch_data(request):
     try:
-        # Fetch statuses
-        status_response = supabase.table("employee_status").select("id, status_name").execute()
+        # Extract the token from the Authorization header (if provided)
+        auth_header = request.headers.get("Authorization")
+        token = None
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+
+        # Decide which Supabase client to use
+        if token:
+            # No JWT validation needed; directly use the service client.
+            supabase_client = supabase_service
+        else:
+            # Use the pre-initialized anonymous client if no token is provided.
+            supabase_client = supabase_anon
+
+        # Now perform your queries using the chosen client.
+        status_response = supabase_client.table("employee_status") \
+            .select("id, status_name") \
+            .execute()
         statuses = status_response.data if status_response.data else []
-        
-        # Fetch roles
-        roles_response = supabase.table("role").select("id, role_name").execute()
+        print("Status response:", status_response)
+
+        roles_response = supabase_client.table("role") \
+            .select("id, role_name") \
+            .execute()
         roles = roles_response.data if roles_response.data else []
-        
-        # Fetch employees with roles
-        response = supabase.table("employee").select(
-        "*, employee_role(role_id, role(id, role_name)), employee_status!employee_status_id_fkey(id, status_name)").execute()
-        employees = response.data if response.data else []
-        
-        # Restructure the employee response for better readability
+
+        employee_response = supabase_client.table("employee") \
+            .select("*, employee_role(role_id, role(id, role_name)), employee_status!employee_status_id_fkey(id, status_name)") \
+            .execute()
+        employees = employee_response.data if employee_response.data else []
+
+        # Reformat the employee data for better readability.
         formatted_employees = []
         for employee in employees:
             employee_roles = [
@@ -55,14 +82,12 @@ def fetch_data(request):
                 "id": employee["id"],
                 "first_name": employee["first_name"],
                 "last_name": employee["last_name"],
-                # "email": employee["email"],
-                # "username": employee["username"],
                 "contact": employee["contact"],
                 "base_salary": employee["base_salary"],
-                "roles": employee_roles,  # List of role names
+                "roles": employee_roles,
                 "status": employee.get("status_id")
             })
-        
+
         return JsonResponse({
             "statuses": statuses,
             "roles": roles,
@@ -71,75 +96,61 @@ def fetch_data(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+
+
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
 def login_view(request):
     try:
-        data = json.loads(request.body.decode("utf-8"))
+        data = json.loads(request.body)
         email = data.get("email")
         passcode = data.get("passcode")
 
-        # Validate input
         if not email or not passcode:
             return JsonResponse({"error": "Both email and passcode are required"}, status=400)
 
-        # Step 1: Sign in using Supabase Auth with the new method name.
-        auth_response = supabase.auth.sign_in_with_password({
+        # Use Supabase Auth to authenticate the user
+        auth_response = supabase_anon.auth.sign_in_with_password({
             "email": email,
             "password": passcode
         })
-
-        # Check if the sign-in was successful.
         if not auth_response or not auth_response.user:
             return JsonResponse({"error": "Invalid credentials"}, status=401)
-        user = auth_response.user
-        user_id = user.id
 
-        # Step 2: Fetch the employee record using the user_id from Supabase Auth.
-        employee_response = supabase.table("employee")\
-            .select("*")\
-            .eq("user_id", user_id)\
-            .execute()
+        user = auth_response.user
+
+        # Fetch the employee record from Supabase
+        employee_response = supabase_anon.table("employee").select("*").eq("user_id", user.id).execute()
         if not employee_response.data:
             return JsonResponse({"error": "Employee record not found"}, status=404)
         employee = employee_response.data[0]
 
-        # Step 3: Fetch the employee's assigned roles.
-        role_response = supabase.table("employee_role")\
-            .select("role_id")\
-            .eq("employee_id", employee["id"])\
-            .execute()
+        # Fetch roles assigned to this employee
+        role_response = supabase_anon.table("employee_role").select("role_id").eq("employee_id", employee["id"]).execute()
         if not role_response.data:
             return JsonResponse({"error": "User has no roles assigned"}, status=403)
 
-        # Step 4: Retrieve the Admin role's ID from the roles table.
-        admin_role_response = supabase.table("role")\
-            .select("id")\
-            .eq("role_name", "Admin")\
-            .execute()
+        # Retrieve the Admin role's ID
+        admin_role_response = supabase_anon.table("role").select("id").eq("role_name", "Admin").execute()
         if not admin_role_response.data:
             return JsonResponse({"error": "Admin role not found"}, status=500)
         admin_role_id = admin_role_response.data[0]["id"]
 
-        # Step 5: Ensure the employee has the Admin role.
+        # Check if the employee has the Admin role
         is_admin = any(role["role_id"] == admin_role_id for role in role_response.data)
         if not is_admin:
-            return JsonResponse({"error": "Only admin users can log in"}, status=403)
+            return JsonResponse({"error": "Access denied: Only Admins can log in"}, status=403)
 
-        # Step 6: Retrieve tokens from the auth_response attributes.
-        access_token = getattr(auth_response, "access_token", "your_access_token")
-        refresh_token = getattr(auth_response, "refresh_token", "your_refresh_token")
+        # Extract the Supabase JWT token from the session
+        supabase_token = auth_response.session.access_token
 
-        return JsonResponse({
-            "message": "Login successful",
-            "admin_id": employee["id"],
-            "access_token": access_token,
-            "refresh_token": refresh_token
-        })
+        return JsonResponse({"access_token": supabase_token, "is_admin": True})
 
     except Exception as e:
-        return JsonResponse({"error": f"Something went wrong: {str(e)}"}, status=500)
+        print("Error in login_view:", str(e))
+        return JsonResponse({"error": "Internal server error"}, status=500)
+
         
 def test_connection(request):
     return JsonResponse({"message": "Backend and frontend are connected successfully!"})
@@ -163,7 +174,7 @@ def add_employee(request):
         roles = data.get("roles", [])    # List of role IDs
 
         # Step 1: Check if a user with this email already exists
-        existing_users_response = supabase.auth.admin.list_users()  # Returns a list of User objects
+        existing_users_response = supabase_anon.auth.admin.list_users()  # Returns a list of User objects
         user = None
         for user_data in existing_users_response:
             if user_data.email == email:
@@ -174,7 +185,7 @@ def add_employee(request):
         if user:
             user_id = user.id  # Use the existing user's id
         else:
-            auth_response = supabase.auth.admin.create_user({
+            auth_response = supabase_anon.auth.admin.create_user({
                 "email": email,
                 "password": passcode,
                 "email_confirm": True  # Auto-confirm email
@@ -194,7 +205,7 @@ def add_employee(request):
             "user_id": user_id,    # Link to Supabase Auth User
             "status_id": 1         # Automatically assign Active status
         }
-        response = supabase.table("employee").insert(insert_data).execute()
+        response = supabase_anon.table("employee").insert(insert_data).execute()
         if not response.data:
             return JsonResponse({"error": "Failed to create employee"}, status=500)
 
@@ -203,7 +214,7 @@ def add_employee(request):
         # Step 3: Assign roles (if any)
         if roles:
             role_entries = [{"employee_id": employee_id, "role_id": role} for role in roles]
-            supabase.table("employee_role").insert(role_entries).execute()
+            supabase_anon.table("employee_role").insert(role_entries).execute()
 
         return JsonResponse({"message": "Employee added successfully"}, status=201)
 

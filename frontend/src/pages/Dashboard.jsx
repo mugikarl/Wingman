@@ -28,15 +28,18 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
       {/* Bottom Section */}
       <div className="flex gap-4">
         <div className="bg-white flex-grow h-64 rounded-[15px] shadow p-6">
-          <span className="text-[#E88504] font-bold text-lg">Sales Overview</span>
+          <span className="text-[#E88504] font-bold text-lg">
+            Sales Overview
+          </span>
         </div>
         <div className="bg-white w-1/4 h-64 rounded-[15px] shadow p-6">
-          <span className="text-[#E88504] font-bold text-lg">Notifications</span>
+          <span className="text-[#E88504] font-bold text-lg">
+            Notifications
+          </span>
         </div>
       </div>
     </div>
   );
 };
-
 
 export default Dashboard;
