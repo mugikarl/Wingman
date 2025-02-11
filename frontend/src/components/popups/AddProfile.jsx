@@ -27,6 +27,13 @@ const AddProfile = ({ isOpen, closeModal, fetchEmployees, roles }) => {
   };
 
   const handleSubmit = async () => {
+    const token = localStorage.getItem("access_token"); // Adjust based on your storage method
+
+    if (!token) {
+      alert("Authentication required. Please log in.");
+      return;
+    }
+
     const employeeData = {
       first_name: firstName,
       last_name: lastName,
@@ -41,7 +48,12 @@ const AddProfile = ({ isOpen, closeModal, fetchEmployees, roles }) => {
     try {
       const response = await axios.post(
         `http://127.0.0.1:8000/api/add-employee/`,
-        employeeData
+        employeeData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
 
       if (response.status === 201) {

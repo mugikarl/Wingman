@@ -13,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
 from django.http import JsonResponse
 from .serializers import *
 from .models import *
-from .supabase_client import supabase_anon, supabase_service, jwt_secret, validate_jwt
+from .supabase_client import supabase_anon, supabase_service, jwt_secret, is_valid_supabase_token 
 from django.views.decorators.csrf import csrf_exempt
 import json
 import jwt
@@ -31,43 +31,102 @@ import jwt
 #     def has_permission(self, request, view):
 #         return request.user and request.user.get("user_metadata", {}).get("role") == "admin"
 
+def authenticate_user(request):
+    """
+    Authenticates the user based on the Supabase JWT token provided in the
+    Authorization header, validates the token, retrieves the user from
+    Supabase Auth, and looks up the corresponding employee record.
+
+    Assumptions:
+      - The Supabase Auth user ID (UUID) is stored in the employee table's
+        `user_id` column.
+      - The primary key of the employee table (an integer) is referenced in the
+        employee_role table.
+
+    Returns:
+        A dictionary containing:
+          - client: The Supabase client to use (authenticated or anonymous).
+          - token: The extracted JWT token.
+          - auth_user_uuid: The UUID of the authenticated user.
+          - employee_pk: The employee's primary key (integer) from the employee table.
+
+    Raises:
+        Exception: If the token is missing/invalid, if the user cannot be retrieved,
+                   or if the employee record is not found.
+    """
+    # Retrieve the token from the Authorization header.
+    auth_header = request.headers.get("Authorization")
+    token = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+
+    # Validate the token and select the appropriate Supabase client.
+    if token and is_valid_supabase_token(token):
+        client = supabase_service  # Use the authenticated client.
+    else:
+        client = supabase_anon     # Fall back to the anonymous client.
+
+    # Retrieve the user from Supabase Auth using the token.
+    user_response = supabase_service.auth.get_user(token)
+    if not (user_response and user_response.user):
+        raise Exception("Unauthorized. Could not fetch user.")
+
+    auth_user_uuid = user_response.user.id
+
+    # Look up the employee record by matching the Supabase auth UUID with employee.user_id.
+    employee_lookup = client.table("employee") \
+        .select("id") \
+        .eq("user_id", auth_user_uuid) \
+        .single() \
+        .execute()
+
+    if not employee_lookup.data:
+        raise Exception("Employee record not found.")
+
+    employee_pk = employee_lookup.data["id"]
+
+    return {
+        "client": client,
+        "token": token,
+        "auth_user_uuid": auth_user_uuid,
+        "employee_pk": employee_pk,
+    }
+
 @api_view(['GET'])
-@authentication_classes([])
-@permission_classes([AllowAny])
+@authentication_classes([])  # No DRF auth classes
+@permission_classes([AllowAny])  # No global permissions
 def fetch_data(request):
     try:
-        # Extract the token from the Authorization header (if provided)
+        # Extract the token from the Authorization header
         auth_header = request.headers.get("Authorization")
         token = None
+
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1]
 
-        # Decide which Supabase client to use
-        if token:
-            # No JWT validation needed; directly use the service client.
-            supabase_client = supabase_service
+        # Validate JWT using Supabase Auth API
+        if token and is_valid_supabase_token(token):
+            supabase_client = supabase_service  # Use service client for authenticated users
         else:
-            # Use the pre-initialized anonymous client if no token is provided.
-            supabase_client = supabase_anon
+            supabase_client = supabase_anon  # Use anonymous client if no token is provided or invalid
+            print("Token:", token)
+            print("Token Valid:", is_valid_supabase_token(token))
 
-        # Now perform your queries using the chosen client.
-        status_response = supabase_client.table("employee_status") \
-            .select("id, status_name") \
-            .execute()
+        # Fetch statuses
+        status_response = supabase_client.table("employee_status").select("id, status_name").execute()
         statuses = status_response.data if status_response.data else []
-        print("Status response:", status_response)
 
-        roles_response = supabase_client.table("role") \
-            .select("id, role_name") \
-            .execute()
+        # Fetch roles
+        roles_response = supabase_client.table("role").select("id, role_name").execute()
         roles = roles_response.data if roles_response.data else []
 
+        # Fetch employees with roles and status
         employee_response = supabase_client.table("employee") \
             .select("*, employee_role(role_id, role(id, role_name)), employee_status!employee_status_id_fkey(id, status_name)") \
             .execute()
         employees = employee_response.data if employee_response.data else []
 
-        # Reformat the employee data for better readability.
+        # Reformat the employee data
         formatted_employees = []
         for employee in employees:
             employee_roles = [
@@ -93,9 +152,9 @@ def fetch_data(request):
             "roles": roles,
             "employees": formatted_employees
         }, safe=False)
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-
 
 
 @api_view(['POST'])
@@ -157,89 +216,137 @@ def test_connection(request):
 
 
 @api_view(['POST'])
-@authentication_classes([])
-@permission_classes([AllowAny])
+@authentication_classes([])  # No DRF auth classes
+@permission_classes([AllowAny])  # No global permissions
 def add_employee(request):
     try:
-        data = json.loads(request.body.decode("utf-8"))
+        # Use the helper function to authenticate and retrieve employee info.
+        auth_data = authenticate_user(request)
+        client = auth_data["client"]
+        employee_pk = auth_data["employee_pk"]
 
-        # Extract user details
+        # Step 3: Check if the employee has an Admin role using the integer primary key.
+        admin_role_check = client.table("employee_role") \
+            .select("role_id") \
+            .eq("employee_id", employee_pk) \
+            .execute()
+
+        user_roles = admin_role_check.data if admin_role_check.data else []
+        role_ids = [role["role_id"] for role in user_roles]
+
+        role_names_response = client.table("role") \
+            .select("id, role_name") \
+            .in_("id", role_ids) \
+            .execute()
+
+        role_names = [role["role_name"] for role in role_names_response.data if "role_name" in role]
+
+        if "Admin" not in role_names:
+            return JsonResponse({"error": "Forbidden. Only Admin users can add employees."}, status=403)
+
+        # Step 4: Extract new employee data from the request body.
+        data = json.loads(request.body.decode("utf-8"))
         first_name = data.get("first_name")
         last_name = data.get("last_name")
         middle_initial = data.get("middle_initial", "")
         email = data.get("email")
         contact = data.get("contact")
         base_salary = data.get("base_salary")
-        passcode = data.get("passcode")  # Password for authentication
-        roles = data.get("roles", [])    # List of role IDs
+        passcode = data.get("passcode")  # Password for authentication.
+        roles = data.get("roles", [])    # List of role IDs.
 
-        # Step 1: Check if a user with this email already exists
-        existing_users_response = supabase_anon.auth.admin.list_users()  # Returns a list of User objects
-        user = None
-        for user_data in existing_users_response:
-            if user_data.email == email:
-                user = user_data
-                break
+        # Step 5: Check if the employee (user) already exists in Supabase Auth.
+        existing_users_response = client.auth.admin.list_users()
+        user = next((user_data for user_data in existing_users_response if user_data.email == email), None)
 
-        # If user exists, reuse the user_id; otherwise, create a new user
+        # Use the existing user's UUID or create a new one.
         if user:
-            user_id = user.id  # Use the existing user's id
+            new_employee_user_uuid = user.id
         else:
-            auth_response = supabase_anon.auth.admin.create_user({
+            auth_response = client.auth.admin.create_user({
                 "email": email,
                 "password": passcode,
-                "email_confirm": True  # Auto-confirm email
+                "email_confirm": True  # Auto-confirm email.
             })
-            print("auth_response:", auth_response)
             if not auth_response or not hasattr(auth_response, 'user'):
                 return JsonResponse({"error": "Failed to create user in Supabase Auth"}, status=500)
-            user_id = auth_response.user.id
+            new_employee_user_uuid = auth_response.user.id
 
-        # Step 2: Insert employee record linked to the Auth User
+        # Step 6: Insert the new employee record.
         insert_data = {
             "first_name": first_name,
             "last_name": last_name,
             "middle_initial": middle_initial,
             "contact": contact,
             "base_salary": base_salary,
-            "user_id": user_id,    # Link to Supabase Auth User
-            "status_id": 1         # Automatically assign Active status
+            "user_id": new_employee_user_uuid,  # The UUID from Supabase Auth.
+            "status_id": 1  # Automatically assign Active status.
         }
-        response = supabase_anon.table("employee").insert(insert_data).execute()
+        response = client.table("employee").insert(insert_data).execute()
         if not response.data:
             return JsonResponse({"error": "Failed to create employee"}, status=500)
 
-        employee_id = response.data[0]["id"]
+        # Retrieve the new employee record's primary key (an integer).
+        new_employee_pk = response.data[0]["id"]
 
-        # Step 3: Assign roles (if any)
+        # Step 7: If roles are provided, assign them using the employee's primary key.
         if roles:
-            role_entries = [{"employee_id": employee_id, "role_id": role} for role in roles]
-            supabase_anon.table("employee_role").insert(role_entries).execute()
+            role_entries = [{"employee_id": new_employee_pk, "role_id": role} for role in roles]
+            client.table("employee_role").insert(role_entries).execute()
 
         return JsonResponse({"message": "Employee added successfully"}, status=201)
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
-
 @api_view(['DELETE'])
 @authentication_classes([])
 @permission_classes([AllowAny])
 def delete_employee(request, employee_id):
     try:
-        response = supabase.table("employee").select("id").eq("id", employee_id).execute()
+        # Authenticate the user
+        auth_data = authenticate_user(request)
+        client = auth_data["client"]
+        authenticated_employee_pk = auth_data["employee_pk"]
+
+        # Step 1: Fetch the employee record to be deleted
+        response = client.table("employee").select("id, user_id").eq("id", employee_id).single().execute()
         
         if not response.data:
             return JsonResponse({"error": "Employee not found"}, status=404)
-            
-        # Delete associated roles first
-        supabase.table("employee_role").delete().eq("employee_id", employee_id).execute()
+
+        target_employee_user_id = response.data["user_id"]
+
+        # Step 2: Check if the authenticated user is an Admin
+        admin_role_check = client.table("employee_role") \
+            .select("role_id") \
+            .eq("employee_id", authenticated_employee_pk) \
+            .execute()
+
+        user_roles = admin_role_check.data if admin_role_check.data else []
+        role_ids = [role["role_id"] for role in user_roles]
+
+        role_names_response = client.table("role") \
+            .select("id, role_name") \
+            .in_("id", role_ids) \
+            .execute()
+
+        role_names = [role["role_name"] for role in role_names_response.data if "role_name" in role]
+
+        is_admin = "Admin" in role_names
+
+        # Step 3: Allow deletion if the user is an Admin or deleting their own record
+        if not is_admin and authenticated_employee_pk != employee_id:
+            return JsonResponse({"error": "Forbidden. You can only delete your own record unless you are an Admin."}, status=403)
+
+        # Step 4: Delete associated roles first
+        client.table("employee_role").delete().eq("employee_id", employee_id).execute()
         
-        # Delete employee record
-        supabase.table("employee").delete().eq("id", employee_id).execute()
+        # Step 5: Delete the employee record
+        client.table("employee").delete().eq("id", employee_id).execute()
         
         return JsonResponse({"message": "Employee deleted successfully"}, status=200)
-    
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
@@ -249,22 +356,51 @@ def delete_employee(request, employee_id):
 @permission_classes([AllowAny])
 def edit_employee(request, employee_id):
     try:
+        # Step 1: Authenticate user
+        auth_data = authenticate_user(request)
+        client = auth_data["client"]
+        auth_user_uuid = auth_data["auth_user_uuid"]
+        employee_pk = auth_data["employee_pk"]  # Authenticated employee ID
+
+        # Step 2: Check if the authenticated user is an Admin
+        admin_role_check = client.table("employee_role") \
+            .select("role_id") \
+            .eq("employee_id", employee_pk) \
+            .execute()
+
+        user_roles = admin_role_check.data if admin_role_check.data else []
+        role_ids = [role["role_id"] for role in user_roles]
+
+        if not role_ids:
+            return JsonResponse({"error": "Unauthorized. No roles assigned."}, status=403)
+
+        # Fetch role names
+        role_names_response = client.table("role") \
+            .select("id, role_name") \
+            .in_("id", role_ids) \
+            .execute()
+
+        role_names = [role["role_name"] for role in role_names_response.data] if role_names_response.data else []
+
+        is_admin = "Admin" in role_names
+
+        # Restrict access: Only Admins can edit
+        if not is_admin:
+            return JsonResponse({"error": "Forbidden. Only Admins can edit employee records."}, status=403)
+
+        # Step 3: Parse request data
         data = json.loads(request.body.decode("utf-8"))
-        
-        # Extract employee details from the request
         first_name = data.get("first_name")
         last_name = data.get("last_name")
         middle_initial = data.get("middle_initial", "")
         email = data.get("email")
         contact = data.get("contact")
         base_salary = data.get("base_salary")
-        passcode = data.get("passcode")  # Plain text passcode provided in the request
-        roles = data.get("roles", [])     # List of role IDs
+        passcode = data.get("passcode")  # Plain text passcode (optional)
+        roles = data.get("roles", [])  # List of role IDs
         status_id = data.get("status_id")
-        
-        # Build the update payload for the employee table.
-        # Note: We no longer update the passcode in the employee table,
-        # because authentication is managed by Supabase Auth.
+
+        # Step 4: Update the employee table
         update_data = {
             "first_name": first_name,
             "last_name": last_name,
@@ -273,50 +409,41 @@ def edit_employee(request, employee_id):
             "base_salary": base_salary,
             "status_id": status_id,
         }
-        
-        # Update the employee record in the "employee" table.
-        supabase.table("employee").update(update_data).eq("id", employee_id).execute()
-        
-        # Retrieve the corresponding Supabase Auth user ID from the employee record.
-        employee_record = supabase.table("employee").select("user_id").eq("id", employee_id).execute()
+
+        client.table("employee").update(update_data).eq("id", employee_id).execute()
+
+        # Step 5: Update Supabase Auth if email or password is changed
+        employee_record = client.table("employee").select("user_id").eq("id", employee_id).execute()
         if not employee_record.data:
             return JsonResponse({"error": "Employee record not found after update"}, status=404)
+
         auth_user_id = employee_record.data[0]["user_id"]
-        
-        # Prepare update payload for Supabase Auth.
-        # Pass the plain text password (if updating) to the auth update,
-        # as Supabase handles the hashing.
         auth_update_data = {}
+
         if email:
             auth_update_data["email"] = email
         if passcode:
             auth_update_data["password"] = passcode
-        
-        # Update the Supabase Auth user details if needed.
+
         if auth_update_data:
-            auth_update_response = supabase.auth.admin.update_user_by_id(auth_user_id, auth_update_data)
-            # Optionally, you can check auth_update_response for errors.
-        
-        # ----- Update Roles in the employee_roles table -----
-        # new_roles: the set of role IDs provided in the request.
+            client.auth.admin.update_user_by_id(auth_user_id, auth_update_data)
+
+        # Step 6: Update employee roles if needed
         new_roles = set(roles)
-        # Fetch current roles for the employee.
-        existing_roles_response = supabase.table("employee_role")\
-            .select("role_id")\
-            .eq("employee_id", employee_id)\
+        existing_roles_response = client.table("employee_role") \
+            .select("role_id") \
+            .eq("employee_id", employee_id) \
             .execute()
+
         existing_roles = {role["role_id"] for role in existing_roles_response.data} if existing_roles_response.data else set()
-        
-        # If the new roles differ from the existing ones, update them.
+
         if new_roles != existing_roles:
-            # Delete current role associations.
-            supabase.table("employee_role").delete().eq("employee_id", employee_id).execute()
-            # Insert new role associations if provided.
+            client.table("employee_role").delete().eq("employee_id", employee_id).execute()
             role_entries = [{"employee_id": employee_id, "role_id": role_id} for role_id in new_roles]
             if role_entries:
-                supabase.table("employee_role").insert(role_entries).execute()
-        
+                client.table("employee_role").insert(role_entries).execute()
+
         return JsonResponse({"message": "Employee updated successfully", "employee_id": employee_id}, status=200)
-    
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

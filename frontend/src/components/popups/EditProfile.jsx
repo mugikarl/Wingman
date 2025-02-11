@@ -52,10 +52,17 @@ const EditProfile = ({
       ...(password && { passcode: password }), // Only include password if set
     };
 
+    const token = localStorage.getItem("access_token");
+
     try {
       await axios.put(
         `http://127.0.0.1:8000/api/edit-employee/${employee.id}/`,
-        updatedEmployeeData
+        updatedEmployeeData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
       fetchEmployees();
       setIsEditMode(!isEditMode);
@@ -68,9 +75,16 @@ const EditProfile = ({
   const handleDelete = async () => {
     if (!window.confirm("Are you sure you want to delete this employee?"))
       return;
+
+    const token = localStorage.getItem("access_token");
     try {
       await axios.delete(
-        `http://127.0.0.1:8000/api/delete-employee/${employee.id}/`
+        `http://127.0.0.1:8000/api/delete-employee/${employee.id}/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
       fetchEmployees();
       closeModal();

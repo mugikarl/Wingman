@@ -14,14 +14,10 @@ if not url or not service_key or not anon_key or not jwt_secret:
 supabase_service: Client = create_client(url, service_key)
 supabase_anon: Client = create_client(url, anon_key)
 
-# Function to validate JWT using the provided jwt_secret.
-def validate_jwt(token: str) -> bool:
-    import jwt
+def is_valid_supabase_token(token: str) -> bool:
+    """Verify Supabase JWT using Supabase authentication API."""
     try:
-        decoded = jwt.decode(token, jwt_secret, algorithms=["HS256"])
-        return True
-    except jwt.ExpiredSignatureError:
-        print("JWT expired")
-    except jwt.InvalidTokenError:
-        print("Invalid JWT")
-    return False
+        response = supabase_service.auth.get_user(token)
+        return response.user is not None  # If user exists, token is valid
+    except Exception:
+        return False
