@@ -12,6 +12,7 @@ const StaffProfile = () => {
   const [roles, setRoles] = useState([]);
   const [statuses, setStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState(1);
 
   // Fetch Employees
   const fetchEmployees = async () => {
@@ -53,6 +54,12 @@ const StaffProfile = () => {
     setSelectedEmployee(null);
   };
 
+  // Filter employees by status and then sort them by id
+  const filteredEmployees = employees.filter(
+    (emp) => emp.status === filterStatus
+  );
+  const sortedEmployees = [...filteredEmployees].sort((a, b) => a.id - b.id);
+
   return (
     <div className="flex-grow p-6">
       {/* Top Section */}
@@ -71,6 +78,28 @@ const StaffProfile = () => {
             Schedule
           </button>
         </Link>
+      </div>
+      <div>
+        <button
+          className={`p-2 shadow w-40 ${
+            filterStatus === 1
+              ? "bg-blue-700 text-white"
+              : "bg-blue-500 text-gray-200"
+          }`}
+          onClick={() => setFilterStatus(1)}
+        >
+          Active
+        </button>
+        <button
+          className={`p-2 shadow w-40 ${
+            filterStatus === 2
+              ? "bg-red-700 text-white"
+              : "bg-red-500 text-gray-200"
+          }`}
+          onClick={() => setFilterStatus(2)}
+        >
+          Inactive
+        </button>
       </div>
 
       {/* Table */}
@@ -92,8 +121,8 @@ const StaffProfile = () => {
                   Loading...
                 </td>
               </tr>
-            ) : employees.length > 0 ? (
-              employees.map((employee) => (
+            ) : sortedEmployees.length > 0 ? (
+              sortedEmployees.map((employee) => (
                 <tr
                   key={employee.id}
                   className="bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"

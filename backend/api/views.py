@@ -118,7 +118,7 @@ def fetch_data(request):
             .select(
                 "id, first_name, last_name, contact, base_salary, user_id, "
                 "employee_role(role_id, role(id, role_name)), "
-                "employee_status!employee_status_id_fkey(id, status_name)"
+                "employee_status(id, status_name)"
             ) \
             .execute()
         employees = employee_response.data if employee_response.data else []
@@ -148,11 +148,11 @@ def fetch_data(request):
             ]
 
             # Retrieve the status name from the joined relationship if available.
-            status_value = None
-            if employee.get("employee_status!employee_status_id_fkey"):
-                status_value = employee["employee_status!employee_status_id_fkey"].get("status_name")
-            else:
-                status_value = employee.get("status_id")
+            # status_value = None
+            # if employee.get("employee_status"):
+            status_value = employee["employee_status"].get("id")
+            # else:
+            #     status_value = employee.get("status_id")
 
             formatted_employees.append({
                 "id": employee["id"],
