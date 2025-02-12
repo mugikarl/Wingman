@@ -19,12 +19,18 @@ const EditProfile = ({
   const [email, setEmail] = useState(employee?.email || "");
   const [contactNumber, setContactNumber] = useState(employee?.contact || "");
   const [salary, setSalary] = useState(employee?.base_salary || "");
-  const [password, setPassword] = useState("");
+  const [passcode, setPasscode] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [status, setStatus] = useState(employee?.status || "");
   const [selectedRoles, setSelectedRoles] = useState(
     employee?.roles?.map((role) => role.id) || []
   );
+
+
+  const generatePasscode = () => {
+    const newPasscode = Math.floor(100000 + Math.random() * 900000).toString();
+    setPasscode(newPasscode);
+  };
 
   const togglePasswordVisibility = () => {
     setPasswordVisible(!passwordVisible);
@@ -47,9 +53,10 @@ const EditProfile = ({
       email,
       contact: contactNumber,
       base_salary: salary,
+      passcode,
       status_id: parseInt(status), // Ensure status is sent as a number
       roles: selectedRoles, // Send role IDs
-      ...(password && { passcode: password }), // Only include password if set
+      ...(passcode && { passcode: passcode }), // Only include password if set
     };
 
     const token = localStorage.getItem("access_token");
@@ -209,23 +216,52 @@ const EditProfile = ({
               </div>
               {/* Password */}
               <div className="flex flex-col space-y-2">
-                <label htmlFor="passcode" className="text-sm font-medium">
-                  Passcode
-                </label>
-                <input
-                  type={passwordVisible ? "text" : "password"}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="p-2 border rounded-lg"
-                  disabled={!isEditMode}
-                />
-                <button
-                  type="button"
-                  onClick={togglePasswordVisibility}
-                  className="text-blue-500 text-sm"
-                >
-                  {passwordVisible ? "Hide" : "Show"} Passcode
-                </button>
-              </div>
+            <label htmlFor="email" className="text-sm font-medium">
+                Password
+              </label>
+              <div className="flex flex-col space-y-2">
+  {/* Password Field with Generate Icon Inside */}
+  <div className="relative">
+  <input
+    type={passwordVisible ? "text" : "password"}
+    value={passcode}
+    readOnly
+    className="p-2 border rounded-lg bg-gray-200 w-full pr-10"
+  />
+  {/* Generate Icon Button */}
+  <button
+    onClick={generatePasscode}
+    className="absolute inset-y-0 right-2 p-2 hover:text-blue-500 transition-colors"
+    title="Generate Passcode"
+    disabled={!isEditMode}
+  >
+    {/* SVG Icon for Generate */}
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      className="w-5 h-5"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 4V1m0 0l-3 3m3-3l3 3M4 12H1m0 0l3-3m-3 3l3 3m16 0h3m0 0l-3-3m3 3l-3 3M12 23v-3m0 0l3 3m-3-3l-3 3"
+      />
+    </svg>
+  </button>
+</div>
+
+{/* Show/Hide Button */}
+<button
+  onClick={togglePasswordVisibility}
+  className="text-blue-500 text-sm self-start"
+>
+  {passwordVisible ? "Hide" : "Show"}
+</button>
+</div>
+</div>
               {/* Roles */}
               <div className="flex flex-col space-y-2">
                 <label className="text-sm font-medium">Roles</label>
