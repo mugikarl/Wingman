@@ -97,38 +97,47 @@ def authenticate_user(request):
 @permission_classes([AllowAny])  # No global permissions
 def fetch_data(request):
     try:
-        # Extract the token from the Authorization header
-        auth_header = request.headers.get("Authorization")
-        token = None
-
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
-
-        # Validate JWT using Supabase Auth API
-        if token and is_valid_supabase_token(token):
-            supabase_client = supabase_service  # Use service client for authenticated users
-        else:
-            supabase_client = supabase_anon  # Use anonymous client if no token is provided or invalid
-            print("Token:", token)
-            print("Token Valid:", is_valid_supabase_token(token))
+        # Authenticate the user; if unauthorized, authenticate_user() will raise an exception.
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]  # Use the authenticated client for table queries
 
         # Fetch statuses
-        status_response = supabase_client.table("employee_status").select("id, status_name").execute()
+        status_response = supabase_client.table("employee_status") \
+            .select("id, status_name") \
+            .execute()
         statuses = status_response.data if status_response.data else []
 
         # Fetch roles
-        roles_response = supabase_client.table("role").select("id, role_name").execute()
+        roles_response = supabase_client.table("role") \
+            .select("id, role_name") \
+            .execute()
         roles = roles_response.data if roles_response.data else []
 
         # Fetch employees with roles and status
         employee_response = supabase_client.table("employee") \
-            .select("*, employee_role(role_id, role(id, role_name)), employee_status!employee_status_id_fkey(id, status_name)") \
+            .select(
+                "id, first_name, last_name, contact, base_salary, user_id, "
+                "employee_role(role_id, role(id, role_name)), "
+                "employee_status!employee_status_id_fkey(id, status_name)"
+            ) \
             .execute()
         employees = employee_response.data if employee_response.data else []
 
-        # Reformat the employee data
+        # Reformat the employee data and fetch auth details for each employee using the admin client.
         formatted_employees = []
         for employee in employees:
+            user_email = None
+            user_password = None  # Raw passwords are not retrievable; we use a placeholder.
+            if employee.get("user_id"):
+                # Use the admin client (with service role key) to fetch user details.
+                user_response = supabase_client.auth.admin.get_user_by_id(employee["user_id"])
+                if user_response and user_response.user:
+                    user_email = user_response.user.email
+                    user_password = "(hidden)"
+                else:
+                    # Optionally, log the failure to fetch user details.
+                    print(f"Could not fetch auth details for user_id: {employee['user_id']}")
+
             employee_roles = [
                 {
                     "id": role_data["role"]["id"],
@@ -137,14 +146,24 @@ def fetch_data(request):
                 for role_data in employee.get("employee_role", [])
                 if "role" in role_data
             ]
+
+            # Retrieve the status name from the joined relationship if available.
+            status_value = None
+            if employee.get("employee_status!employee_status_id_fkey"):
+                status_value = employee["employee_status!employee_status_id_fkey"].get("status_name")
+            else:
+                status_value = employee.get("status_id")
+
             formatted_employees.append({
                 "id": employee["id"],
                 "first_name": employee["first_name"],
                 "last_name": employee["last_name"],
                 "contact": employee["contact"],
                 "base_salary": employee["base_salary"],
+                "email": user_email,
+                "password": user_password,
                 "roles": employee_roles,
-                "status": employee.get("status_id")
+                "status": status_value
             })
 
         return JsonResponse({
@@ -155,6 +174,7 @@ def fetch_data(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
 
 
 @api_view(['POST'])

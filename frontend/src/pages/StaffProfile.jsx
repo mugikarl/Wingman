@@ -12,7 +12,6 @@ const StaffProfile = () => {
   const [roles, setRoles] = useState([]);
   const [statuses, setStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState(1);
 
   // Fetch Employees
   const fetchEmployees = async () => {
@@ -73,28 +72,6 @@ const StaffProfile = () => {
           </button>
         </Link>
       </div>
-      <div>
-        <button
-          className={`p-2 shadow w-40 ${
-            filterStatus === 1
-              ? "bg-blue-700 text-white"
-              : "bg-blue-500 text-gray-200"
-          }`}
-          onClick={() => setFilterStatus(1)}
-        >
-          Active
-        </button>
-        <button
-          className={`p-2 shadow w-40 ${
-            filterStatus === 2
-              ? "bg-red-700 text-white"
-              : "bg-red-500 text-gray-200"
-          }`}
-          onClick={() => setFilterStatus(2)}
-        >
-          Inactive
-        </button>
-      </div>
 
       {/* Table */}
       <div className="table-container border rounded-lg shadow overflow-x-auto">
@@ -115,35 +92,32 @@ const StaffProfile = () => {
                   Loading...
                 </td>
               </tr>
-            ) : employees.filter((emp) => emp.status === filterStatus).length >
-              0 ? (
-              employees
-                .filter((emp) => emp.status === filterStatus)
-                .map((employee) => (
-                  <tr
-                    key={employee.id}
-                    className="bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
-                    onClick={() => openEditModal(employee)}
-                  >
-                    <td className="p-2">{employee.id}</td>
-                    <td className="p-2">
-                      {employee.first_name} {employee.last_name}
-                    </td>
-                    <td className="p-2">
-                      {employee.roles.map((role) => role.role_name).join(", ")}
-                    </td>
-                    <td className="p-2">
-                      <button className="bg-blue-500 text-white p-1 rounded shadow">
-                        Time In
-                      </button>
-                    </td>
-                    <td className="p-2">
-                      <button className="bg-red-500 text-white p-1 rounded shadow">
-                        Time Out
-                      </button>
-                    </td>
-                  </tr>
-                ))
+            ) : employees.length > 0 ? (
+              employees.map((employee) => (
+                <tr
+                  key={employee.id}
+                  className="bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
+                  onClick={() => openEditModal(employee)}
+                >
+                  <td className="p-2">{employee.id}</td>
+                  <td className="p-2">
+                    {employee.first_name} {employee.last_name}
+                  </td>
+                  <td className="p-2">
+                    {employee.roles.map((role) => role.role_name).join(", ")}
+                  </td>
+                  <td className="p-2">
+                    <button className="bg-blue-500 text-white p-1 rounded shadow">
+                      Time In
+                    </button>
+                  </td>
+                  <td className="p-2">
+                    <button className="bg-red-500 text-white p-1 rounded shadow">
+                      Time Out
+                    </button>
+                  </td>
+                </tr>
+              ))
             ) : (
               <tr>
                 <td className="p-2 text-center" colSpan="5">
