@@ -10,6 +10,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny, BasePermission
+from rest_framework.authentication import BaseAuthentication
+from rest_framework import exceptions
 from django.http import JsonResponse
 from .serializers import *
 from .models import *
@@ -92,9 +94,80 @@ def authenticate_user(request):
         "employee_pk": employee_pk,
     }
 
+class SupabaseAuthentication(BaseAuthentication):
+    def authenticate(self, request):
+        try:
+            # Call your existing function to authenticate the user.
+            auth_data = authenticate_user(request)
+        except Exception as e:
+            # If the authentication fails, raise an AuthenticationFailed exception.
+            raise exceptions.AuthenticationFailed(str(e))
+        
+        # Mark the auth_data dictionary as authenticated.
+        auth_data["is_authenticated"] = True
+        
+        # Retrieve the token (if needed).
+        token = auth_data.get("token")
+        
+        # Return a tuple of (user, token). Here, the user is your auth_data dictionary.
+        return (auth_data, token)
+    
+class SupabaseIsAuthenticated(BasePermission):
+    def has_permission(self, request, view):
+        # Check that request.user is a dict and that is_authenticated is True.
+        return isinstance(request.user, dict) and request.user.get("is_authenticated", False)
+
+class SupabaseIsAdmin(BasePermission):
+    """
+    Allows access only to employees with the "Admin" role.
+    This permission expects that request.user is a dictionary (from SupabaseAuthentication)
+    that contains the employee's primary key as "employee_pk".
+    """
+    def has_permission(self, request, view):
+        # First, ensure the request has been authenticated using our custom authentication.
+        if not (isinstance(request.user, dict) and request.user.get("is_authenticated", False)):
+            return False
+        
+        employee_pk = request.user.get("employee_pk")
+        if not employee_pk:
+            return False
+
+        try:
+            # Query the employee_role table to get the role IDs for this employee.
+            role_mapping = supabase_service.table("employee_role") \
+                .select("role_id") \
+                .eq("employee_id", employee_pk) \
+                .execute()
+
+            if not role_mapping.data:
+                return False
+
+            # Extract role IDs from the mapping.
+            role_ids = [entry["role_id"] for entry in role_mapping.data]
+
+            # Now query the role table to retrieve the role names corresponding to these IDs.
+            roles_response = supabase_service.table("role") \
+                .select("role_name") \
+                .in_("id", role_ids) \
+                .execute()
+
+            if not roles_response.data:
+                return False
+
+            role_names = [role["role_name"] for role in roles_response.data]
+
+            # Check if "Admin" is one of the roles.
+            return "Admin" in role_names
+
+        except Exception as e:
+            # Optionally log the error here.
+            print("Error in SupabaseIsAdmin permission:", e)
+            return False
+
+
 @api_view(['GET'])
-@authentication_classes([])  # No DRF auth classes
-@permission_classes([AllowAny])  # No global permissions
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
 def fetch_data(request):
     try:
         # Authenticate the user; if unauthorized, authenticate_user() will raise an exception.
@@ -236,8 +309,8 @@ def test_connection(request):
 
 
 @api_view(['POST'])
-@authentication_classes([])  # No DRF auth classes
-@permission_classes([AllowAny])  # No global permissions
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
 def add_employee(request):
     try:
         # Use the helper function to authenticate and retrieve employee info.
@@ -320,8 +393,8 @@ def add_employee(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 @api_view(['DELETE'])
-@authentication_classes([])
-@permission_classes([AllowAny])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
 def delete_employee(request, employee_id):
     try:
         # Authenticate the user
@@ -372,8 +445,8 @@ def delete_employee(request, employee_id):
 
 
 @api_view(['PUT'])
-@authentication_classes([])
-@permission_classes([AllowAny])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
 def edit_employee(request, employee_id):
     try:
         # Step 1: Authenticate user
