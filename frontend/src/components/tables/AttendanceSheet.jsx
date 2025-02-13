@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import CameraModal from "../CameraModal";// Import the CameraModal component
 
 const AttendanceSheet = () => {
   const attendanceData = [
@@ -11,6 +12,24 @@ const AttendanceSheet = () => {
     { id: 7, name: "Mae F. Espera", status: "Absent", timeIn: "-", timeOut: "-" },
     { id: 8, name: "Justinne L. Floresca", status: "Absent", timeIn: "-", timeOut: "-" },
   ];
+
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [capturedImage, setCapturedImage] = useState(null);
+
+  const handleImageClick = (employee) => {
+    setSelectedEmployee(employee);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedEmployee(null);
+    setCapturedImage(null);
+  };
+
+  const handleCapture = (imageSrc) => {
+    setCapturedImage(imageSrc);
+    // You can save the captured image or perform other actions here
+    console.log("Captured Image:", imageSrc);
+  };
 
   return (
     <div>
@@ -40,13 +59,27 @@ const AttendanceSheet = () => {
                 <td className="p-2">{entry.timeIn}</td>
                 <td className="p-2">{entry.timeOut}</td>
                 <td className="p-2">
-                  <button className="bg-orange-500 text-white px-3 py-1 rounded">Image</button>
+                  <button
+                    onClick={() => handleImageClick(entry)}
+                    className="bg-orange-500 text-white px-3 py-1 rounded"
+                  >
+                    Image
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Render the CameraModal if an employee is selected */}
+      {selectedEmployee && (
+        <CameraModal
+          name={selectedEmployee.name}
+          onClose={handleCloseModal}
+          onCapture={handleCapture}
+        />
+      )}
     </div>
   );
 };

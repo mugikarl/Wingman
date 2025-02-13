@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import ChangePasswordPopup from "./ChangePasswordPopup"; // Import the new component
+
 
 const EditProfile = ({
   isOpen,
@@ -25,7 +27,7 @@ const EditProfile = ({
   const [selectedRoles, setSelectedRoles] = useState(
     employee?.roles?.map((role) => role.id) || []
   );
-
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   const generatePasscode = () => {
     const newPasscode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -43,7 +45,26 @@ const EditProfile = ({
         : [...prevRoles, roleId]
     );
   };
-
+  const handleChangePassword = (newPasscode) => {
+    // Update the employee's passcode in the backend
+    const token = localStorage.getItem("access_token");
+    axios
+      .put(
+        `http://127.0.0.1:8000/api/change-password/${employee.id}/`,
+        { passcode: newPasscode },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+      .then(() => {
+        fetchEmployees();
+      })
+      .catch((error) => {
+        console.error("Error changing password:", error);
+      });
+  };
   const handleSubmit = async () => {
     const updatedEmployeeData = {
       first_name: firstName,
@@ -221,38 +242,18 @@ const EditProfile = ({
               </label>
               <div className="flex flex-col space-y-2">
   {/* Password Field with Generate Icon Inside */}
-  <div className="relative">
-  <input
-    type={passwordVisible ? "text" : "password"}
-    value={passcode}
-    readOnly
-    className="p-2 border rounded-lg bg-gray-200 w-full pr-10"
-  />
-  {/* Generate Icon Button */}
   <button
-    onClick={generatePasscode}
-    className="absolute inset-y-0 right-2 p-2 hover:text-blue-500 transition-colors"
-    title="Generate Passcode"
-    disabled={!isEditMode}
-  >
-    {/* SVG Icon for Generate */}
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      className="w-5 h-5"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 4V1m0 0l-3 3m3-3l3 3M4 12H1m0 0l3-3m-3 3l3 3m16 0h3m0 0l-3-3m3 3l-3 3M12 23v-3m0 0l3 3m-3-3l-3 3"
-      />
-    </svg>
-  </button>
-</div>
-
+                onClick={() => setIsChangePasswordOpen(true)}
+                className="bg-[#E88504] text-white p-2 rounded-lg"
+              >
+                Change Password
+              </button>
+              <ChangePasswordPopup
+            isOpen={isChangePasswordOpen}
+            closePopup={() => setIsChangePasswordOpen(false)}
+            currentPassword={employee?.passcode} // Assuming the passcode is stored in the employee object
+            onSave={handleChangePassword}
+          />
 {/* Show/Hide Button */}
 <button
   onClick={togglePasswordVisibility}
