@@ -14,6 +14,7 @@ import Inventory from "./pages/Inventory";
 import StaffProfile from "./pages/StaffProfile";
 import Sales from "./pages/Sales";
 import Login from "./pages/Login";
+import Attendance from "./pages/Attendance/Attendance";
 import TestConnection from "./pages/TestConnection";
 import DisposedItems from "./pages/Inventory/DisposedItems";
 import Schedule from "./pages/Staff Profile/Schedule";
@@ -27,8 +28,6 @@ import ChooseOrder from "./components/popups/ChooseOrder";
 import SalesCalendar from "./pages/Sales/SalesCalendar";
 import AdminRoute from "./components/admin/AdminRoute";
 
-// You can have a placeholder component for Attendance
-const Attendance = () => <div>Attendance Page</div>;
 
 // You might have a separate dashboard for employees if needed.
 const EmployeeDashboard = Dashboard; // For this example, we reuse Dashboard
@@ -54,8 +53,11 @@ const App = () => {
         <div className="flex-grow">
           <Routes>
             {/* Login Page */}
-            <Route path="/login" element={<Login setIsAdmin={setIsAdmin} />} />
-
+            <Route 
+              path="/login"
+              element={<Login setIsAdmin={setIsAdmin} />
+              } 
+            />
             {/* Admin Dashboard Routes (protected by AdminRoute) */}
             <Route
               path="/dashboard-admin/ordertable"

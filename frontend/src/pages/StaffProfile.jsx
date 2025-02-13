@@ -61,7 +61,7 @@ const StaffProfile = () => {
   const sortedEmployees = [...filteredEmployees].sort((a, b) => a.id - b.id);
 
   return (
-    <div className="flex-grow p-6">
+    <div className="flex-grow p-6 bg-[#E2D6D5] min-h-full">
       {/* Top Section */}
       <div className="flex items-start mb-4 space-x-4">
         <button className="bg-blue-500 text-white p-2 rounded-lg shadow">
@@ -122,10 +122,10 @@ const StaffProfile = () => {
                 </td>
               </tr>
             ) : sortedEmployees.length > 0 ? (
-              sortedEmployees.map((employee) => (
+              sortedEmployees.map((employee, index) => (
                 <tr
                   key={employee.id}
-                  className="bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
+                  className={index % 2 === 0 ? "bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200" : "bg-[#FFFFFF] border-b border-[#FFCF03] cursor-pointer hover:bg-gray-200"}
                   onClick={() => openEditModal(employee)}
                 >
                   <td className="p-2">{employee.id}</td>
