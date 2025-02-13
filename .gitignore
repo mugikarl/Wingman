@@ -2,8 +2,8 @@
 **/.env
 
 # Django-specific ignores (if applicable)
-backend/*.pyc
-backend/__pycache__/
+**/*.pyc
+**/__pycache__/
 
 # Node/Vite/React-specific ignores (if applicable)
 frontend/node_modules/
