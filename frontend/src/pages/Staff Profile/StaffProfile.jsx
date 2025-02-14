@@ -64,9 +64,11 @@ const StaffProfile = () => {
     <div className="flex-grow p-6 bg-[#E2D6D5] min-h-full">
       {/* Top Section */}
       <div className="flex items-start mb-4 space-x-4">
+        <Link to="/attendancereview">
         <button className="bg-blue-500 text-white p-2 rounded-lg shadow">
-          Button 1
+          Attendance Sheet
         </button>
+        </Link>
         <button
           onClick={openAddModal}
           className="bg-[#E88504] text-white p-2 rounded-lg shadow"
