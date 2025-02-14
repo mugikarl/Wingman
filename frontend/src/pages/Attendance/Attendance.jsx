@@ -1,37 +1,71 @@
-import React, { useState } from 'react';
-import AttendanceSheet from '../../components/tables/AttendanceSheet';
-import TimeIn from '../../components/popups/TimeIn';
-import TimeOut from '../../components/popups/TimeOut';
+import React, { useState, useEffect } from "react";
+import AttendanceSheet from "../../components/tables/AttendanceSheet";
+import TimeIn from "../../components/popups/TimeIn";
+import TimeOut from "../../components/popups/TimeOut";
+import AttendanceReview from "./AttendanceReview";
+import axios from "axios";
 
 const Attendance = () => {
-    const [isTimeInModalOpen, setIsTimeInModalOpen] = useState(false);
-    const [isTimeOutModalOpen, setIsTimeOutModalOpen] = useState(false);
+  const [isTimeInModalOpen, setIsTimeInModalOpen] = useState(false);
+  const [isTimeOutModalOpen, setIsTimeOutModalOpen] = useState(false);
+  const [attendanceData, setAttendanceData] = useState([]);
 
-    return (
-        <div className='flex-grow p-6 bg-[#E2D6D5] min-h-full'>
-            <div className="flex items-start mb-4 space-x-4">
-                <button
-                    onClick={() => setIsTimeInModalOpen(true)}
-                    className="bg-[#E88504] text-white p-2 rounded-lg w-auto shadow"
-                >
-                    Time In
-                </button>
-                <button
-                    onClick={() => setIsTimeOutModalOpen(true)}
-                    className="bg-[#E88504] text-white p-2 rounded-lg w-auto shadow"
-                >
-                    Time Out
-                </button>
-            </div>
-            <div className='space-y-4'>
-                <AttendanceSheet />
-            </div>
+  // Function to fetch attendance data
+  const fetchAttendanceData = () => {
+    axios
+      .get("http://127.0.0.1:8000/fetch-attendance-data/")
+      .then((response) => {
+        setAttendanceData(response.data);
+      })
+      .catch((error) => {
+        console.error("Error fetching attendance data:", error);
+      });
+  };
 
-            {/* Show modals when respective states are true */}
-            {isTimeInModalOpen && <TimeIn closeModal={() => setIsTimeInModalOpen(false)} />}
-            {isTimeOutModalOpen && <TimeOut closeModal={() => setIsTimeOutModalOpen(false)} />}
-        </div>
-    );
-}
+  // Fetch data when the component mounts
+  useEffect(() => {
+    fetchAttendanceData();
+  }, []);
+
+  return (
+    <div className="flex-grow p-6 bg-[#E2D6D5] min-h-full">
+      <div className="flex items-start mb-4 space-x-4">
+        <button
+          onClick={() => setIsTimeInModalOpen(true)}
+          className="bg-[#E88504] text-white p-2 rounded-lg w-auto shadow"
+        >
+          Time In
+        </button>
+        <button
+          onClick={() => setIsTimeOutModalOpen(true)}
+          className="bg-[#E88504] text-white p-2 rounded-lg w-auto shadow"
+        >
+          Time Out
+        </button>
+      </div>
+      <div className="space-y-4">
+        {/* Pass attendanceData and refresh function to AttendanceReview */}
+        <AttendanceReview
+          attendanceData={attendanceData}
+          refreshAttendance={fetchAttendanceData}
+        />
+      </div>
+
+      {/* Show modals when respective states are true */}
+      {isTimeInModalOpen && (
+        <TimeIn
+          refreshAttendance={fetchAttendanceData} // Pass the function to TimeIn
+          closeModal={() => setIsTimeInModalOpen(false)}
+        />
+      )}
+      {isTimeOutModalOpen && (
+        <TimeOut
+          refreshAttendance={fetchAttendanceData}
+          closeModal={() => setIsTimeOutModalOpen(false)}
+        />
+      )}
+    </div>
+  );
+};
 
 export default Attendance;

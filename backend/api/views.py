@@ -19,7 +19,13 @@ from .supabase_client import supabase_anon, supabase_service, jwt_secret, is_val
 from django.views.decorators.csrf import csrf_exempt
 import json
 import jwt
-from datetime import datetime
+from datetime import datetime, timezone
+import base64
+import io
+from django.utils.timezone import now
+
+
+#AUTHETICATE USER/ADMIN
 
 def authenticate_user(request):
     """
@@ -152,6 +158,10 @@ class SupabaseIsAdmin(BasePermission):
             print("Error in SupabaseIsAdmin permission:", e)
             return False
 
+
+# LOGIN AS ADMIN
+
+
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
@@ -209,6 +219,8 @@ def login_view(request):
 def test_connection(request):
     return JsonResponse({"message": "Backend and frontend are connected successfully!"})
 
+
+#STAFF PROFILING
 
 # Fetch employee data
 @api_view(['GET'])
@@ -507,6 +519,9 @@ def edit_employee(request, employee_id):
         return JsonResponse({"error": str(e)}, status=500)
     
 
+
+# ATTENDANCE 
+
 @api_view(['GET'])
 @authentication_classes([])
 @permission_classes([AllowAny])
@@ -524,56 +539,65 @@ def fetch_attendance_data(request):
     This view is public and intended for admin usage.
     """
     try:
-        # Query the employee table including nested employee_status and attendance details.
+        # Note the relationship alias "attendance" (not "attendance_id") to reflect the FK from employee.
         response = supabase_anon.table("employee").select(
             "id, first_name, last_name, "
             "employee_status:employee_status(status_name), "
-            "attendance:attendance_id(id, attendance_status:attendance_status(status_name), attendance_time:attendance_time(time_in,time_out))"
+            "attendance:attendance(attendance_status:attendance_status(status_name), attendance_time:attendance_time(time_in,time_out))"
         ).execute()
 
         employees = response.data if response.data else []
         attendance_data = []
 
         for emp in employees:
-            # Build full name
+            # Build full name.
             full_name = f"{emp.get('first_name', '')} {emp.get('last_name', '')}".strip()
 
-            # Retrieve employee status (e.g., "Active" or "Inactive")
+            # Retrieve employee status.
             emp_status_obj = emp.get("employee_status")
             employee_status = emp_status_obj.get("status_name") if emp_status_obj else "N/A"
 
-            # Process attendance details
+            # Process attendance details.
             attendance = emp.get("attendance")
             current_attendance_status = "N/A"
             time_in = "-"
             time_out = "-"
 
             if attendance:
-                attendance_id = attendance.get("id")
-                time_obj = attendance.get("attendance_time")
-                status_obj = attendance.get("attendance_status")
-
-                time_in_val = time_obj.get("time_in") if time_obj else None
-                time_out_val = time_obj.get("time_out") if time_obj else None
-
-                # If there's no time in, update the attendance_status to "A" (Absent, id:2)
-                if not time_in_val:
-                    update_response = supabase_anon.table("attendance").update(
-                        {"attendance_status": 2}  # 2 corresponds to "A" in attendance_status table
-                    ).eq("id", attendance_id).execute()
-                    current_attendance_status = "A"
+                # If attendance is returned as a list (1-to-many), take the first record.
+                if isinstance(attendance, list) and len(attendance) > 0:
+                    attendance_record = attendance[0]
+                elif isinstance(attendance, dict):
+                    attendance_record = attendance
                 else:
-                    current_attendance_status = status_obj.get("status_name") if status_obj else "N/A"
+                    attendance_record = None
 
-                time_in = time_in_val if time_in_val else "-"
-                time_out = time_out_val if time_out_val else "-"
+                if attendance_record:
+                    attendance_id = attendance_record.get("id")
+                    time_obj = attendance_record.get("attendance_time")
+                    status_obj = attendance_record.get("attendance_status")
 
-            # Build the final response object
+                    time_in_val = time_obj.get("time_in") if time_obj else None
+                    time_out_val = time_obj.get("time_out") if time_obj else None
+
+                    # If there's no time in, update the attendance_status to "A" (Absent, id:2).
+                    if not time_in_val:
+                        update_response = supabase_anon.table("attendance").update(
+                            {"attendance_status": 2}
+                        ).eq("id", attendance_id).execute()
+                        current_attendance_status = "A"
+                    else:
+                        current_attendance_status = status_obj.get("status_name") if status_obj else "N/A"
+
+                    time_in = time_in_val if time_in_val else "-"
+                    time_out = time_out_val if time_out_val else "-"
+
+            # Build the final response object.
             attendance_data.append({
                 "id": emp.get("id"),
                 "name": full_name,
-                "employeeStatus": employee_status,      # e.g., "Active"
-                "attendanceStatus": current_attendance_status,  # "P" or "A"
+                "employeeStatus": employee_status,
+                "attendanceStatus": current_attendance_status,
                 "timeIn": time_in,
                 "timeOut": time_out,
             })
@@ -582,34 +606,179 @@ def fetch_attendance_data(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-    
+
+
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
-def verify_attendance(request):
+def time_in(request):
     """
-    Verifies an employee's passcode for time in.
+    Verifies an employee's passcode for attendance (time in) and updates/creates the attendance record.
+    
     Expects a POST payload with:
       - employee_id: the selected employee's id (from the employee table)
+      - email: the provided email (from the frontend)
       - passcode: the entered 6-digit passcode
-
-    The employee record contains a user_id used to fetch authentication details.
-    The passcode stored in the user's metadata (under "passcode") is compared with the entered passcode.
-    If they match, the function updates the corresponding attendance record to record the current UTC time as time_in.
+    
+    Workflow:
+      1. Verify the employee’s credentials.
+      2. Ensure that the provided email matches the email associated with the employee.
+      3. Query for existing attendance records for this employee (including joined attendance_time to check time_in).
+      4. If a record for today exists and is marked as absent (status = 2), update it to present (status = 1).
+         Otherwise, create a new attendance record:
+             a. Insert a new record into attendance_time with the current time_in.
+             b. Insert a new attendance record referencing that attendance_time and mark it as present.
+    
+    Note: By default, an attendance record is absent until the employee times in.
     """
     try:
         employee_id = request.data.get("employee_id")
         entered_passcode = request.data.get("passcode")
+        provided_email = request.data.get("email")  # Email entered by the user
 
-        if not employee_id or not entered_passcode:
+        if not employee_id or not entered_passcode or not provided_email:
             return JsonResponse({"error": "Missing required fields."}, status=400)
 
-        # Query the employee record to get the linked user_id and attendance_id.
-        employee_response = supabase_service.table("employee") \
-            .select("id, user_id, first_name, last_name, attendance_id") \
-            .eq("id", employee_id) \
-            .single() \
+        # Query the employee record.
+        employee_response = (
+            supabase_service.table("employee")
+            .select("id, user_id, first_name, last_name")
+            .eq("id", employee_id)
+            .single()
             .execute()
+        )
+        if not employee_response.data:
+            return JsonResponse({"error": "Employee not found."}, status=404)
+
+        employee = employee_response.data
+        if not employee.get("user_id"):
+            return JsonResponse({"error": "Employee not linked to an auth user."}, status=400)
+
+        # Fetch user details using the admin client.
+        user_response = supabase_service.auth.admin.get_user_by_id(employee["user_id"])
+        if not (user_response and user_response.user):
+            return JsonResponse({"error": "Unable to fetch user authentication details."}, status=404)
+
+        # Ensure the provided email matches the employee's registered email.
+        if provided_email.lower() != user_response.user.email.lower():
+            return JsonResponse(
+                {"error": "Provided email does not match the selected employee's email."},
+                status=400,
+            )
+
+        # Attempt to sign in using the provided email and passcode.
+        sign_in_response = supabase_service.auth.sign_in_with_password({
+            "email": provided_email,
+            "password": entered_passcode
+        })
+        if not getattr(sign_in_response, "user", None):
+            return JsonResponse({"error": "Invalid passcode."}, status=401)
+        # Sign out after successful sign in.
+        supabase_service.auth.sign_out()
+
+        # Determine today's date (as a string in YYYY-MM-DD format).
+        today_str = datetime.now().strftime("%Y-%m-%d")
+
+        # Query for existing attendance records for this employee,
+        # joining the related attendance_time (to check its time_in).
+        existing_response = supabase_service.table("attendance").select(
+            "id, attendance_status, attendance_time(time_in)"
+        ).eq("employee_id", employee_id).execute()
+
+        attendance_record = None
+        if existing_response.data:
+            for record in existing_response.data:
+                att_time = record.get("attendance_time")
+                if att_time and isinstance(att_time, dict):
+                    time_in_val = att_time.get("time_in")
+                    # Check if the time_in value starts with today's date.
+                    if time_in_val and time_in_val.startswith(today_str):
+                        attendance_record = record
+                        break
+
+        if attendance_record:
+            attendance_id = attendance_record["id"]
+            # If the record is still marked absent (status = 2), update it to present (status = 1).
+            if attendance_record.get("attendance_status") == 2:
+                update_response = supabase_service.table("attendance").update(
+                    {"attendance_status": 1}
+                ).eq("id", attendance_id).execute()
+                if not update_response.data:
+                    return JsonResponse({"error": "Error updating attendance status."}, status=500)
+        else:
+            # 1. Insert a new record into the attendance_time table.
+            new_time_record = {
+                "time_in": datetime.now().isoformat(),
+                "time_out": None
+            }
+            time_response = supabase_service.table("attendance_time").insert(new_time_record).execute()
+            if not time_response.data:
+                return JsonResponse({"error": "Error inserting time record."}, status=500)
+            attendance_time_id = time_response.data[0]["id"]
+
+            # 2. Insert a new attendance record referencing the new attendance_time.
+            new_attendance = {
+                "employee_id": employee_id,
+                "attendance_status": 1,   # Mark as present.
+                "attendance_time": attendance_time_id
+            }
+            attendance_response = supabase_service.table("attendance").insert(new_attendance).execute()
+            if not attendance_response.data:
+                return JsonResponse({"error": "Error inserting attendance record."}, status=500)
+            attendance_id = attendance_response.data[0]["id"]
+
+        # Build the full employee name.
+        full_name = f"{employee.get('first_name', '')} {employee.get('last_name', '')}".strip()
+
+        return JsonResponse({
+            "success": True,
+            "message": "Time in successful.",
+            "employee": {
+                "id": employee.get("id"),
+                "name": full_name
+            }
+        })
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+    
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def time_out(request):
+    """
+    Handles employee time-out by ensuring they have already timed in for the current day.
+
+    Expected POST payload:
+      - employee_id: the ID of the employee
+      - email: employee's registered email
+      - passcode: the entered 6-digit passcode
+
+    Steps:
+      1. Validate employee credentials.
+      2. Ensure the provided email matches the employee’s registered email.
+      3. Authenticate the user using their passcode.
+      4. Check if there is an existing time-in record for today.
+      5. If time-in exists, update the corresponding attendance_time record with the time-out.
+
+    Note: Employees can only time out if they have already timed in for the same day.
+    """
+    try:
+        employee_id = request.data.get("employee_id")
+        provided_email = request.data.get("email")
+        entered_passcode = request.data.get("passcode")
+
+        if not employee_id or not provided_email or not entered_passcode:
+            return JsonResponse({"error": "Missing required fields."}, status=400)
+
+        # Query the employee record
+        employee_response = (
+            supabase_service.table("employee")
+            .select("id, user_id, first_name, last_name")
+            .eq("id", employee_id)
+            .single()
+            .execute()
+        )
 
         if not employee_response.data:
             return JsonResponse({"error": "Employee not found."}, status=404)
@@ -618,59 +787,62 @@ def verify_attendance(request):
         if not employee.get("user_id"):
             return JsonResponse({"error": "Employee not linked to an auth user."}, status=400)
 
-        # Use the admin client (with service role key) to fetch user details.
+        # Fetch user details using the admin client
         user_response = supabase_service.auth.admin.get_user_by_id(employee["user_id"])
         if not (user_response and user_response.user):
             return JsonResponse({"error": "Unable to fetch user authentication details."}, status=404)
 
-        user = user_response.user
+        # Ensure provided email matches the employee's registered email
+        if provided_email.lower() != user_response.user.email.lower():
+            return JsonResponse({"error": "Email mismatch."}, status=400)
 
-        # Retrieve the stored passcode from the user's metadata.
-        # Here we use the same pattern as the snippet provided.
-        stored_passcode = None
-        if user.user_metadata and isinstance(user.user_metadata, dict):
-            stored_passcode = user.user_metadata.get("passcode")
-        
-        if stored_passcode is None:
-            return JsonResponse({"error": "No passcode set for this user."}, status=400)
-
-        if stored_passcode != entered_passcode:
+        # Authenticate using the provided passcode
+        sign_in_response = supabase_service.auth.sign_in_with_password({
+            "email": provided_email,
+            "password": entered_passcode
+        })
+        if not getattr(sign_in_response, "user", None):
             return JsonResponse({"error": "Invalid passcode."}, status=401)
+        # Sign out after successful sign-in
+        supabase_service.auth.sign_out()
 
-        # Passcode verified. Now update the attendance record with the current UTC time as time_in.
-        attendance_id = employee.get("attendance_id")
-        if not attendance_id:
-            return JsonResponse({"error": "No attendance record linked to this employee."}, status=400)
+        # Get today's date
+        today_str = datetime.now().strftime("%Y-%m-%d")
 
-        # Retrieve the attendance record to get the linked attendance_time id.
-        attendance_record_response = supabase_service.table("attendance") \
-            .select("attendance_time") \
-            .eq("id", attendance_id) \
-            .single() \
-            .execute()
-        if not attendance_record_response.data:
-            return JsonResponse({"error": "Attendance record not found."}, status=404)
+        # Check if the employee has a time-in record for today
+        existing_response = supabase_service.table("attendance").select(
+            "id, attendance_status, attendance_time(id, time_in, time_out)"
+        ).eq("employee_id", employee_id).execute()
 
-        attendance_record = attendance_record_response.data
-        attendance_time_id = attendance_record.get("attendance_time")
-        if not attendance_time_id:
-            return JsonResponse({"error": "Attendance time record not linked."}, status=400)
+        attendance_record = None
+        for record in existing_response.data:
+            att_time = record.get("attendance_time")
+            if att_time and isinstance(att_time, dict):
+                time_in_val = att_time.get("time_in")
+                if time_in_val and time_in_val.startswith(today_str):
+                    attendance_record = record
+                    break
 
-        # Update the attendance_time record with the current UTC time as time_in.
-        current_time = datetime.utcnow().isoformat()
-        update_response = supabase_service.table("attendance_time") \
-            .update({"time_in": current_time}) \
-            .eq("id", attendance_time_id) \
-            .execute()
+        if not attendance_record:
+            return JsonResponse({"error": "No time-in record found for today."}, status=400)
 
-        # Optionally, you can check update_response.data to confirm the update.
+        attendance_time_id = attendance_record["attendance_time"]["id"]
+        time_out_val = attendance_record["attendance_time"]["time_out"]
+
+        if time_out_val:
+            return JsonResponse({"error": "Time-out already recorded."}, status=400)
+
+        # Update attendance_time with the time-out
+        update_response = supabase_service.table("attendance_time").update(
+            {"time_out": datetime.now().isoformat()}
+        ).eq("id", attendance_time_id).execute()
+
+        if not update_response.data:
+            return JsonResponse({"error": "Failed to update time-out."}, status=500)
+
         return JsonResponse({
             "success": True,
-            "message": "Passcode verified and time_in recorded.",
-            "employee": {
-                "id": employee.get("id"),
-                "name": f"{employee.get('first_name', '')} {employee.get('last_name', '')}".strip()
-            }
+            "message": "Time out successful."
         })
 
     except Exception as e:

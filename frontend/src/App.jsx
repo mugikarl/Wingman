@@ -29,7 +29,6 @@ import SalesCalendar from "./pages/Sales/SalesCalendar";
 import AdminRoute from "./components/admin/AdminRoute";
 import AttendanceReview from "./pages/Attendance/AttendanceReview";
 
-
 // You might have a separate dashboard for employees if needed.
 const EmployeeDashboard = Dashboard; // For this example, we reuse Dashboard
 
@@ -54,11 +53,7 @@ const App = () => {
         <div className="flex-grow">
           <Routes>
             {/* Login Page */}
-            <Route 
-              path="/login"
-              element={<Login setIsAdmin={setIsAdmin} />
-              } 
-            />
+            <Route path="/login" element={<Login setIsAdmin={setIsAdmin} />} />
             {/* Admin Dashboard Routes (protected by AdminRoute) */}
             <Route
               path="/dashboard-admin/ordertable"
