@@ -6,7 +6,6 @@ const TimeIn = ({ closeModal }) => {
     const [code, setCode] = useState("");
     const [isVerified, setIsVerified] = useState(false);
 
-    // Dummy verification function (replace with actual verification logic)
     const verifyCode = () => {
         if (code.length === 6 && /^\d+$/.test(code)) {
             setIsVerified(true);
