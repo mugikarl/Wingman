@@ -27,6 +27,7 @@ import Order from "./pages/Order/Order";
 import ChooseOrder from "./components/popups/ChooseOrder";
 import SalesCalendar from "./pages/Sales/SalesCalendar";
 import AdminRoute from "./components/admin/AdminRoute";
+import AttendanceReview from "./pages/Attendance/AttendanceReview";
 
 
 // You might have a separate dashboard for employees if needed.
@@ -123,6 +124,7 @@ const App = () => {
             <Route path="/order" element={<Order />} />
             <Route path="/chooseorder" element={<ChooseOrder />} />
             <Route path="/testconnection" element={<TestConnection />} />
+            <Route path="/attendancereview" element={<AttendanceReview />} />
 
             {/* Fallback Route */}
             <Route
