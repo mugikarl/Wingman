@@ -176,45 +176,45 @@ const AddProfile = ({ isOpen, closeModal, fetchEmployees, roles }) => {
                 Password
               </label>
               <div className="relative">
-  <input
-    type={passwordVisible ? "text" : "password"}
-    value={passcode}
-    readOnly
-    className="p-2 border rounded-lg bg-gray-200 w-full pr-10"
-  />
-  {/* Generate Icon Button */}
-  <button
-    onClick={generatePasscode}
-    className="absolute inset-y-0 right-2 p-2 hover:text-blue-500 transition-colors"
-    title="Generate Passcode"
-  >
-    {/* SVG Icon for Generate */}
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      className="w-5 h-5"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 4V1m0 0l-3 3m3-3l3 3M4 12H1m0 0l3-3m-3 3l3 3m16 0h3m0 0l-3-3m3 3l-3 3M12 23v-3m0 0l3 3m-3-3l-3 3"
-      />
-    </svg>
-  </button>
-</div>
+              <input
+                type={passwordVisible ? "text" : "password"}
+                value={passcode}
+                readOnly
+                className="p-2 border rounded-lg bg-gray-200 w-full pr-10"
+              />
+              {/* Generate Icon Button */}
+              <button
+                onClick={generatePasscode}
+                className="absolute inset-y-0 right-2 p-2 hover:text-blue-500 transition-colors"
+                title="Generate Passcode"
+              >
+                {/* SVG Icon for Generate */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  className="w-5 h-5"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4V1m0 0l-3 3m3-3l3 3M4 12H1m0 0l3-3m-3 3l3 3m16 0h3m0 0l-3-3m3 3l-3 3M12 23v-3m0 0l3 3m-3-3l-3 3"
+                  />
+                </svg>
+              </button>
+            </div>
 
-{/* Show/Hide Button */}
-<button
-  onClick={togglePasswordVisibility}
-  className="text-blue-500 text-sm self-start"
->
-  {passwordVisible ? "Hide" : "Show"}
-</button>
+            {/* Show/Hide Button */}
+            <button
+              onClick={togglePasswordVisibility}
+              className="text-blue-500 text-sm self-start"
+            >
+              {passwordVisible ? "Hide" : "Show"}
+            </button>
 
-</div>
+            </div>
             {/* Roles */}
             <div className="flex flex-col space-y-2">
               <label className="text-sm font-medium">Roles</label>

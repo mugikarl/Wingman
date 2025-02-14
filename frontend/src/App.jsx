@@ -11,7 +11,7 @@ import Sidebar from "./components/navigations/Sidebar"; // Combined Sidebar comp
 import Dashboard from "./pages/Dashboard";
 import Ordertable from "./pages/Ordertable";
 import Inventory from "./pages/Inventory";
-import StaffProfile from "./pages/StaffProfile";
+import StaffProfile from "./pages/Staff Profile/StaffProfile";
 import Sales from "./pages/Sales";
 import Login from "./pages/Login";
 import Attendance from "./pages/Attendance/Attendance";
