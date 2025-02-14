@@ -1,9 +1,11 @@
-import React, { useState } from 'react'
-import AttendanceSheet from '../../components/tables/AttendanceSheet'
+import React, { useState } from 'react';
+import AttendanceSheet from '../../components/tables/AttendanceSheet';
 import TimeIn from '../../components/popups/TimeIn';
+import TimeOut from '../../components/popups/TimeOut';
 
 const Attendance = () => {
     const [isTimeInModalOpen, setIsTimeInModalOpen] = useState(false);
+    const [isTimeOutModalOpen, setIsTimeOutModalOpen] = useState(false);
 
     return (
         <div className='flex-grow p-6 bg-[#E2D6D5] min-h-full'>
@@ -15,6 +17,7 @@ const Attendance = () => {
                     Time In
                 </button>
                 <button
+                    onClick={() => setIsTimeOutModalOpen(true)}
                     className="bg-[#E88504] text-white p-2 rounded-lg w-auto shadow"
                 >
                     Time Out
@@ -24,10 +27,11 @@ const Attendance = () => {
                 <AttendanceSheet />
             </div>
 
-            {/* Show modal when isTimeInModalOpen is true */}
+            {/* Show modals when respective states are true */}
             {isTimeInModalOpen && <TimeIn closeModal={() => setIsTimeInModalOpen(false)} />}
+            {isTimeOutModalOpen && <TimeOut closeModal={() => setIsTimeOutModalOpen(false)} />}
         </div>
-    )
+    );
 }
 
-export default Attendance
+export default Attendance;
