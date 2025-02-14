@@ -19,11 +19,14 @@ const StaffProfile = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("access_token"); // Retrieve token
-      const response = await axios.get("http://127.0.0.1:8000/fetch-data/", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await axios.get(
+        "http://127.0.0.1:8000/fetch-employee-data/",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       setEmployees(response.data.employees || []);
       setRoles(response.data.roles || []);
@@ -125,7 +128,11 @@ const StaffProfile = () => {
               sortedEmployees.map((employee, index) => (
                 <tr
                   key={employee.id}
-                  className={index % 2 === 0 ? "bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200" : "bg-[#FFFFFF] border-b border-[#FFCF03] cursor-pointer hover:bg-gray-200"}
+                  className={
+                    index % 2 === 0
+                      ? "bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
+                      : "bg-[#FFFFFF] border-b border-[#FFCF03] cursor-pointer hover:bg-gray-200"
+                  }
                   onClick={() => openEditModal(employee)}
                 >
                   <td className="p-2">{employee.id}</td>
