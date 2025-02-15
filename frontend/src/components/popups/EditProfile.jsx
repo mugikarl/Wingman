@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import axios from "axios";
-import ChangePasswordPopup from "./ChangePasswordPopup"; // Import the new component
-
+import ChangePasswordPopup from "./ChangePasswordPopup"; // Import the popup component
 
 const EditProfile = ({
   isOpen,
@@ -14,9 +13,7 @@ const EditProfile = ({
   const [isEditMode, setIsEditMode] = useState(false);
   const [firstName, setFirstName] = useState(employee?.first_name || "");
   const [lastName, setLastName] = useState(employee?.last_name || "");
-  const [middleInitial, setMiddleInitial] = useState(
-    employee?.middle_initial || ""
-  );
+  const [middleInitial, setMiddleInitial] = useState(employee?.middle_initial || "");
   const [username, setUsername] = useState(employee?.username || "");
   const [email, setEmail] = useState(employee?.email || "");
   const [contactNumber, setContactNumber] = useState(employee?.contact || "");
@@ -45,26 +42,7 @@ const EditProfile = ({
         : [...prevRoles, roleId]
     );
   };
-  const handleChangePassword = (newPasscode) => {
-    // Update the employee's passcode in the backend
-    const token = localStorage.getItem("access_token");
-    axios
-      .put(
-        `http://127.0.0.1:8000/api/change-password/${employee.id}/`,
-        { passcode: newPasscode },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      )
-      .then(() => {
-        fetchEmployees();
-      })
-      .catch((error) => {
-        console.error("Error changing password:", error);
-      });
-  };
+
   const handleSubmit = async () => {
     const updatedEmployeeData = {
       first_name: firstName,
@@ -72,12 +50,11 @@ const EditProfile = ({
       middle_initial: middleInitial,
       username,
       email,
+      passcode,
       contact: contactNumber,
       base_salary: salary,
-      passcode,
       status_id: parseInt(status), // Ensure status is sent as a number
       roles: selectedRoles, // Send role IDs
-      ...(passcode && { passcode: passcode }), // Only include password if set
     };
 
     const token = localStorage.getItem("access_token");
@@ -92,8 +69,9 @@ const EditProfile = ({
           },
         }
       );
+      alert("Employee has been updated!")
       fetchEmployees();
-      setIsEditMode(!isEditMode);
+      setIsEditMode(false);
       closeModal();
     } catch (error) {
       console.error("Error updating employee:", error);
@@ -125,19 +103,13 @@ const EditProfile = ({
     isOpen && (
       <div className="fixed inset-0 flex justify-center items-center bg-gray-500 bg-opacity-50 p-4">
         <div className="bg-white rounded-lg p-6 w-8/10 space-y-4">
-          <button
-            onClick={closeModal}
-            className="text-gray-500 hover:text-gray-800"
-          >
+          <button onClick={closeModal} className="text-gray-500 hover:text-gray-800">
             &times;
           </button>
           <div className="flex justify-between">
             <h2 className="text-2xl font-bold">Edit Staff Profile</h2>
             <div className="space-x-2">
-              <button
-                onClick={handleDelete}
-                className="bg-red-500 text-white p-2 rounded-lg"
-              >
+              <button onClick={handleDelete} className="bg-red-500 text-white p-2 rounded-lg">
                 Delete
               </button>
               <button
@@ -209,19 +181,6 @@ const EditProfile = ({
             </div>
 
             <div className="flex flex-col space-y-4 w-1/2">
-              {/* Username
-              <div className="flex flex-col space-y-2">
-                <label htmlFor="username" className="text-sm font-medium">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="p-2 border rounded-lg"
-                  disabled={!isEditMode}
-                />
-              </div> */}
               {/* Email */}
               <div className="flex flex-col space-y-2">
                 <label htmlFor="email" className="text-sm font-medium">
@@ -237,32 +196,51 @@ const EditProfile = ({
               </div>
               {/* Password */}
               <div className="flex flex-col space-y-2">
-            <label htmlFor="email" className="text-sm font-medium">
-                Password
-              </label>
-              <div className="flex flex-col space-y-2">
-  {/* Password Field with Generate Icon Inside */}
-  <button
-                onClick={() => setIsChangePasswordOpen(true)}
-                className="bg-[#E88504] text-white p-2 rounded-lg"
-              >
-                Change Password
-              </button>
-              <ChangePasswordPopup
-            isOpen={isChangePasswordOpen}
-            closePopup={() => setIsChangePasswordOpen(false)}
-            currentPassword={employee?.passcode} // Assuming the passcode is stored in the employee object
-            onSave={handleChangePassword}
-          />
-{/* Show/Hide Button */}
-<button
-  onClick={togglePasswordVisibility}
-  className="text-blue-500 text-sm self-start"
->
-  {passwordVisible ? "Hide" : "Show"}
-</button>
-</div>
-</div>
+                <label htmlFor="email" className="text-sm font-medium">
+                  Password
+                </label>
+                <div className="flex flex-col space-y-2">
+                  {/* Password Field with Generate Icon Inside */}
+                  <div className="relative">
+                    <input
+                      type={passwordVisible ? "text" : "password"}
+                      value={passcode}
+                      readOnly
+                      className="p-2 border rounded-lg bg-gray-200 w-full pr-10"
+                    />
+                    {/* Generate Icon Button */}
+                    <button
+                      onClick={generatePasscode}
+                      className="absolute inset-y-0 right-2 p-2 hover:text-blue-500 transition-colors"
+                      title="Generate Passcode"
+                      disabled={!isEditMode}
+                    >
+                      {/* SVG Icon for Generate */}
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        className="w-5 h-5"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4V1m0 0l-3 3m3-3l3 3M4 12H1m0 0l3-3m-3 3l3 3m16 0h3m0 0l-3-3m3 3l-3 3M12 23v-3m0 0l3 3m-3-3l-3 3"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  {/* Show/Hide Button */}
+                  <button
+                    onClick={togglePasswordVisibility}
+                    className="text-blue-500 text-sm self-start"
+                  >
+                    {passwordVisible ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </div>
               {/* Roles */}
               <div className="flex flex-col space-y-2">
                 <label className="text-sm font-medium">Roles</label>
@@ -281,11 +259,11 @@ const EditProfile = ({
                       />
                       <div
                         className={`w-5 h-5 border rounded-md flex items-center justify-center 
-                        ${
-                          selectedRoles.includes(role.id)
-                            ? "bg-blue-500 border-blue-600 text-white"
-                            : "border-gray-400 bg-white"
-                        }`}
+                          ${
+                            selectedRoles.includes(role.id)
+                              ? "bg-blue-500 border-blue-600 text-white"
+                              : "border-gray-400 bg-white"
+                          }`}
                       >
                         {selectedRoles.includes(role.id) && "✓"}
                       </div>
@@ -294,6 +272,7 @@ const EditProfile = ({
                   ))}
                 </div>
               </div>
+
               {/* Status */}
               <div className="flex flex-col space-y-2">
                 <label className="text-sm font-medium">Status</label>
@@ -314,11 +293,11 @@ const EditProfile = ({
                       />
                       <div
                         className={`w-5 h-5 border rounded-full flex items-center justify-center 
-                        ${
-                          parseInt(status) === statusOption.id
-                            ? "bg-green-500 border-green-600"
-                            : "border-gray-400 bg-white"
-                        }`}
+                          ${
+                            parseInt(status) === statusOption.id
+                              ? "bg-green-500 border-green-600"
+                              : "border-gray-400 bg-white"
+                          }`}
                       >
                         {parseInt(status) === statusOption.id && (
                           <div className="w-3 h-3 bg-white rounded-full"></div>
