@@ -21,17 +21,12 @@ const ChangePasswordPopup = ({ isOpen, closePopup, currentPassword, onSave }) =>
       return;
     }
 
-    if (currentPasscode !== currentPassword) {
-      setError("Incorrect current password.");
-      return;
-    }
-
     if (!newPasscode) {
       setError("Please generate a new passcode.");
       return;
     }
 
-    onSave(newPasscode);
+    onSave({ currentPasscode, newPasscode });
     closePopup();
   };
 

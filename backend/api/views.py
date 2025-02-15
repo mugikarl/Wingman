@@ -429,11 +429,12 @@ def edit_employee(request, employee_id):
     try:
         # Step 1: Authenticate user
         auth_data = authenticate_user(request)
-        supabase_client = auth_data["client"]
+        client = auth_data["client"]
+        auth_user_uuid = auth_data["auth_user_uuid"]
         employee_pk = auth_data["employee_pk"]  # Authenticated employee ID
 
         # Step 2: Check if the authenticated user is an Admin
-        admin_role_check = supabase_client.table("employee_role") \
+        admin_role_check = client.table("employee_role") \
             .select("role_id") \
             .eq("employee_id", employee_pk) \
             .execute()
@@ -445,7 +446,7 @@ def edit_employee(request, employee_id):
             return JsonResponse({"error": "Unauthorized. No roles assigned."}, status=403)
 
         # Fetch role names
-        role_names_response = supabase_client.table("role") \
+        role_names_response = client.table("role") \
             .select("id, role_name") \
             .in_("id", role_ids) \
             .execute()
@@ -480,10 +481,10 @@ def edit_employee(request, employee_id):
             "status_id": status_id,
         }
 
-        supabase_client.table("employee").update(update_data).eq("id", employee_id).execute()
+        client.table("employee").update(update_data).eq("id", employee_id).execute()
 
         # Step 5: Update Supabase Auth if email or password is changed
-        employee_record = supabase_client.table("employee").select("user_id").eq("id", employee_id).execute()
+        employee_record = client.table("employee").select("user_id").eq("id", employee_id).execute()
         if not employee_record.data:
             return JsonResponse({"error": "Employee record not found after update"}, status=404)
 
@@ -496,11 +497,11 @@ def edit_employee(request, employee_id):
             auth_update_data["password"] = passcode
 
         if auth_update_data:
-            supabase_client.auth.admin.update_user_by_id(auth_user_id, auth_update_data)
+            client.auth.admin.update_user_by_id(auth_user_id, auth_update_data)
 
         # Step 6: Update employee roles if needed
         new_roles = set(roles)
-        existing_roles_response = supabase_client.table("employee_role") \
+        existing_roles_response = client.table("employee_role") \
             .select("role_id") \
             .eq("employee_id", employee_id) \
             .execute()
@@ -508,16 +509,15 @@ def edit_employee(request, employee_id):
         existing_roles = {role["role_id"] for role in existing_roles_response.data} if existing_roles_response.data else set()
 
         if new_roles != existing_roles:
-            supabase_client.table("employee_role").delete().eq("employee_id", employee_id).execute()
+            client.table("employee_role").delete().eq("employee_id", employee_id).execute()
             role_entries = [{"employee_id": employee_id, "role_id": role_id} for role_id in new_roles]
             if role_entries:
-                supabase_client.table("employee_role").insert(role_entries).execute()
+                client.table("employee_role").insert(role_entries).execute()
 
         return JsonResponse({"message": "Employee updated successfully", "employee_id": employee_id}, status=200)
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-    
+        return JsonResponse({"error": str(e)}, status=500)    
 
 
 # ATTENDANCE 
