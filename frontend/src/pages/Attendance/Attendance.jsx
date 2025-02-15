@@ -10,10 +10,15 @@ const Attendance = () => {
   const [isTimeOutModalOpen, setIsTimeOutModalOpen] = useState(false);
   const [attendanceData, setAttendanceData] = useState([]);
 
-  // Function to fetch attendance data
-  const fetchAttendanceData = () => {
+  // Function to fetch attendance data; accepts an optional date parameter.
+  const fetchAttendanceData = (date = null) => {
+    let url = "http://127.0.0.1:8000/fetch-attendance-data/";
+    // If a date is provided, append it as a query parameter.
+    if (date) {
+      url += `?date=${date}`;
+    }
     axios
-      .get("http://127.0.0.1:8000/fetch-attendance-data/")
+      .get(url)
       .then((response) => {
         setAttendanceData(response.data);
       })
@@ -22,7 +27,7 @@ const Attendance = () => {
       });
   };
 
-  // Fetch data when the component mounts
+  // Fetch initial data when the component mounts.
   useEffect(() => {
     fetchAttendanceData();
   }, []);
@@ -54,7 +59,7 @@ const Attendance = () => {
       {/* Show modals when respective states are true */}
       {isTimeInModalOpen && (
         <TimeIn
-          refreshAttendance={fetchAttendanceData} // Pass the function to TimeIn
+          refreshAttendance={fetchAttendanceData}
           closeModal={() => setIsTimeInModalOpen(false)}
         />
       )}
