@@ -650,89 +650,6 @@ def fetch_attendance_data(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-# def fetch_attendance_data(request):
-#     """
-#     Fetch employees along with:
-#       - Their own employee status (from employee_status table)
-#       - Attendance details including:
-#           • Attendance status (from attendance_status table)
-#           • Time in and time out (from attendance_time table)
-    
-#     If an employee's attendance record is missing a time in, update that attendance record
-#     to have an attendance_status of Absent ("A", which is id: 2).
-    
-#     This view is public and intended for admin usage.
-#     """
-#     try:
-#         # Note the relationship alias "attendance" (not "attendance_id") to reflect the FK from employee.
-#         response = supabase_anon.table("employee").select(
-#             "id, first_name, last_name, "
-#             "employee_status:employee_status(status_name), "
-#             "attendance:attendance(attendance_status:attendance_status(status_name), attendance_time:attendance_time(time_in,time_out))"
-#         ).execute()
-
-#         employees = response.data if response.data else []
-#         attendance_data = []
-
-#         for emp in employees:
-#             # Build full name.
-#             full_name = f"{emp.get('first_name', '')} {emp.get('last_name', '')}".strip()
-
-#             # Retrieve employee status.
-#             emp_status_obj = emp.get("employee_status")
-#             employee_status = emp_status_obj.get("status_name") if emp_status_obj else "N/A"
-
-#             # Process attendance details.
-#             attendance = emp.get("attendance")
-#             current_attendance_status = "N/A"
-#             time_in = "-"
-#             time_out = "-"
-
-#             if attendance:
-#                 # If attendance is returned as a list (1-to-many), take the first record.
-#                 if isinstance(attendance, list) and len(attendance) > 0:
-#                     attendance_record = attendance[0]
-#                 elif isinstance(attendance, dict):
-#                     attendance_record = attendance
-#                 else:
-#                     attendance_record = None
-
-#                 if attendance_record:
-#                     attendance_id = attendance_record.get("id")
-#                     time_obj = attendance_record.get("attendance_time")
-#                     status_obj = attendance_record.get("attendance_status")
-
-#                     time_in_val = time_obj.get("time_in") if time_obj else None
-#                     time_out_val = time_obj.get("time_out") if time_obj else None
-
-#                     # If there's no time in, update the attendance_status to "A" (Absent, id:2).
-#                     if not time_in_val:
-#                         update_response = supabase_anon.table("attendance").update(
-#                             {"attendance_status": 2}
-#                         ).eq("id", attendance_id).execute()
-#                         current_attendance_status = "A"
-#                     else:
-#                         current_attendance_status = status_obj.get("status_name") if status_obj else "N/A"
-
-#                     time_in = time_in_val if time_in_val else "-"
-#                     time_out = time_out_val if time_out_val else "-"
-
-#             # Build the final response object.
-#             attendance_data.append({
-#                 "id": emp.get("id"),
-#                 "name": full_name,
-#                 "employeeStatus": employee_status,
-#                 "attendanceStatus": current_attendance_status,
-#                 "timeIn": time_in,
-#                 "timeOut": time_out,
-#             })
-
-#         return JsonResponse(attendance_data, safe=False)
-
-#     except Exception as e:
-#         return JsonResponse({"error": str(e)}, status=500)
-
-
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
@@ -969,6 +886,103 @@ def time_out(request):
             "success": True,
             "message": "Time out successful."
         })
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+# INVENTORY
+@api_view(['GET'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def fetch_item_data(request):
+    """
+    Fetches measurements (units), categories, items, and inventory data.
+    Returns them in a structure similar to employee data with roles and statuses.
+    """
+    try:
+        # Authenticate the user; if unauthorized, authenticate_user() will raise an exception.
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]  # Use the authenticated client for table queries
+
+        # Fetch units
+        units_response = supabase_client.table("unit_of_measurement") \
+            .select("id, symbol") \
+            .execute()
+        units = units_response.data if units_response.data else []
+
+        # Fetch categories
+        categories_response = supabase_client.table("item_category") \
+            .select("id, name") \
+            .execute()
+        categories = categories_response.data if categories_response.data else []
+
+        # Fetch items
+        items_response = supabase_client.table("items") \
+            .select("id, name, measurement, category, stock_trigger") \
+            .execute()
+        items = items_response.data if items_response.data else []
+
+        # Fetch inventory data (with item references)
+        inventory_response = supabase_client.table("inventory") \
+            .select("id, item, quantity") \
+            .execute()
+        inventory_data = inventory_response.data if inventory_response.data else []
+
+        # Format items with measurement/unit and category
+        formatted_items = []
+        for item in items:
+            # Find unit for the item
+            unit = next((unit for unit in units if unit["id"] == item.get("measurement")), {})
+            # Find category for the item
+            category = next((category for category in categories if category["id"] == item.get("category")), {})
+            formatted_items.append({
+                "id": item["id"],
+                "name": item["name"],
+                "measurement": unit.get("symbol", ""),
+                "category": category.get("name", ""),
+                "stock_trigger": item.get("stock_trigger", "")
+            })
+
+        return JsonResponse({
+            "units": units,
+            "categories": categories,
+            "items": formatted_items,
+        }, safe=False)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@api_view(['POST'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def add_item(request):
+    """
+    Handles adding a new item to the database.
+    """
+    try:
+        data = json.loads(request.body)
+        name = data.get("name")
+        stock_trigger = data.get("stock_trigger")
+        unit_id = data.get("measurement")
+        category_id = data.get("category")
+
+        if not name or not stock_trigger or not unit_id or not category_id:
+            return JsonResponse({"error": "All fields are required."}, status=400)
+
+        # Insert new item
+        insert_response = supabase_service.table("items").insert({
+            "name": name,
+            "stock_trigger": stock_trigger,
+            "measurement": unit_id,
+            "category": category_id
+        }).execute()
+
+        if insert_response.data:
+            return JsonResponse({"message": "Item added successfully."}, status=201)
+        else:
+            return JsonResponse({"error": "Failed to add item."}, status=500)
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
