@@ -139,47 +139,56 @@ const AttendanceReview = ({ attendanceData, refreshAttendance }) => {
 
   return (
     <div className="p-4 mx-auto">
-      {/* Top navigation: arrows and current date */}
-      <div className="relative bg-[#c27100] text-center text-lg font-semibold w-full py-1 rounded flex justify-center items-center">
-        <button
-          className="px-3 py-1 rounded-l-lg text-white hover:bg-white hover:text-[#c27100]"
-          onClick={decrementDate}
-        >
-          &lt;
-        </button>
-        <div
-          className="cursor-pointer px-2 bg-[#c27100] text-white"
-          onClick={() => setShowDatepicker(!showDatepicker)}
-        >
-          {displayDate}
-        </div>
-        <button
-          className="px-3 py-1 rounded-r-lg text-white hover:bg-white hover:text-[#c27100]"
-          onClick={incrementDate}
-        >
-          &gt;
-        </button>
-        {showDatepicker && (
-          <div className="absolute top-10 left-1/2 transform -translate-x-1/2 mt-2 z-10 bg-white shadow-lg rounded-lg">
-            <Datepicker
-              inline
-              value={new Date(selectedDate)}
-              onChange={(date) => {
-                console.log("Date selected:", date);
-                if (date instanceof Date) {
-                  setSelectedDate(getLocalDateString(date));
-                  setShowDatepicker(false);
-                } else if (Array.isArray(date) && date.length > 0) {
-                  setSelectedDate(getLocalDateString(date[0]));
-                  setShowDatepicker(false);
-                }
-              }}
-              theme={customTheme}
-              className="bg-white"
-            />
-          </div>
-        )}
+  {/* Top navigation: arrows and current date */}
+  <div className="relative bg-[#c27100] text-lg font-semibold w-full rounded flex justify-between items-center">
+    {/* Leftmost: Decrement Button */}
+    <button
+      className="px-4 py-2 text-white hover:bg-white hover:text-[#c27100] border-r border-white"
+      onClick={decrementDate}
+    >
+      &lt;
+    </button>
+
+    {/* Center: Date Display */}
+    <div
+      className="absolute left-1/2 transform -translate-x-1/2 cursor-pointer px-2 bg-[#c27100] text-white"
+      onClick={() => setShowDatepicker(!showDatepicker)}
+    >
+      {displayDate}
+    </div>
+
+    {/* Rightmost: Increment Button */}
+    <button
+      className="px-4 py-2 text-white hover:bg-white hover:text-[#c27100] border-l border-white"
+      onClick={incrementDate}
+    >
+      &gt;
+    </button>
+
+    {/* Datepicker - Always centered */}
+    {showDatepicker && (
+      <div className="absolute top-10 left-1/2 transform -translate-x-1/2 mt-2 z-10 bg-white shadow-lg rounded-lg">
+        <Datepicker
+          inline
+          value={new Date(selectedDate)}
+          onChange={(date) => {
+            console.log("Date selected:", date);
+            if (date instanceof Date) {
+              setSelectedDate(getLocalDateString(date));
+              setShowDatepicker(false);
+            } else if (Array.isArray(date) && date.length > 0) {
+              setSelectedDate(getLocalDateString(date[0]));
+              setShowDatepicker(false);
+            }
+          }}
+          theme={customTheme}
+          className="bg-white"
+        />
       </div>
+    )}
+  </div>
+
+
 
       {/* Attendance Table */}
       <div className="overflow-x-auto">
