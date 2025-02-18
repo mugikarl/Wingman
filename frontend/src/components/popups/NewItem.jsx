@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-const NewItem = ({ isOpen, closeModal, fetchInventoryData }) => {
+const NewItem = ({ isOpen, closeModal, fetchItemData, categories, units }) => {
   const [itemName, setItemName] = useState("");
   const [stockTrigger, setStockTrigger] = useState("");
   const [selectedUnit, setSelectedUnit] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [units, setUnits] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -16,29 +14,6 @@ const NewItem = ({ isOpen, closeModal, fetchInventoryData }) => {
       fetchItemData();
     }
   }, [isOpen]);
-
-  const fetchItemData = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const token = localStorage.getItem("access_token");
-      const response = await axios.get(
-        "http://127.0.0.1:8000/fetch-item-data/",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      setUnits(response.data.units || []);
-      setCategories(response.data.categories || []);
-    } catch (err) {
-      console.error("Error fetching item data:", err);
-      setError("Failed to load data.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSubmit = async () => {
     if (!itemName || !stockTrigger || !selectedUnit || !selectedCategory) {
@@ -62,8 +37,8 @@ const NewItem = ({ isOpen, closeModal, fetchInventoryData }) => {
       );
 
       alert("Item added successfully!");
-      fetchInventoryData();
-      closeModal(); // Refresh inventory list
+      fetchItemData();
+      closeModal(); // Refresh items list
     } catch (error) {
       console.error("Error adding item:", error);
       alert("Failed to add item.");

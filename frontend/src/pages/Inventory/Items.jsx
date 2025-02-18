@@ -1,54 +1,46 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import NewItem from "../components/popups/NewItem";
-import Table from "../components/tables/Table";
+import { Datepicker } from "flowbite-react";
+import NewItem from "../../components/popups/NewItem";
+import Table from "../../components/tables/Table";
 import axios from "axios";
 
-const Inventory = () => {
+const Items = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [inventoryData, setInventoryData] = useState([]); // State to hold inventory data
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [units, setUnits] = useState([]);
+  const [categories, setCategories] = useState([]);
 
-  const openModal = () => {
-    setIsModalOpen(true);
+  const openModal = () => setIsModalOpen(true);
+  const closeModal = () => setIsModalOpen(false);
+
+  // Fetch item data from the backend API
+  const fetchItemData = async () => {
+    try {
+      const response = await axios.get(
+        "http://127.0.0.1:8000/fetch-item-data/"
+      );
+      setItems(response.data.items); // ✅ Correctly access items
+      setCategories(response.data.categories || []);
+      setUnits(response.data.units || []);
+    } catch (error) {
+      console.error("Error fetching inventory data:", error);
+    } finally {
+      setLoading(false);
+    }
   };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-  };
-
-  // Fetch inventory data from the API
   useEffect(() => {
-    const fetchInventoryData = async () => {
-      try {
-        const response = await axios.get(
-          "http://127.0.0.1:8000/fetch-item-data/"
-        ); // Adjust to your actual API endpoint
-        setInventoryData(response.data.inventory); // Store formatted inventory data in state
-      } catch (error) {
-        console.error("Error fetching inventory data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchInventoryData();
+    fetchItemData();
   }, []);
 
   return (
     <div className="min-h-screen w-full bg-[#E2D6D5] flex">
-      {/* Main Content */}
       <div className="flex-grow p-6">
-        {/* Top Section */}
         <div className="flex flex-col space-y-4 mb-4">
-          {/* Side Buttons with Image and Text (Moved Above Search Bar) */}
           <div className="flex space-x-4">
-            {/* New Product Button */}
             <Link to="/inventory">
-              <button
-                onClick={openModal}
-                className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]"
-              >
+              <button className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
                 <img
                   src="/images/stockout/cart.png"
                   alt="New Product"
@@ -57,8 +49,7 @@ const Inventory = () => {
                 <span className="text-white">Inventory</span>
               </button>
             </Link>
-            {/* Other Buttons */}
-            <Link to="/items">
+            <Link to="">
               <button className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
                 <img
                   src="/images/stockout/menu.png"
@@ -68,7 +59,6 @@ const Inventory = () => {
                 <span className="text-white">Items</span>
               </button>
             </Link>
-
             <Link to="/stockin">
               <button className="flex items-center bg-[#00BA34] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
                 <img
@@ -79,7 +69,6 @@ const Inventory = () => {
                 <span className="text-white">Stock In</span>
               </button>
             </Link>
-
             <Link to="/disposeditems">
               <button className="flex items-center bg-[#FF0000] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
                 <img
@@ -91,19 +80,26 @@ const Inventory = () => {
               </button>
             </Link>
           </div>
-
-          {/* Search Bar and Scrollable Buttons */}
           <div className="w-full">
-            {/* Search Bar */}
-            <div className="flex items-center space-x-2 mb-4 w-1/2">
+            <div className="flex items-center justify-between space-x-2 mb-4">
               <input
                 type="text"
                 placeholder="Search..."
-                className="flex-grow p-2 border rounded-lg shadow"
+                className="w-1/2 p-2 border rounded-lg shadow"
               />
+              <button
+                onClick={openModal}
+                className="flex items-center bg-[#1c4686] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]"
+              >
+                <img
+                  src="/images/stockout/trash.png"
+                  alt="Disposed"
+                  className="w-8 h-8 mr-2"
+                />
+                <span className="text-white">New Item</span>
+              </button>
             </div>
 
-            {/* Scrollable Buttons */}
             <div className="flex space-x-4 overflow-x-auto scrollbar-hide">
               <button className="flex items-center justify-center bg-blue-500 text-white p-2 rounded-lg shadow min-w-[12%]">
                 Button
@@ -122,24 +118,30 @@ const Inventory = () => {
         </div>
         {/* Table */}
         <Table
-          columns={["ID", "NAME", "UNIT", "CATEGORY", "QUANTITY"]}
+          columns={["ID", "ITEM NAME", "UNIT", "CATEGORY"]}
           data={
             loading
-              ? [["", "", "Loading...", "", ""]] // Show "Loading..." while fetching
-              : inventoryData.map((item) => [
+              ? [["", "", "Loading...", ""]] // Show "Loading..." while fetching
+              : items.map((item) => [
                   item.id,
                   item.name,
                   item.measurement,
                   item.category,
-                  item.quantity,
                 ])
           }
         />
-        {/* New Product Modal */}
-        <NewItem isOpen={isModalOpen} closeModal={closeModal} />
+
+        {/* New Item Modal */}
+        <NewItem
+          isOpen={isModalOpen}
+          closeModal={closeModal}
+          fetchItemData={fetchItemData}
+          categories={categories}
+          units={units}
+        />
       </div>
     </div>
   );
 };
 
-export default Inventory;
+export default Items;

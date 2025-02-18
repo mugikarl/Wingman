@@ -893,8 +893,8 @@ def time_out(request):
 
 # INVENTORY
 @api_view(['GET'])
-@authentication_classes([SupabaseAuthentication])
-@permission_classes([SupabaseIsAdmin])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def fetch_item_data(request):
     """
     Fetches measurements (units), categories, items, and inventory data.
@@ -902,29 +902,29 @@ def fetch_item_data(request):
     """
     try:
         # Authenticate the user; if unauthorized, authenticate_user() will raise an exception.
-        auth_data = authenticate_user(request)
-        supabase_client = auth_data["client"]  # Use the authenticated client for table queries
+        # auth_data = authenticate_user(request)
+        # supabase_client = auth_data["client"]  # Use the authenticated client for table queries
 
         # Fetch units
-        units_response = supabase_client.table("unit_of_measurement") \
+        units_response = supabase_anon.table("unit_of_measurement") \
             .select("id, symbol") \
             .execute()
         units = units_response.data if units_response.data else []
 
         # Fetch categories
-        categories_response = supabase_client.table("item_category") \
+        categories_response = supabase_anon.table("item_category") \
             .select("id, name") \
             .execute()
         categories = categories_response.data if categories_response.data else []
 
         # Fetch items
-        items_response = supabase_client.table("items") \
+        items_response = supabase_anon.table("items") \
             .select("id, name, measurement, category, stock_trigger") \
             .execute()
         items = items_response.data if items_response.data else []
 
         # Fetch inventory data (with item references)
-        inventory_response = supabase_client.table("inventory") \
+        inventory_response = supabase_anon.table("inventory") \
             .select("id, item, quantity") \
             .execute()
         inventory_data = inventory_response.data if inventory_response.data else []
@@ -944,10 +944,27 @@ def fetch_item_data(request):
                 "stock_trigger": item.get("stock_trigger", "")
             })
 
+        # Format inventory with item details
+        formatted_inventory = []
+        for inventory in inventory_data:
+            # Find the corresponding item data
+            item = next((item for item in items if item["id"] == inventory.get("item")), {})
+            # Find the category and unit for the item
+            unit = next((unit for unit in units if unit["id"] == item.get("measurement")), {})
+            category = next((category for category in categories if category["id"] == item.get("category")), {})
+            formatted_inventory.append({
+                "id": item["id"],
+                "name": item["name"],
+                "category": category.get("name", ""),
+                "measurement": unit.get("symbol", ""),
+                "quantity": inventory.get("quantity", 0)
+            })
+
         return JsonResponse({
             "units": units,
             "categories": categories,
             "items": formatted_items,
+            "inventory": formatted_inventory
         }, safe=False)
 
     except Exception as e:
