@@ -29,6 +29,8 @@ import SalesCalendar from "./pages/Sales/SalesCalendar";
 import AdminRoute from "./components/admin/AdminRoute";
 import AttendanceReview from "./pages/Attendance/AttendanceReview";
 import Items from "./pages/Inventory/Items";
+import EditItem from "./components/popups/EditItem";
+import EditInventory from "./components/popups/EditInventory";
 
 // You might have a separate dashboard for employees if needed.
 const EmployeeDashboard = Dashboard; // For this example, we reuse Dashboard
@@ -114,6 +116,7 @@ const App = () => {
             <Route path="/legendmodal" element={<LegendModal />} />
             <Route path="/employeeleave" element={<EmployeeLeave />} />
             <Route path="/holidays" element={<Holidays />} />
+
             <Route path="/salescalendar" element={<SalesCalendar />} />
             <Route path="/menu" element={<Menu />} />
             <Route path="/stockin" element={<StockIn />} />
@@ -122,7 +125,8 @@ const App = () => {
             <Route path="/testconnection" element={<TestConnection />} />
             <Route path="/attendancereview" element={<AttendanceReview />} />
             <Route path="/items" element={<Items />} />
-
+            <Route path="/edititem" element={<EditItem />} />
+            <Route path="/editinventory" element={<EditInventory />} />
             {/* Fallback Route */}
             <Route
               path="*"

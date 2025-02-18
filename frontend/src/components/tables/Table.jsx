@@ -17,7 +17,7 @@ const Table = ({ columns, data, rowOnClick }) => {
               <tr
                 key={rowIndex}
                 className="bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
-                onClick={() => rowOnClick && rowOnClick(rowIndex)}
+                onClick={() => rowOnClick && rowOnClick(rowIndex)} 
               >
                 {row.map((cell, cellIndex) => (
                   <td key={cellIndex} className="p-2">{cell}</td>

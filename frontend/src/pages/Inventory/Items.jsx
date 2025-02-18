@@ -4,17 +4,29 @@ import { Datepicker } from "flowbite-react";
 import NewItem from "../../components/popups/NewItem";
 import Table from "../../components/tables/Table";
 import axios from "axios";
+import EditItem from "../../components/popups/EditItem";
 
 const Items = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // State for edit modal
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [units, setUnits] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [selectedItem, setSelectedItem] = useState(null); // State to track selected item
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
 
+  const openEditModal = (item) => {
+    setSelectedItem(item); // Set the selected item
+    setIsEditModalOpen(true); // Open the edit modal
+  };
+
+  const closeEditModal = () => {
+    setSelectedItem(null); // Clear the selected item
+    setIsEditModalOpen(false); // Close the edit modal
+  };
   // Fetch item data from the backend API
   const fetchItemData = async () => {
     try {
@@ -118,17 +130,19 @@ const Items = () => {
         </div>
         {/* Table */}
         <Table
-          columns={["ID", "ITEM NAME", "UNIT", "CATEGORY"]}
+          columns={["ID", "ITEM NAME", "UNIT", "CATEGORY", "STOCK TRIGGER"]}
           data={
             loading
-              ? [["", "", "Loading...", ""]] // Show "Loading..." while fetching
+              ? [["", "", "Loading...", "", ""]]
               : items.map((item) => [
                   item.id,
                   item.name,
                   item.measurement,
                   item.category,
+                  item.stock_trigger
                 ])
           }
+          rowOnClick={(rowIndex) => openEditModal(items[rowIndex])} // Pass row click handler
         />
 
         {/* New Item Modal */}
@@ -138,6 +152,14 @@ const Items = () => {
           fetchItemData={fetchItemData}
           categories={categories}
           units={units}
+        />
+        <EditItem
+          isOpen={isEditModalOpen}
+          closeModal={closeEditModal}
+          item={selectedItem} // Pass the selected item
+          fetchItemData={fetchItemData}
+          units={units}
+          categories={categories}
         />
       </div>
     </div>

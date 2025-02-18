@@ -3,11 +3,14 @@ import { Link } from "react-router-dom";
 import NewItem from "../components/popups/NewItem";
 import Table from "../components/tables/Table";
 import axios from "axios";
+import EditInventory from "../components/popups/EditInventory"; // Import the EditInventory component
 
 const Inventory = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [inventoryData, setInventoryData] = useState([]); // State to hold inventory data
   const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState(null); // State to track selected item for editing
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // State for the edit modal
 
   const openModal = () => {
     setIsModalOpen(true);
@@ -15,6 +18,16 @@ const Inventory = () => {
 
   const closeModal = () => {
     setIsModalOpen(false);
+  };
+
+  const openEditModal = (item) => {
+    setSelectedItem(item); // Set the selected item to be edited
+    setIsEditModalOpen(true); // Open the edit modal
+  };
+
+  const closeEditModal = () => {
+    setSelectedItem(null); // Clear selected item
+    setIsEditModalOpen(false); // Close the edit modal
   };
 
   // Fetch inventory data from the API
@@ -43,7 +56,6 @@ const Inventory = () => {
         <div className="flex flex-col space-y-4 mb-4">
           {/* Side Buttons with Image and Text (Moved Above Search Bar) */}
           <div className="flex space-x-4">
-            {/* New Product Button */}
             <Link to="/inventory">
               <button
                 onClick={openModal}
@@ -120,12 +132,13 @@ const Inventory = () => {
             </div>
           </div>
         </div>
+
         {/* Table */}
         <Table
           columns={["ID", "NAME", "UNIT", "CATEGORY", "QUANTITY"]}
           data={
             loading
-              ? [["", "", "Loading...", "", ""]] // Show "Loading..." while fetching
+              ? [["", "", "Loading...", "", ""]]
               : inventoryData.map((item) => [
                   item.id,
                   item.name,
@@ -134,9 +147,32 @@ const Inventory = () => {
                   item.quantity,
                 ])
           }
+        //  rowOnClick={(rowIndex) => openEditModal(inventoryData[rowIndex])} // Pass row click handler
         />
+
         {/* New Product Modal */}
         <NewItem isOpen={isModalOpen} closeModal={closeModal} />
+
+        {/* Edit Inventory Modal */}
+        <EditInventory
+          isOpen={isEditModalOpen}
+          closeModal={closeEditModal}
+          item={selectedItem}
+          fetchInventoryData={() => {
+            // Fetch updated data after editing
+            const fetchInventoryData = async () => {
+              try {
+                const response = await axios.get(
+                  "http://127.0.0.1:8000/fetch-item-data/"
+                );
+                setInventoryData(response.data.inventory);
+              } catch (error) {
+                console.error("Error fetching inventory data:", error);
+              }
+            };
+            fetchInventoryData();
+          }}
+        />
       </div>
     </div>
   );
