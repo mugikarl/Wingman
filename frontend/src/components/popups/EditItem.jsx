@@ -10,35 +10,38 @@ const EditItem = ({
   categories,
   stock_trigger,
 }) => {
+  const [isEditMode, setIsEditMode] = useState(false);
   const [name, setName] = useState("");
-  const [unit, setUnit] = useState("");
-  const [category, setCategory] = useState("");
+  const [unitId, setUnitId] = useState(""); // State for unit ID
+  const [categoryId, setCategoryId] = useState(""); // State for category ID
   const [stockTrigger, setStockTrigger] = useState("");
 
-  // Use useEffect to update form fields when `item` prop changes
+  // Update form fields when `item` prop changes
   useEffect(() => {
     if (item) {
       setName(item.name);
-      setUnit(item.measurement);
-      setCategory(item.category);
-      setStockTrigger(item.stock_trigger); // Set the stock trigger from item
+      setUnitId(item.measurement); // measurement is the ID of the unit
+      setCategoryId(item.category); // category is the ID of the category
+      setStockTrigger(item.stock_trigger);
     }
-  }, [item]); // Run the effect when `item` changes
+  }, [item]);
+
+  console.log(units);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     const updatedItemData = {
       name,
-      measurement: unit,
-      category,
+      measurement: unitId, // Send the unit ID
+      category: categoryId, // Send the category ID
       stock_trigger: stockTrigger, // Send the stock trigger
     };
 
     try {
       const token = localStorage.getItem("access_token");
       await axios.put(
-        `http://127.0.0.1:8000/api/edit-item/${item.id}/`,
+        `http://127.0.0.1:8000/edit-item/${item.id}/`, // API endpoint for updating item
         updatedItemData,
         {
           headers: {
@@ -48,11 +51,37 @@ const EditItem = ({
       );
       alert("Item updated successfully!");
       fetchItemData(); // Refresh the item list
-      closeModal(); // Close the modal
+      setIsEditMode(false);
+      closeModal();
     } catch (error) {
       console.error("Error updating item:", error);
       alert("Failed to update item.");
     }
+  };
+
+  const handleDelete = async () => {
+    try {
+      const token = localStorage.getItem("access_token");
+      await axios.delete(
+        `http://127.0.0.1:8000/delete-item/${item.id}/`, // Adjust URL if needed
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      alert("Item deleted successfully!");
+      fetchItemData(); // Refresh the item list
+      closeModal();
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      alert("Failed to delete item.");
+    }
+  };
+
+  const handleCancel = () => {
+    setIsEditMode(false);
+    closeModal();
   };
 
   if (!isOpen) return null;
@@ -62,63 +91,87 @@ const EditItem = ({
       <div className="bg-white rounded-lg p-6 w-11/12 max-w-md">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Edit Item</h2>
-          <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">
-            &times;
-          </button>
+          <div className="space-x-2">
+            <button onClick={handleDelete} className="bg-red-500 text-white p-2 rounded-lg">
+              Delete
+            </button>
+            <button
+              onClick={() => setIsEditMode(!isEditMode)}
+              className="bg-[#E88504] text-white px-4 py-2 rounded-lg hover:bg-[#D57B03] transition-colors"
+            >
+              {isEditMode ? "Cancel Edit" : "Edit"}
+            </button>
+            <button onClick={handleCancel} className="text-gray-500 hover:text-gray-700">
+              &times;
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Name */}
           <div>
             <label className="block text-sm font-medium">Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full p-2 border rounded-lg"
+              className={`w-full p-2 border rounded-lg ${
+                !isEditMode ? "bg-gray-200 text-gray-500 cursor-not-allowed" : ""
+              }`}
+              disabled={!isEditMode}
               required
             />
           </div>
 
+          {/* Unit */}
           <div>
             <label className="block text-sm font-medium">Unit</label>
             <select
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              className="w-full p-2 border rounded-lg"
+              value={unitId}
+              onChange={(e) => setUnitId(e.target.value)}
+              className={`w-full p-2 border rounded-lg ${
+                !isEditMode ? "bg-gray-200 text-gray-500 cursor-not-allowed" : ""
+              }`}
               required
             >
               {units.map((unit) => (
-                <option key={unit.id} value={unit.unit_name}>
-                  {unit.unit_name}
+                <option key={unit.id} value={unit.id}>
+                  {unit.symbol}
                 </option>
               ))}
             </select>
           </div>
 
+          {/* Category */}
           <div>
             <label className="block text-sm font-medium">Category</label>
             <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full p-2 border rounded-lg"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className={`w-full p-2 border rounded-lg ${
+                !isEditMode ? "bg-gray-200 text-gray-500 cursor-not-allowed" : ""
+              }`}
               required
             >
               {categories.map((category) => (
-                <option key={category.id} value={category.category_name}>
-                  {category.category_name}
+                <option key={category.id} value={category.id}>
+                  {category.name}
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Stock Trigger input field */}
+          {/* Stock Trigger */}
           <div>
             <label className="block text-sm font-medium">Stock Trigger</label>
             <input
               type="text"
               value={stockTrigger}
               onChange={(e) => setStockTrigger(e.target.value)}
-              className="w-full p-2 border rounded-lg"
+              className={`w-full p-2 border rounded-lg ${
+                !isEditMode ? "bg-gray-200 text-gray-500 cursor-not-allowed" : ""
+              }`}
+              disabled={!isEditMode}
               required
             />
           </div>
@@ -126,14 +179,15 @@ const EditItem = ({
           <div className="flex justify-end space-x-2">
             <button
               type="button"
-              onClick={closeModal}
-              className="bg-gray-500 text-white px-4 py-2 rounded-lg"
+              onClick={handleCancel}
+              className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="bg-blue-500 text-white px-4 py-2 rounded-lg"
+              className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+              disabled={!isEditMode}
             >
               Save
             </button>

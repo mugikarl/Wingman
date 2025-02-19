@@ -891,20 +891,15 @@ def time_out(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-# INVENTORY
 @api_view(['GET'])
-@authentication_classes([])
+@authentication_classes([])  # You can add authentication classes if needed
 @permission_classes([AllowAny])
 def fetch_item_data(request):
     """
     Fetches measurements (units), categories, items, and inventory data.
-    Returns them in a structure similar to employee data with roles and statuses.
+    Returns them with both display values and their respective IDs.
     """
     try:
-        # Authenticate the user; if unauthorized, authenticate_user() will raise an exception.
-        # auth_data = authenticate_user(request)
-        # supabase_client = auth_data["client"]  # Use the authenticated client for table queries
-
         # Fetch units
         units_response = supabase_anon.table("unit_of_measurement") \
             .select("id, symbol") \
@@ -919,7 +914,10 @@ def fetch_item_data(request):
 
         # Fetch items
         items_response = supabase_anon.table("items") \
-            .select("id, name, measurement, category, stock_trigger") \
+            .select("id, name, stock_trigger, "
+                    "unit_of_measurement(id, symbol), "
+                    "item_category(id, name)"
+            ) \
             .execute()
         items = items_response.data if items_response.data else []
 
@@ -929,19 +927,18 @@ def fetch_item_data(request):
             .execute()
         inventory_data = inventory_response.data if inventory_response.data else []
 
-        # Format items with measurement/unit and category
+        # Format items with measurement/unit and category, including IDs
         formatted_items = []
         for item in items:
-            # Find unit for the item
-            unit = next((unit for unit in units if unit["id"] == item.get("measurement")), {})
-            # Find category for the item
-            category = next((category for category in categories if category["id"] == item.get("category")), {})
+            unit_value = item["unit_of_measurement"].get("id")
+            category_value = item["item_category"].get("id")
+
             formatted_items.append({
                 "id": item["id"],
                 "name": item["name"],
-                "measurement": unit.get("symbol", ""),
-                "category": category.get("name", ""),
-                "stock_trigger": item.get("stock_trigger", "")
+                "stock_trigger": item["stock_trigger"],
+                "measurement": unit_value,
+                "category": category_value
             })
 
         # Format inventory with item details
@@ -949,14 +946,16 @@ def fetch_item_data(request):
         for inventory in inventory_data:
             # Find the corresponding item data
             item = next((item for item in items if item["id"] == inventory.get("item")), {})
-            # Find the category and unit for the item
+            # Find the unit and category for the item
             unit = next((unit for unit in units if unit["id"] == item.get("measurement")), {})
             category = next((category for category in categories if category["id"] == item.get("category")), {})
             formatted_inventory.append({
                 "id": item["id"],
                 "name": item["name"],
-                "category": category.get("name", ""),
                 "measurement": unit.get("symbol", ""),
+                "measurement_id": unit.get("id", ""),
+                "category": category.get("name", ""),
+                "category_id": category.get("id", ""),
                 "quantity": inventory.get("quantity", 0)
             })
 
@@ -969,7 +968,6 @@ def fetch_item_data(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-
 
 @api_view(['POST'])
 @authentication_classes([SupabaseAuthentication])
@@ -1001,5 +999,73 @@ def add_item(request):
         else:
             return JsonResponse({"error": "Failed to add item."}, status=500)
 
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+    
+@api_view(['PUT'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin]) 
+def edit_item(request, item_id):
+    """
+    This view handles the update of an existing item.
+    """
+    try:
+        # Parse the JSON data from the request body
+        data = json.loads(request.body)
+        name = data.get("name")
+        stock_trigger = data.get("stock_trigger")
+        unit_id = data.get("measurement")
+        category_id = data.get("category")
+
+        # Validate input
+        if not name or not stock_trigger or not unit_id or not category_id:
+            return JsonResponse({"error": "All fields (name, stock_trigger, unit_id, category_id) are required."}, status=400)
+
+        # Find the item to update
+        item_response = supabase_service.table("items").select("*").eq("id", item_id).execute()
+        item = item_response.data[0] if item_response.data else None
+
+        if not item:
+            return JsonResponse({"error": "Item not found."}, status=404)
+
+        # Update the item in the database
+        update_response = supabase_service.table("items").update({
+            "name": name,
+            "stock_trigger": stock_trigger,
+            "measurement": unit_id,
+            "category": category_id
+        }).eq("id", item_id).execute()
+
+        # Check if the update was successful
+        if update_response.data:
+            return JsonResponse({"message": "Item updated successfully."}, status=200)
+        else:
+            return JsonResponse({"error": "Failed to update item."}, status=500)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+    
+@api_view(['DELETE'])
+@authentication_classes([SupabaseAuthentication])  # Use appropriate authentication
+@permission_classes([SupabaseIsAdmin])  # Ensure only admins can delete items
+def delete_item(request, item_id):
+    """
+    This view handles the deletion of an existing item.
+    """
+    try:
+        # Check if the item exists
+        item_response = supabase_service.table("items").select("*").eq("id", item_id).execute()
+        if not item_response.data:
+            return JsonResponse({"error": "Item not found."}, status=404)
+        
+        # Delete the item from the database
+        delete_response = supabase_service.table("items").delete().eq("id", item_id).execute()
+        
+        # Check if the deletion was successful
+        if delete_response.data:
+            return JsonResponse({"message": "Item deleted successfully."}, status=200)
+        else:
+            return JsonResponse({"error": "Failed to delete item."}, status=500)
+    
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)

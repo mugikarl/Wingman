@@ -134,13 +134,19 @@ const Items = () => {
           data={
             loading
               ? [["", "", "Loading...", "", ""]]
-              : items.map((item) => [
-                  item.id,
-                  item.name,
-                  item.measurement,
-                  item.category,
-                  item.stock_trigger
-                ])
+              : items.map((item) => {
+                  // Find the corresponding unit (measurement) and category for each item
+                  const unit = units.find((u) => u.id === item.measurement);
+                  const category = categories.find((c) => c.id === item.category);
+
+                  return [
+                    item.id,
+                    item.name,
+                    unit ? unit.symbol : "", // Display the unit symbol
+                    category ? category.name : "", // Display the category name
+                    item.stock_trigger
+                  ];
+                })
           }
           rowOnClick={(rowIndex) => openEditModal(items[rowIndex])} // Pass row click handler
         />
