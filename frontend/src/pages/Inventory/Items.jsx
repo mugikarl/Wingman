@@ -5,6 +5,7 @@ import NewItem from "../../components/popups/NewItem";
 import Table from "../../components/tables/Table";
 import axios from "axios";
 import EditItem from "../../components/popups/EditItem";
+import NewCategory from "../../components/popups/NewCategory";
 
 const Items = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -13,10 +14,14 @@ const Items = () => {
   const [loading, setLoading] = useState(true);
   const [units, setUnits] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  
   const [selectedItem, setSelectedItem] = useState(null); // State to track selected item
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
+  const closeCategoryModal = () => setIsCategoryModalOpen(false);
+
 
   const openEditModal = (item) => {
     setSelectedItem(item); // Set the selected item
@@ -101,7 +106,7 @@ const Items = () => {
               />
               <button
                 onClick={openModal}
-                className="flex items-center bg-[#1c4686] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]"
+                className="flex items-center bg-[#1c4686] p-2 rounded-lg shadow hover:shadow-lg min-w-[15%]"
               >
                 <img
                   src="/images/stockout/trash.png"
@@ -110,20 +115,35 @@ const Items = () => {
                 />
                 <span className="text-white">New Item</span>
               </button>
+              
             </div>
 
-            <div className="flex space-x-4 overflow-x-auto scrollbar-hide">
-              <button className="flex items-center justify-center bg-blue-500 text-white p-2 rounded-lg shadow min-w-[12%]">
-                Button
-              </button>
-              <button className="flex items-center justify-center bg-green-500 text-white p-2 rounded-lg shadow min-w-[12%]">
-                Button 2
-              </button>
-              <button className="flex items-center justify-center bg-yellow-500 text-white p-2 rounded-lg shadow min-w-[11%]">
-                Button 3
-              </button>
-              <button className="flex items-center justify-center bg-red-500 text-white p-2 rounded-lg shadow min-w-[11%]">
-                Button 4
+            <div className="flex justify-between items-center w-full">
+              <div className="flex space-x-4">
+                <button className="flex items-center justify-center bg-blue-500 text-white p-2 rounded-lg shadow min-w-[12%]">
+                  Button
+                </button>
+                <button className="flex items-center justify-center bg-green-500 text-white p-2 rounded-lg shadow min-w-[12%]">
+                  Button 2
+                </button>
+                <button className="flex items-center justify-center bg-yellow-500 text-white p-2 rounded-lg shadow min-w-[11%]">
+                  Button 3
+                </button>
+                <button className="flex items-center justify-center bg-red-500 text-white p-2 rounded-lg shadow min-w-[11%]">
+                  Button 4
+                </button>
+              </div>
+              {/* New Category button */}
+              <button
+                onClick={() => setIsCategoryModalOpen(true)}
+                className="flex items-center bg-[#5930b2] p-2 rounded-lg shadow hover:shadow-lg min-w-[15%]"
+              >
+                <img
+                  src="/images/stockout/trash.png"
+                  alt="Disposed"
+                  className="w-8 h-8 mr-2"
+                />
+                <span className="text-white">New Category</span>
               </button>
             </div>
           </div>
@@ -161,6 +181,14 @@ const Items = () => {
           units={units}
           categories={categories}
         />
+        <NewCategory
+           isOpen={isCategoryModalOpen}
+           closeModal={closeCategoryModal}
+           fetchItemData={fetchItemData}
+           items={items} 
+        />
+
+        
       </div>
     </div>
   );

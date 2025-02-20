@@ -31,6 +31,7 @@ import AttendanceReview from "./pages/Attendance/AttendanceReview";
 import Items from "./pages/Inventory/Items";
 import EditItem from "./components/popups/EditItem";
 import EditInventory from "./components/popups/EditInventory";
+import NewCategory from "./components/popups/NewCategory";
 
 // You might have a separate dashboard for employees if needed.
 const EmployeeDashboard = Dashboard; // For this example, we reuse Dashboard
@@ -127,6 +128,7 @@ const App = () => {
             <Route path="/items" element={<Items />} />
             <Route path="/edititem" element={<EditItem />} />
             <Route path="/editinventory" element={<EditInventory />} />
+            <Route path="/newcategory" element={<NewCategory />} />
             {/* Fallback Route */}
             <Route
               path="*"
