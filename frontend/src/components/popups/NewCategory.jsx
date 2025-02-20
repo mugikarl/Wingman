@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 
-const NewCategory = ({ isOpen, closeModal, items, setItems }) => {
+const NewCategory = ({ isOpen, closeModal, items = [], setItems }) => {
   const [categoryName, setCategoryName] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -10,7 +10,7 @@ const NewCategory = ({ isOpen, closeModal, items, setItems }) => {
     if (!categoryName.trim()) return;
     try {
       const response = await axios.post("http://127.0.0.1:8000/add-category/", { name: categoryName });
-      setItems((prevItems) => [...prevItems, { ...response.data, category: categoryName }]);
+      setItems((prevItems) => [...prevItems, { ...response.data, category: { name: categoryName } }]);
       setCategoryName("");
     } catch (error) {
       console.error("Error adding category:", error);
@@ -21,7 +21,7 @@ const NewCategory = ({ isOpen, closeModal, items, setItems }) => {
     if (!categoryName.trim() || selectedIndex === null) return;
     try {
       const updatedItems = [...items];
-      updatedItems[selectedIndex].category = categoryName;
+      updatedItems[selectedIndex].category.name = categoryName;
       await axios.put(`http://127.0.0.1:8000/update-category/${updatedItems[selectedIndex].id}/`, { name: categoryName });
       setItems(updatedItems);
       setCategoryName("");
@@ -94,18 +94,18 @@ const NewCategory = ({ isOpen, closeModal, items, setItems }) => {
               </tr>
             </thead>
             <tbody>
-              {items.length > 0 ? (
+              {(items || []).length > 0 ? (
                 items.map((item, index) => (
                   <tr
                     key={index}
                     className="border-b cursor-pointer hover:bg-gray-100"
                     onClick={() => {
-                      setCategoryName(item.category);
+                      setCategoryName(item.name);
                       setSelectedIndex(index);
                       setIsEditing(true);
                     }}
                   >
-                    <td className="p-2">{item.category}</td>
+                    <td className="p-2">{item.name}</td>
                     <td className="p-2">
                       <button onClick={() => handleDeleteCategory(index)} className="bg-red-500 text-white px-2 py-1 rounded">
                         Delete
