@@ -191,7 +191,7 @@ const Items = () => {
            isOpen={isCategoryModalOpen}
            closeModal={closeCategoryModal}
            fetchItemData={fetchItemData}
-           items={items} 
+           categories={categories} 
         />
 
         

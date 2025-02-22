@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 
-const NewCategory = ({ isOpen, closeModal, items = [], setItems }) => {
+const NewCategory = ({ isOpen, closeModal, categories = [], fetchItemData }) => {
   const [categoryName, setCategoryName] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -9,8 +9,16 @@ const NewCategory = ({ isOpen, closeModal, items = [], setItems }) => {
   const handleAddCategory = async () => {
     if (!categoryName.trim()) return;
     try {
-      const response = await axios.post("http://127.0.0.1:8000/add-category/", { name: categoryName });
-      setItems((prevItems) => [...prevItems, { ...response.data, category: { name: categoryName } }]);
+      const token = localStorage.getItem("access_token");
+      const response = await axios.post("http://127.0.0.1:8000/add-category/", 
+        { name: categoryName },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      fetchItemData();
       setCategoryName("");
     } catch (error) {
       console.error("Error adding category:", error);
@@ -20,10 +28,17 @@ const NewCategory = ({ isOpen, closeModal, items = [], setItems }) => {
   const handleEditCategory = async () => {
     if (!categoryName.trim() || selectedIndex === null) return;
     try {
-      const updatedItems = [...items];
+      const token = localStorage.getItem("access_token");
+      const updatedItems = [...categories];
       updatedItems[selectedIndex].category.name = categoryName;
-      await axios.put(`http://127.0.0.1:8000/update-category/${updatedItems[selectedIndex].id}/`, { name: categoryName });
-      setItems(updatedItems);
+      await axios.put(`http://127.0.0.1:8000/update-category/${updatedItems[selectedIndex].id}/`, 
+        { name: categoryName },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      fetchItemData(updatedItems);
       setCategoryName("");
       setIsEditing(false);
       setSelectedIndex(null);
@@ -37,8 +52,14 @@ const NewCategory = ({ isOpen, closeModal, items = [], setItems }) => {
     if (!confirmDelete) return;
 
     try {
-      await axios.delete(`http://127.0.0.1:8000/delete-category/${items[index].id}/`);
-      setItems((prevItems) => prevItems.filter((_, i) => i !== index));
+      const token = localStorage.getItem("access_token");
+      await axios.delete(`http://127.0.0.1:8000/delete-category/${categories[index].id}/`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      fetchItemData((prevItems) => prevItems.filter((_, i) => i !== index));
       if (index === selectedIndex) {
         setCategoryName("");
         setIsEditing(false);
@@ -94,18 +115,18 @@ const NewCategory = ({ isOpen, closeModal, items = [], setItems }) => {
               </tr>
             </thead>
             <tbody>
-              {(items || []).length > 0 ? (
-                items.map((item, index) => (
+              {(categories || []).length > 0 ? (
+                categories.map((category, index) => (
                   <tr
                     key={index}
                     className="border-b cursor-pointer hover:bg-gray-100"
                     onClick={() => {
-                      setCategoryName(item.name);
+                      setCategoryName(category.name);
                       setSelectedIndex(index);
                       setIsEditing(true);
                     }}
                   >
-                    <td className="p-2">{item.name}</td>
+                    <td className="p-2">{category.name}</td>
                     <td className="p-2">
                       <button onClick={() => handleDeleteCategory(index)} className="bg-red-500 text-white px-2 py-1 rounded">
                         Delete

@@ -1069,3 +1069,53 @@ def delete_item(request, item_id):
     
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+
+@api_view(['POST'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def add_category(request):
+    """
+    Handles adding a new category to the databae
+    """
+    try:
+        data = json.loads(request.body)
+        name = data.get("name")
+
+        if not name:
+            return JsonResponse({"error" : "All fields are required"}, status=400)
+        
+        # Insert new item
+        insert_response = supabase_service.table("item_category").insert({
+            "name": name
+        }).execute()
+
+        if insert_response.data:
+            return JsonResponse({"message" : "Item Category added successfully"}, status=201)
+        else:
+            return JsonResponse({"error" : "Failed to add Item Category"}, status=500)
+        
+    except Exception as e:
+        return JsonResponse({"error" : str(e)}, status=500)
+
+@api_view(['DELETE'])
+@authentication_classes([SupabaseAuthentication])  # Use appropriate authentication
+@permission_classes([SupabaseIsAdmin])  # Ensure only admins can delete categories
+def delete_category(request, category_id):
+    """
+    This view handles the deletion of an existing category
+    """
+    try:
+        category_response = supabase_service.table("item_category").select("*").eq("id", category_id).execute()
+        if not category_response.data:
+            return JsonResponse({"error" : "Item Category not found."}, status=404)
+        
+        delete_response = supabase_service.table("item_category").delete().eq("id", category_id).execute()
+
+        if delete_response.data:
+            return JsonResponse({"message": "Item Category deleted successfully."}, status=200)
+        else:
+            return JsonResponse({"error": "Failed to delete Item Category."}, status=500)
+    
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
