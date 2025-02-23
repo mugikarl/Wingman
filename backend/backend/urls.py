@@ -16,6 +16,7 @@ urlpatterns = [
     path('edit-item/<int:item_id>/', views.edit_item, name='edit_item'),
     path('delete-item/<int:item_id>/', views.delete_item, name='delete_item'),
     path('add-category/', views.add_category, name='add_category'),
+    path('edit-category/<int:category_id>/', views.edit_category, name='edit_category'),
     path('delete-category/<int:category_id>/', views.delete_category, name='delete_category'),
     # path('register-time-in/', views.register_time_in, name='register_time_in'),
     # path('api/user/register/', CreateUserView.as_view(), name="register"),

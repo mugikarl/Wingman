@@ -945,19 +945,16 @@ def fetch_item_data(request):
         formatted_inventory = []
         for inventory in inventory_data:
             # Find the corresponding item data
-            item = next((item for item in items if item["id"] == inventory.get("item")), {})
-            # Find the unit and category for the item
-            unit = next((unit for unit in units if unit["id"] == item.get("measurement")), {})
-            category = next((category for category in categories if category["id"] == item.get("category")), {})
-            formatted_inventory.append({
-                "id": item["id"],
-                "name": item["name"],
-                "measurement": unit.get("symbol", ""),
-                "measurement_id": unit.get("id", ""),
-                "category": category.get("name", ""),
-                "category_id": category.get("id", ""),
-                "quantity": inventory.get("quantity", 0)
-            })
+            item = next((i for i in items if i["id"] == inventory.get("item")), None)
+            
+            if item:
+                formatted_inventory.append({
+                    "id": item["id"],
+                    "name": item["name"],
+                    "measurement": item["unit_of_measurement"].get("id"),
+                    "category": item["item_category"].get("id"),
+                    "quantity": inventory.get("quantity", 0)
+                })
 
         return JsonResponse({
             "units": units,
@@ -1097,6 +1094,37 @@ def add_category(request):
         
     except Exception as e:
         return JsonResponse({"error" : str(e)}, status=500)
+
+@api_view(['PUT'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def edit_category(request, category_id):
+    """
+    Handles updating an existing category name
+    """
+    try:
+        data = json.loads(request.body)
+        new_name = data.get("name")
+
+        if not new_name:
+            return JsonResponse({"error": "Name is required."}, status=400)
+
+        # Check if category exists
+        category_response = supabase_service.table("item_category").select("*").eq("id", category_id).execute()
+        if not category_response.data:
+            return JsonResponse({"error": "Item Category not found."}, status=404)
+
+        # Update category name
+        update_response = supabase_service.table("item_category").update({"name": new_name}).eq("id", category_id).execute()
+
+        if update_response.data:
+            return JsonResponse({"message": "Item Category updated successfully."}, status=200)
+        else:
+            return JsonResponse({"error": "Failed to update Item Category."}, status=500)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
 
 @api_view(['DELETE'])
 @authentication_classes([SupabaseAuthentication])  # Use appropriate authentication

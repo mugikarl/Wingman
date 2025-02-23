@@ -1,7 +1,12 @@
 import React, { useState } from "react";
 import axios from "axios";
 
-const NewCategory = ({ isOpen, closeModal, categories = [], fetchItemData }) => {
+const NewCategory = ({
+  isOpen,
+  closeModal,
+  categories = [],
+  fetchItemData,
+}) => {
   const [categoryName, setCategoryName] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -10,7 +15,8 @@ const NewCategory = ({ isOpen, closeModal, categories = [], fetchItemData }) => 
     if (!categoryName.trim()) return;
     try {
       const token = localStorage.getItem("access_token");
-      const response = await axios.post("http://127.0.0.1:8000/add-category/", 
+      const response = await axios.post(
+        "http://127.0.0.1:8000/add-category/",
         { name: categoryName },
         {
           headers: {
@@ -25,25 +31,48 @@ const NewCategory = ({ isOpen, closeModal, categories = [], fetchItemData }) => 
     }
   };
 
-  const handleEditCategory = async () => {
+  const handleEditCategory = async (e) => {
+    e.preventDefault();
+
     if (!categoryName.trim() || selectedIndex === null) return;
+
+    const categoryId = categories[selectedIndex]?.id; // Get the actual ID
+    console.log("Editing Category ID:", categoryId); // ✅ Debugging log
+
+    if (!categoryId) {
+      console.error("Error: No category ID found!");
+      return;
+    }
+
+    const updatedCategoryData = {
+      name: categoryName, // Send the updated category name
+    };
+
     try {
       const token = localStorage.getItem("access_token");
-      const updatedItems = [...categories];
-      updatedItems[selectedIndex].category.name = categoryName;
-      await axios.put(`http://127.0.0.1:8000/update-category/${updatedItems[selectedIndex].id}/`, 
-        { name: categoryName },
+      await axios.put(
+        `http://127.0.0.1:8000/edit-category/${categoryId}/`, // ✅ API endpoint for updating category
+        updatedCategoryData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        });
-      fetchItemData(updatedItems);
+        }
+      );
+      alert("Category updated successfully!");
+      fetchItemData((prevCategories) =>
+        prevCategories.map((category, index) =>
+          index === selectedIndex
+            ? { ...category, name: categoryName }
+            : category
+        )
+      ); // Refresh categories
       setCategoryName("");
       setIsEditing(false);
-      setSelectedIndex(null);
+      setSelectedIndex(null); // Close modal if applicable
     } catch (error) {
       console.error("Error updating category:", error);
+      alert("Failed to update category.");
     }
   };
 
@@ -53,12 +82,14 @@ const NewCategory = ({ isOpen, closeModal, categories = [], fetchItemData }) => 
 
     try {
       const token = localStorage.getItem("access_token");
-      await axios.delete(`http://127.0.0.1:8000/delete-category/${categories[index].id}/`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await axios.delete(
+        `http://127.0.0.1:8000/delete-category/${categories[index].id}/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       fetchItemData((prevItems) => prevItems.filter((_, i) => i !== index));
       if (index === selectedIndex) {
         setCategoryName("");
@@ -74,7 +105,10 @@ const NewCategory = ({ isOpen, closeModal, categories = [], fetchItemData }) => 
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
       <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
         {/* Close Button */}
-        <button onClick={closeModal} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+        <button
+          onClick={closeModal}
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
+        >
           x
         </button>
 
@@ -90,15 +124,24 @@ const NewCategory = ({ isOpen, closeModal, categories = [], fetchItemData }) => 
             className="w-1/2 p-2 border rounded-lg"
           />
           {!isEditing ? (
-            <button onClick={handleAddCategory} className="bg-blue-500 text-white px-3 py-2 rounded-lg">
+            <button
+              onClick={handleAddCategory}
+              className="bg-blue-500 text-white px-3 py-2 rounded-lg"
+            >
               Add
             </button>
           ) : (
             <>
-              <button onClick={() => setIsEditing(false)} className="bg-gray-500 text-white px-3 py-2 rounded-lg">
+              <button
+                onClick={() => setIsEditing(false)}
+                className="bg-gray-500 text-white px-3 py-2 rounded-lg"
+              >
                 Cancel
               </button>
-              <button onClick={handleEditCategory} className="bg-green-500 text-white px-3 py-2 rounded-lg">
+              <button
+                onClick={handleEditCategory}
+                className="bg-green-500 text-white px-3 py-2 rounded-lg"
+              >
                 Update
               </button>
             </>
@@ -121,6 +164,8 @@ const NewCategory = ({ isOpen, closeModal, categories = [], fetchItemData }) => 
                     key={index}
                     className="border-b cursor-pointer hover:bg-gray-100"
                     onClick={() => {
+                      console.log("Clicked Category:", category); // Debugging log
+                      console.log("Category ID:", category.id);
                       setCategoryName(category.name);
                       setSelectedIndex(index);
                       setIsEditing(true);
@@ -128,7 +173,10 @@ const NewCategory = ({ isOpen, closeModal, categories = [], fetchItemData }) => 
                   >
                     <td className="p-2">{category.name}</td>
                     <td className="p-2">
-                      <button onClick={() => handleDeleteCategory(index)} className="bg-red-500 text-white px-2 py-1 rounded">
+                      <button
+                        onClick={() => handleDeleteCategory(index)}
+                        className="bg-red-500 text-white px-2 py-1 rounded"
+                      >
                         Delete
                       </button>
                     </td>
@@ -136,7 +184,9 @@ const NewCategory = ({ isOpen, closeModal, categories = [], fetchItemData }) => 
                 ))
               ) : (
                 <tr>
-                  <td colSpan="2" className="p-2 text-center">No Categories Available</td>
+                  <td colSpan="2" className="p-2 text-center">
+                    No Categories Available
+                  </td>
                 </tr>
               )}
             </tbody>

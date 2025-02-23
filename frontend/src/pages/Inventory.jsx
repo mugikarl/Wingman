@@ -10,6 +10,8 @@ const Inventory = () => {
   const [inventoryData, setInventoryData] = useState([]); // State to hold inventory data
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState(null); // State to track selected item for editing
+  const [units, setUnits] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false); // State for the edit modal
 
   const openModal = () => {
@@ -38,6 +40,8 @@ const Inventory = () => {
           "http://127.0.0.1:8000/fetch-item-data/"
         ); // Adjust to your actual API endpoint
         setInventoryData(response.data.inventory); // Store formatted inventory data in state
+        setUnits(response.data.units || []); // Store units
+        setCategories(response.data.categories || []); // Store categories
       } catch (error) {
         console.error("Error fetching inventory data:", error);
       } finally {
@@ -139,15 +143,24 @@ const Inventory = () => {
           data={
             loading
               ? [["", "", "Loading...", "", ""]]
-              : inventoryData.map((item) => [
-                  item.id,
-                  item.name,
-                  item.measurement,
-                  item.category,
-                  item.quantity,
-                ])
+              : inventoryData.map((item) => {
+                  // Find the corresponding unit symbol
+                  const unit = units.find((u) => u.id === item.measurement);
+                  // Find the corresponding category name
+                  const category = categories.find(
+                    (c) => c.id === item.category
+                  );
+
+                  return [
+                    item.id,
+                    item.name,
+                    unit ? unit.symbol : "", // Display unit symbol if found
+                    category ? category.name : "", // Display category name if found
+                    item.quantity,
+                  ];
+                })
           }
-        //  rowOnClick={(rowIndex) => openEditModal(inventoryData[rowIndex])} // Pass row click handler
+          //  rowOnClick={(rowIndex) => openEditModal(inventoryData[rowIndex])} // Pass row click handler
         />
 
         {/* New Product Modal */}
