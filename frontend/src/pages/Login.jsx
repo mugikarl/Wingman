@@ -22,12 +22,6 @@ const Login = ({ setIsAdmin }) => {
           },
         }
       );
-
-      console.log("Backend Response:", response.data);
-
-      // Extract the access token from the response.
-      // (Depending on your backend, it might be returned directly in access_token
-      //  or inside a session object.)
       const access_token =
         response.data.access_token || response.data.session?.access_token;
       const is_admin = response.data.is_admin || false;

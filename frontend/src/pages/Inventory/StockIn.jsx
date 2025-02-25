@@ -1,153 +1,152 @@
-import React, { useState } from "react";
-import Table from "../../components/tables/Table";
+import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
+import Table from "../../components/tables/Table";
+import StockInDetails from "../../components/popups/StockInDetails";
 
 const StockIn = () => {
-  const columns = ["ID", "PRODUCT NAME", "UNIT", "QUANTITY", "TOTAL COST"];
-  const [data, setData] = useState([]);
+  const [isStockInDetailsOpen, setIsStockInDetailsOpen] = useState(false);
+  const [items, setItems] = useState([]);
+  const [receipts, setReceipts] = useState([]);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
+  const [isReadOnly, setIsReadOnly] = useState([false]);
+  const [loading, setLoading] = useState(true);
 
-  // State for input fields
-  const [selectedItem, setSelectedItem] = useState("");
-  const [selectedUnit, setSelectedUnit] = useState("Kg");
-  const [quantity, setQuantity] = useState("");
-  const [costPerUnit, setCostPerUnit] = useState("");
+  const openStockInDetailsModal = (receipt = null, readOnly = false) => {
+    setSelectedReceipt(receipt);
+    setIsStockInDetailsOpen(true);
+    setIsReadOnly(readOnly); // Pass read-only flag
+  };
 
-  // Item list for dropdown
-  const items = ["Item A", "Item B", "Item C"];
+  const closeStockInDetailsModal = () => {
+    setIsStockInDetailsOpen(false);
+    setSelectedReceipt(null);
+  };
 
-  // Function to add a new row to the table
-  const addItem = () => {
-    if (selectedItem && quantity && costPerUnit) {
-      const totalCost = (
-        parseFloat(quantity) * parseFloat(costPerUnit)
-      ).toFixed(2);
-      setData([
-        ...data,
-        [
-          data.length + 1,
-          selectedItem,
-          selectedUnit,
-          quantity,
-          totalCost,
-          <button
-            className="bg-red-500 text-white p-2 rounded shadow remove-btn"
-            onClick={() => removeItem(data.length)}
-          >
-            Remove
-          </button>,
-        ],
-      ]);
+  const [unitMeasurements, setUnitMeasurements] = useState([]);
 
-      // Reset input fields after adding
-      setSelectedItem("");
-      setQuantity("");
-      setCostPerUnit("");
+  const fetchReceipts = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(
+        "http://127.0.0.1:8000/fetch-stockin-data/"
+      );
+
+      setReceipts(response.data.receipts || []);
+      setUnitMeasurements(response.data.units || []);
+      setItems(response.data.items || []); // ✅ Store items
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setReceipts([]);
+      setItems([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Function to remove a row from the table
-  const removeItem = (index) => {
-    setData(data.filter((_, i) => i !== index));
-  };
+  useEffect(() => {
+    fetchReceipts();
+  }, []);
+
+  const columns = ["RECEIPT NO.", "SUPPLIER NAME", "DATE"];
+  const tableData = receipts.map((receipt) => [
+    receipt.receipt_no,
+    receipt.supplier_name,
+    receipt.date,
+  ]);
 
   return (
     <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
+      {/* Navigation Buttons */}
+      <div className="flex space-x-4 mb-4">
+        <Link to="/inventory">
+          <button className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+            <img
+              src="/images/stockout/cart.png"
+              alt="Inventory"
+              className="w-8 h-8 mr-2"
+            />
+            <span className="text-white">Inventory</span>
+          </button>
+        </Link>
+        <Link to="/items">
+          <button className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+            <img
+              src="/images/stockout/menu.png"
+              alt="Menu"
+              className="w-8 h-8 mr-2"
+            />
+            <span className="text-white">Items</span>
+          </button>
+        </Link>
+        <Link to="/stockin">
+          <button className="flex items-center bg-[#00BA34] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+            <img
+              src="/images/stockout/stock.png"
+              alt="Stock In"
+              className="w-8 h-8 mr-2"
+            />
+            <span className="text-white">Stock In</span>
+          </button>
+        </Link>
+        <Link to="/disposeditems">
+          <button className="flex items-center bg-[#FF0000] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+            <img
+              src="/images/stockout/trash.png"
+              alt="Disposed"
+              className="w-8 h-8 mr-2"
+            />
+            <span className="text-white">Disposed</span>
+          </button>
+        </Link>
+      </div>
+
+      {/* New Receipt Button */}
+      <div className="w-full">
+        <div className="flex items-center justify-between space-x-2 mb-4">
+          <input
+            type="text"
+            placeholder="Search..."
+            className="w-1/2 p-2 border rounded-lg shadow"
+          />
+          <button
+            onClick={openStockInDetailsModal}
+            className="flex items-center bg-[#1c4686] p-2 rounded-lg shadow hover:shadow-lg min-w-[15%]"
+          >
+            <img
+              src="/images/stockout/trash.png"
+              alt="Disposed"
+              className="w-8 h-8 mr-2"
+            />
+            <span className="text-white">New Item</span>
+          </button>
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className="flex-grow">
-        {/* Top Section */}
-        <div className="flex items-center space-x-4 mb-6">
-          <div className="flex items-center space-x-2">
-            <label htmlFor="supplier" className="font-bold">
-              Supplier Name:
-            </label>
-            <input
-              type="text"
-              id="supplier"
-              placeholder="Enter text"
-              className="p-2 border rounded-lg shadow"
-            />
-          </div>
-          <div className="flex items-center">
-            <label className="font-bold mr-4 w-1/4">Date</label>
-            <input
-              type="date"
-              className="p-2 border rounded-lg shadow w-full"
-              id="calendar"
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <label htmlFor="receipt" className="font-bold">
-              Receipt No:
-            </label>
-            <input
-              type="text"
-              id="receipt"
-              placeholder="Enter text"
-              className="p-2 border rounded-lg shadow"
-            />
-          </div>
-          <button className="bg-[#E88504] text-white px-6 py-2 rounded-lg shadow">
-            Submit
-          </button>
-        </div>
-
-        {/* New Row Input Section */}
-        <div className="flex items-center space-x-4 mb-6 p-4">
-          {/* Item Dropdown */}
-          <select
-            className="p-2 border rounded-lg shadow w-1/5"
-            value={selectedItem}
-            onChange={(e) => setSelectedItem(e.target.value)}
-          >
-            <option value="">Select Item</option>
-            {items.map((item, index) => (
-              <option key={index} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-
-          {/* Unit Dropdown */}
-          <select
-            className="p-2 border rounded-lg shadow w-1/6"
-            value={selectedUnit}
-            onChange={(e) => setSelectedUnit(e.target.value)}
-          >
-            <option value="Kg">Kg</option>
-            <option value="pc">pc</option>
-            <option value="L">L</option>
-          </select>
-
-          {/* Quantity Input */}
-          <input
-            type="number"
-            placeholder="Quantity"
-            className="p-2 border rounded-lg shadow w-1/6"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
+        {loading ? (
+          <div className="text-center">Loading...</div>
+        ) : (
+          <Table
+            columns={columns}
+            data={tableData}
+            rowOnClick={(rowIndex) =>
+              openStockInDetailsModal(receipts[rowIndex], true)
+            } // Read-only when clicking a row
           />
-
-          {/* Cost per Unit Input */}
-          <input
-            type="number"
-            placeholder="Cost per Unit"
-            className="p-2 border rounded-lg shadow w-1/6"
-            value={costPerUnit}
-            onChange={(e) => setCostPerUnit(e.target.value)}
-          />
-
-          {/* Add Button */}
-          <button
-            onClick={addItem}
-            className="bg-[#00BA34] text-white px-6 py-2 rounded-lg shadow"
-          >
-            Add
-          </button>
-        </div>
-
-        {/* Table */}
-        <Table columns={columns} data={data} />
+        )}
       </div>
+
+      {/* StockInDetails Modal */}
+      <StockInDetails
+        isOpen={isStockInDetailsOpen}
+        onClose={closeStockInDetailsModal}
+        receipt={selectedReceipt}
+        unitMeasurements={unitMeasurements}
+        items={items}
+        isReadOnly={isReadOnly} // Pass the flag
+      />
     </div>
   );
 };

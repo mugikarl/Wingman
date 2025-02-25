@@ -1147,3 +1147,110 @@ def delete_category(request, category_id):
     
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+    
+
+@api_view(['GET'])
+@authentication_classes([])  # You can add authentication classes if needed
+@permission_classes([AllowAny])
+def fetch_stockin_data(request):
+    """
+    Fetches receipts along with their stock-in details, related inventory, and item data.
+    """
+    try:
+        # Fetch units
+        units_response = supabase_anon.table("unit_of_measurement") \
+            .select("id, symbol") \
+            .execute()
+        units = units_response.data if units_response.data else []
+
+        # Fetch categories
+        categories_response = supabase_anon.table("item_category") \
+            .select("id, name") \
+            .execute()
+        categories = categories_response.data if categories_response.data else []
+
+        # Fetch items with unit of measurement
+        items_response = supabase_anon.table("items") \
+            .select("id, name, stock_trigger, measurement, category") \
+            .execute()
+
+        items = items_response.data if items_response.data else []
+        # Fetch all receipts
+        receipts_response = supabase_anon.table("receipts") \
+            .select("id, receipt_no, supplier_name, date") \
+            .execute()
+
+        if not receipts_response.data:
+            return JsonResponse({"receipts": []}, safe=False)
+
+        formatted_receipts = []
+
+        for receipt in receipts_response.data:
+            receipt_id = receipt["id"]  # Primary key of the receipt table
+
+            # Fetch stock-in records that reference this receipt_id
+            stockins_response = supabase_anon.table("stockin") \
+                .select("id, price, quantity_in, inventory_id") \
+                .eq("receipt_id", receipt_id) \
+                .execute()
+
+            stockins_data = []
+
+
+            if stockins_response.data:
+                for stockin in stockins_response.data:
+                    inventory_id = stockin.get("inventory_id")
+
+                    # Fetch inventory details if an inventory_id exists
+                    inventory_details = None
+                    item_details = None
+                    if inventory_id:
+                        inventory_response = supabase_anon.table("inventory") \
+                            .select("id, item, quantity") \
+                            .eq("id", inventory_id) \
+                            .execute()
+                        
+                        if inventory_response.data:
+                            inventory_details = inventory_response.data[0]
+                            item_id = inventory_details.get("item")
+
+                            # Fetch item details if an item_id exists
+                            if item_id:
+                                item_response = supabase_anon.table("items") \
+                                    .select("id, name, category, measurement, stock_trigger") \
+                                    .eq("id", item_id) \
+                                    .execute()
+                                
+                                item_details = item_response.data[0] if item_response.data else None
+
+                    # Append stock-in with inventory and item details
+                    stockins_data.append({
+                        "id": stockin["id"],
+                        "price": stockin["price"],
+                        "quantity_in": stockin["quantity_in"],
+                        "inventory": {
+                            "id": inventory_details["id"] if inventory_details else None,
+                            "current_stock": inventory_details["quantity"] if inventory_details else None,
+                            "item": item_details  # Embed item details
+                        } if inventory_details else None
+                    })
+
+            # Structure the receipt with its stock-in details
+            formatted_receipts.append({
+                "receipt_id": receipt["id"],  # Primary key of the receipt
+                "receipt_no": receipt["receipt_no"],  # Purchase receipt number
+                "supplier_name": receipt["supplier_name"],
+                "date": receipt["date"][:10],  # Extract YYYY-MM-DD
+                "stock_ins": stockins_data  # Attach stock-in records with inventory & item details
+            })
+
+        return JsonResponse({
+            "receipts": formatted_receipts, 
+            "units": units,
+            "categories": categories,
+            "items": items,
+            }, safe=False)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
