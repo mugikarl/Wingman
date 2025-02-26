@@ -9,6 +9,7 @@ const StockIn = () => {
   const [isAddStockInOpen, setIsAddStockInOpen] = useState(false);
   const [isEditStockInOpen, setIsEditStockInOpen] = useState(false);
   const [items, setItems] = useState([]);
+  const [inventory, setInvetory] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [unitMeasurements, setUnitMeasurements] = useState([]);
@@ -42,6 +43,7 @@ const StockIn = () => {
       setReceipts(response.data.receipts || []);
       setUnitMeasurements(response.data.units || []);
       setItems(response.data.items || []);
+      setInvetory(response.data.inventory || []);
     } catch (error) {
       console.error("Error fetching data:", error);
       setReceipts([]);
@@ -148,7 +150,9 @@ const StockIn = () => {
         isOpen={isAddStockInOpen}
         onClose={closeAddStockInModal}
         unitMeasurements={unitMeasurements}
+        fetchReceipts={fetchReceipts}
         items={items}
+        inventory={inventory}
       />
       <EditStockInDetails
         isOpen={isEditStockInOpen}

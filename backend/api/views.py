@@ -947,7 +947,8 @@ def fetch_item_data(request):
             
             if item:
                 formatted_inventory.append({
-                    "id": item["id"],
+                    "id": inventory.get("id"),
+                    "item": item["id"],
                     "name": item["name"],
                     "measurement": item["unit_of_measurement"].get("id"),
                     "category": item["item_category"].get("id"),
@@ -1021,6 +1022,37 @@ def fetch_item_data(request):
             "inventory": formatted_inventory,
             "receipts": formatted_receipts
         }, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def add_inventory(request): # MAIN PURPOSE OF THIS IS TO MAKE A NEW DATA ENTRY WHEN STOCKING IN IF THERE IS NO EXISTING DATA ENTRY, CANNOT ADD QUANTITY
+    """
+    Handles adding a new inventory record for an item with initial quantity set to 0
+    Will be used only if there is no existing data when stocking in 
+    """
+    try:
+        data = json.loads(request.body)
+        item_id = data.get("item")
+        if not item_id:
+            return JsonResponse({"error": "Item field is required."}, status=400)
+
+        # Insert a new inventory record with quantity set to 0
+        insert_response = supabase_service.table("inventory").insert({
+            "item": item_id,
+            "quantity": 0
+        }).execute()
+
+        if insert_response.data:
+            # Return the created inventory record
+            return JsonResponse({
+                "message": "Inventory record created.",
+                "inventory": insert_response.data[0]
+            }, status=201)
+        else:
+            return JsonResponse({"error": "Failed to create inventory record."}, status=500)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
@@ -1312,3 +1344,115 @@ def fetch_stockin_data(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def add_stockin_data(request):
+    """
+    Handles stocking in items and adding it to the inventory.
+    Inserts a new item and updates the current quantity of the item in the inventory
+    """
+    try:
+        data = json.loads(request.body)
+        receipt_no = data.get("receipt_no")
+        supplier_name = data.get("supplier_name")
+        date = data.get("date")
+        stock_ins = data.get("stock_ins", [])
+
+        # Validate receipt fields and stock in arrays
+        if not receipt_no or not supplier_name or not date or not stock_ins:
+            return JsonResponse(
+                {"error": "Receipt fields and at aleast one stock in entry are required"},
+                status=400
+            )
+        
+        receipt_response = supabase_anon.table("receipts").insert({
+            "receipt_no": receipt_no,
+            "supplier_name": supplier_name,
+            "date": date 
+        }).execute()
+
+        if not receipt_response.data:
+            return JsonResponse({"error": "Failed to add receipt."}, status=500)
+        
+        # Get the newly created receipt ID
+        receipt_id = receipt_response.data[0].get("id")
+        if not receipt_id:
+            return JsonResponse({"error": "Receipt ID not returned."}, status=500)
+        
+        # Process each stock in entry
+        for entry in stock_ins:
+            inventory_id = entry.get("inventory_id")
+            item_id = entry.get("item_id")
+            quantity_in = entry.get("quantity_in")
+            price = entry.get("price")
+
+            if not inventory_id or not item_id or quantity_in is None or price is None:
+                return JsonResponse(
+                    {"error": "All fields (inventory_id, item_id, quantity_in, price) are required for each stock in entry."},
+                    status=400
+                )
+            
+            try:
+                quantity_in = int(quantity_in)
+                price = float(price)
+            except Exception:
+                return JsonResponse({"error": "Invalid quantity or price format."}, status=400)
+            
+            # Insert the Stock In records with the Receipt ID
+            stock_in_response = supabase_anon.table("stockin").insert({\
+                "receipt_id": receipt_id,
+                "inventory_id": inventory_id,
+                "item_id": item_id,
+                "quantity_in": quantity_in,
+                "price": price
+            }).execute()
+            
+            if not stock_in_response.data:
+                return JsonResponse(
+                    {"error": f"Failed to add stock in entry for ID {inventory_id}."},
+                    status=500
+                )
+            
+            # Retrieve current inventory to update quantity
+            inventory_response = supabase_anon.table("inventory") \
+                .select("quantity, item") \
+                .eq("id", inventory_id) \
+                .execute()
+            
+            if not inventory_response.data or len(inventory_response.data) == 0:
+                return JsonResponse(
+                    {"error": f"Inventory record not found for ID {inventory_id}"},
+                    status=404
+                )
+            
+            inventory_record = inventory_response.data[0]
+            current_quantity = inventory_record.get("quantity", 0)
+
+            # Validate that the inventory's item matches the provided Item ID
+            if str(inventory_record.get("item")) != str(item_id):
+                return JsonResponse(
+                    {"error": f"Mismatch between provided Item ID {item_id} and inventory record for Inventory ID {inventory_id}."},
+                    status=400
+                )
+            
+            new_quantity = current_quantity + quantity_in
+
+            # Update the inventory record with the new quantity
+            update_response = supabase_service.table("inventory").update({
+                "quantity": new_quantity
+            }).eq("id", inventory_id).execute()
+
+            if not update_response.data:
+                return JsonResponse(
+                    {"error": f"Failed to update inventory for inventory_id {inventory_id}."},
+                    status=500
+                )
+            
+        return JsonResponse(
+            {"message": "Receipt and stock in entries added; inventory updated successfully."},
+            status=201
+        )
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

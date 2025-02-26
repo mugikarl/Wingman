@@ -193,8 +193,6 @@ const Items = () => {
            fetchItemData={fetchItemData}
            categories={categories} 
         />
-
-        
       </div>
     </div>
   );
