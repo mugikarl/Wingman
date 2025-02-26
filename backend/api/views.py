@@ -896,8 +896,7 @@ def time_out(request):
 @permission_classes([AllowAny])
 def fetch_item_data(request):
     """
-    Fetches measurements (units), categories, items, and inventory data.
-    Returns them with both display values and their respective IDs.
+    Fetches units, categories, items, inventory, and stock-in data.
     """
     try:
         # Fetch units
@@ -920,14 +919,7 @@ def fetch_item_data(request):
             ) \
             .execute()
         items = items_response.data if items_response.data else []
-
-        # Fetch inventory data (with item references)
-        inventory_response = supabase_anon.table("inventory") \
-            .select("id, item, quantity") \
-            .execute()
-        inventory_data = inventory_response.data if inventory_response.data else []
-
-        # Format items with measurement/unit and category, including IDs
+	
         formatted_items = []
         for item in items:
             unit_value = item["unit_of_measurement"].get("id")
@@ -941,7 +933,13 @@ def fetch_item_data(request):
                 "category": category_value
             })
 
-        # Format inventory with item details
+        # Fetch inventory data
+        inventory_response = supabase_anon.table("inventory") \
+            .select("id, item, quantity") \
+            .execute()
+        inventory_data = inventory_response.data if inventory_response.data else []
+	
+	# Format inventory with item details
         formatted_inventory = []
         for inventory in inventory_data:
             # Find the corresponding item data
@@ -955,14 +953,74 @@ def fetch_item_data(request):
                     "category": item["item_category"].get("id"),
                     "quantity": inventory.get("quantity", 0)
                 })
+        # Fetch receipts
+        receipts_response = supabase_anon.table("receipts") \
+            .select("id, receipt_no, supplier_name, date") \
+            .execute()
+        receipts = receipts_response.data if receipts_response.data else []
+	
+        formatted_receipts = []
+
+        for receipt in receipts:
+            receipt_id = receipt["id"]
+
+            # Fetch stock-in records for this receipt
+            stockins_response = supabase_anon.table("stockin") \
+                .select("id, price, quantity_in, inventory_id") \
+                .eq("receipt_id", receipt_id) \
+                .execute()
+            stockins_data = []
+
+            if stockins_response.data:
+                for stockin in stockins_response.data:
+                    inventory_id = stockin.get("inventory_id")
+                    inventory_details = None
+                    item_details = None
+
+                    if inventory_id:
+                        inventory_response = supabase_anon.table("inventory") \
+                            .select("id, item, quantity") \
+                            .eq("id", inventory_id) \
+                            .execute()
+                        
+                        if inventory_response.data:
+                            inventory_details = inventory_response.data[0]
+                            item_id = inventory_details.get("item")
+
+                            if item_id:
+                                item_response = supabase_anon.table("items") \
+                                    .select("id, name, category, measurement, stock_trigger") \
+                                    .eq("id", item_id) \
+                                    .execute()
+                                
+                                item_details = item_response.data[0] if item_response.data else None
+
+                    stockins_data.append({
+                        "id": stockin["id"],
+                        "price": stockin["price"],
+                        "quantity_in": stockin["quantity_in"],
+                        "inventory": {
+                            "id": inventory_details["id"] if inventory_details else None,
+                            "current_stock": inventory_details["quantity"] if inventory_details else None,
+                            "item": item_details
+                        } if inventory_details else None
+                    })
+
+            formatted_receipts.append({
+                "receipt_id": receipt["id"],
+                "receipt_no": receipt["receipt_no"],
+                "supplier_name": receipt["supplier_name"],
+                "date": receipt["date"][:10],
+                "stock_ins": stockins_data
+            })
 
         return JsonResponse({
             "units": units,
             "categories": categories,
             "items": formatted_items,
-            "inventory": formatted_inventory
+            "inventory": formatted_inventory,
+            "receipts": formatted_receipts
         }, safe=False)
-
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 

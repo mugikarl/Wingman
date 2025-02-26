@@ -2,39 +2,46 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import Table from "../../components/tables/Table";
-import StockInDetails from "../../components/popups/StockInDetails";
+import AddStockInDetails from "../../components/popups/AddStockInDetails";
+import EditStockInDetails from "../../components/popups/EditStockInDetails";
 
 const StockIn = () => {
-  const [isStockInDetailsOpen, setIsStockInDetailsOpen] = useState(false);
+  const [isAddStockInOpen, setIsAddStockInOpen] = useState(false);
+  const [isEditStockInOpen, setIsEditStockInOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
-  const [isReadOnly, setIsReadOnly] = useState([false]);
+  const [unitMeasurements, setUnitMeasurements] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const openStockInDetailsModal = (receipt = null, readOnly = false) => {
-    setSelectedReceipt(receipt);
-    setIsStockInDetailsOpen(true);
-    setIsReadOnly(readOnly); // Pass read-only flag
+  const openAddStockInModal = () => {
+    setSelectedReceipt(null);
+    setIsAddStockInOpen(true);
   };
 
-  const closeStockInDetailsModal = () => {
-    setIsStockInDetailsOpen(false);
+  const openEditStockInModal = (receipt) => {
+    setSelectedReceipt(receipt);
+    setIsEditStockInOpen(true);
+  };
+
+  const closeAddStockInModal = () => {
+    setIsAddStockInOpen(false);
+  };
+
+  const closeEditStockInModal = () => {
+    setIsEditStockInOpen(false);
     setSelectedReceipt(null);
   };
-
-  const [unitMeasurements, setUnitMeasurements] = useState([]);
 
   const fetchReceipts = async () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        "http://127.0.0.1:8000/fetch-stockin-data/"
+        "http://127.0.0.1:8000/fetch-item-data/"
       );
-
       setReceipts(response.data.receipts || []);
       setUnitMeasurements(response.data.units || []);
-      setItems(response.data.items || []); // ✅ Store items
+      setItems(response.data.items || []);
     } catch (error) {
       console.error("Error fetching data:", error);
       setReceipts([]);
@@ -110,15 +117,15 @@ const StockIn = () => {
             className="w-1/2 p-2 border rounded-lg shadow"
           />
           <button
-            onClick={openStockInDetailsModal}
+            onClick={openAddStockInModal}
             className="flex items-center bg-[#1c4686] p-2 rounded-lg shadow hover:shadow-lg min-w-[15%]"
           >
             <img
               src="/images/stockout/trash.png"
-              alt="Disposed"
+              alt="New Item"
               className="w-8 h-8 mr-2"
             />
-            <span className="text-white">New Item</span>
+            <span className="text-white">New Receipt</span>
           </button>
         </div>
       </div>
@@ -131,21 +138,24 @@ const StockIn = () => {
           <Table
             columns={columns}
             data={tableData}
-            rowOnClick={(rowIndex) =>
-              openStockInDetailsModal(receipts[rowIndex], true)
-            } // Read-only when clicking a row
+            rowOnClick={(rowIndex) => openEditStockInModal(receipts[rowIndex])}
           />
         )}
       </div>
 
-      {/* StockInDetails Modal */}
-      <StockInDetails
-        isOpen={isStockInDetailsOpen}
-        onClose={closeStockInDetailsModal}
+      {/* Modals */}
+      <AddStockInDetails
+        isOpen={isAddStockInOpen}
+        onClose={closeAddStockInModal}
+        unitMeasurements={unitMeasurements}
+        items={items}
+      />
+      <EditStockInDetails
+        isOpen={isEditStockInOpen}
+        onClose={closeEditStockInModal}
         receipt={selectedReceipt}
         unitMeasurements={unitMeasurements}
         items={items}
-        isReadOnly={isReadOnly} // Pass the flag
       />
     </div>
   );
