@@ -51,7 +51,7 @@ const AddStockInDetails = ({ isOpen, onClose, unitMeasurements, fetchReceipts, i
   };
 
   
-  const handleAddEntry = async () => {
+  const handleAddEntry = () => {
     if (
       !newEntry.item_id ||
       !newEntry.unit ||
@@ -62,50 +62,31 @@ const AddStockInDetails = ({ isOpen, onClose, unitMeasurements, fetchReceipts, i
       return;
     }
     
-    // Try to find the inventory record for the selected item.
-    let selectedInventory = inventory.find(
+    // Lookup the inventory record based on the selected item_id
+    const selectedInventory = inventory.find(
       (inv) => Number(inv.item) === Number(newEntry.item_id)
     );
     
-    // If not found, create a new inventory record (with initial quantity 0)
     if (!selectedInventory) {
-      try {
-        const createResponse = await axios.post(
-          "http://127.0.0.1:8000/add-inventory/",
-          {
-            item: newEntry.item_id,
-            quantity: 0,
-          }
-        );
-        // Extract the newly created inventory record from the response.
-        selectedInventory = createResponse.data.inventory;
-      } catch (error) {
-        console.error("Error creating inventory record:", error);
-        alert("Error creating inventory record. Please try again.");
-        return;
-      }
+      alert("No inventory record found for the selected item.");
+      return;
     }
     
-    // Now create the stock-in entry using the (new or existing) inventory record.
-    const entry = {
-      inventory_id: selectedInventory.id, // This field is now correctly set.
+    // Create payload entry (object) for submission
+    const entryPayload = {
+      inventory_id: selectedInventory.id,
       item_id: newEntry.item_id,
       quantity_in: parseFloat(newEntry.quantity),
       price: parseFloat(newEntry.cost),
     };
     
-    // Update both the payload and display states.
-    setStockInData([...stockInData, entry]);
-    setStockInPayload([...stockInPayload, entry]);
-    
-    // Prepare a display row for the table.
-    const itemName =
-      items.find((item) => Number(item.id) === Number(newEntry.item_id))?.name ||
-      "Unknown Item";
-    const totalCost =
-      parseFloat(newEntry.quantity) * parseFloat(newEntry.cost);
+    // Create display row for the table
+    const itemName = items.find(
+      (item) => Number(item.id) === Number(newEntry.item_id)
+    )?.name || "Unknown Item";
+    const totalCost = parseFloat(newEntry.quantity) * parseFloat(newEntry.cost);
     const displayRow = [
-      stockInRows.length + 1, // Row number
+      stockInPayload.length + 1,
       itemName,
       newEntry.unit,
       newEntry.cost,
@@ -113,9 +94,9 @@ const AddStockInDetails = ({ isOpen, onClose, unitMeasurements, fetchReceipts, i
       totalCost,
     ];
     
+    // Update both states
+    setStockInPayload([...stockInPayload, entryPayload]);
     setStockInRows([...stockInRows, displayRow]);
-    
-    // Reset the new entry form fields.
     setNewEntry({ item_id: "", unit: "", quantity: "", cost: "" });
   };
 
@@ -136,7 +117,7 @@ const AddStockInDetails = ({ isOpen, onClose, unitMeasurements, fetchReceipts, i
     try {
       const response = await axios.post(
         "http://127.0.0.1:8000/add-stockin-data/",
-        payload
+        payload // set of item arrays
       );
       console.log("Response:", response.data);
       fetchReceipts();

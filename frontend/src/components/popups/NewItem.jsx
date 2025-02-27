@@ -25,13 +25,27 @@ const NewItem = ({ isOpen, closeModal, fetchItemData, categories, units }) => {
 
     try {
       const token = localStorage.getItem("access_token");
-      await axios.post(
+      const addItemResponse = await axios.post(
         "http://127.0.0.1:8000/add-item/",
         {
           name: itemName,
           stock_trigger: stockTrigger,
           measurement: selectedUnit,
           category: selectedCategory,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const newItem = addItemResponse.data.item || addItemResponse.data;
+      if (!newItem || !newItem.id) {
+        alert("Item added but no item ID was returned.");
+        return;
+      }
+      // Create a new inventory record for the new item with initial quantity 0.
+      await axios.post("http://127.0.0.1:8000/add-inventory/", 
+        {
+          item: newItem.id,
+          quantity: 0,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );

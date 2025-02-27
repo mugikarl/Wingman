@@ -1026,8 +1026,8 @@ def fetch_item_data(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 @api_view(['POST'])
-@authentication_classes([])
-@permission_classes([AllowAny])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
 def add_inventory(request): # MAIN PURPOSE OF THIS IS TO MAKE A NEW DATA ENTRY WHEN STOCKING IN IF THERE IS NO EXISTING DATA ENTRY, CANNOT ADD QUANTITY
     """
     Handles adding a new inventory record for an item with initial quantity set to 0
@@ -1082,7 +1082,7 @@ def add_item(request):
         }).execute()
 
         if insert_response.data:
-            return JsonResponse({"message": "Item added successfully."}, status=201)
+            return JsonResponse({"message": "Item added successfully.", "item": insert_response.data[0]}, status=201)
         else:
             return JsonResponse({"error": "Failed to add item."}, status=500)
 
