@@ -1238,112 +1238,6 @@ def delete_category(request, category_id):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
     
-
-@api_view(['GET'])
-@authentication_classes([])  # You can add authentication classes if needed
-@permission_classes([AllowAny])
-def fetch_stockin_data(request):
-    """
-    Fetches receipts along with their stock-in details, related inventory, and item data.
-    """
-    try:
-        # Fetch units
-        units_response = supabase_anon.table("unit_of_measurement") \
-            .select("id, symbol") \
-            .execute()
-        units = units_response.data if units_response.data else []
-
-        # Fetch categories
-        categories_response = supabase_anon.table("item_category") \
-            .select("id, name") \
-            .execute()
-        categories = categories_response.data if categories_response.data else []
-
-        # Fetch items with unit of measurement
-        items_response = supabase_anon.table("items") \
-            .select("id, name, stock_trigger, measurement, category") \
-            .execute()
-
-        items = items_response.data if items_response.data else []
-        # Fetch all receipts
-        receipts_response = supabase_anon.table("receipts") \
-            .select("id, receipt_no, supplier_name, date") \
-            .execute()
-
-        if not receipts_response.data:
-            return JsonResponse({"receipts": []}, safe=False)
-
-        formatted_receipts = []
-
-        for receipt in receipts_response.data:
-            receipt_id = receipt["id"]  # Primary key of the receipt table
-
-            # Fetch stock-in records that reference this receipt_id
-            stockins_response = supabase_anon.table("stockin") \
-                .select("id, price, quantity_in, inventory_id") \
-                .eq("receipt_id", receipt_id) \
-                .execute()
-
-            stockins_data = []
-
-
-            if stockins_response.data:
-                for stockin in stockins_response.data:
-                    inventory_id = stockin.get("inventory_id")
-
-                    # Fetch inventory details if an inventory_id exists
-                    inventory_details = None
-                    item_details = None
-                    if inventory_id:
-                        inventory_response = supabase_anon.table("inventory") \
-                            .select("id, item, quantity") \
-                            .eq("id", inventory_id) \
-                            .execute()
-                        
-                        if inventory_response.data:
-                            inventory_details = inventory_response.data[0]
-                            item_id = inventory_details.get("item")
-
-                            # Fetch item details if an item_id exists
-                            if item_id:
-                                item_response = supabase_anon.table("items") \
-                                    .select("id, name, category, measurement, stock_trigger") \
-                                    .eq("id", item_id) \
-                                    .execute()
-                                
-                                item_details = item_response.data[0] if item_response.data else None
-
-                    # Append stock-in with inventory and item details
-                    stockins_data.append({
-                        "id": stockin["id"],
-                        "price": stockin["price"],
-                        "quantity_in": stockin["quantity_in"],
-                        "inventory": {
-                            "id": inventory_details["id"] if inventory_details else None,
-                            "current_stock": inventory_details["quantity"] if inventory_details else None,
-                            "item": item_details  # Embed item details
-                        } if inventory_details else None
-                    })
-
-            # Structure the receipt with its stock-in details
-            formatted_receipts.append({
-                "receipt_id": receipt["id"],  # Primary key of the receipt
-                "receipt_no": receipt["receipt_no"],  # Purchase receipt number
-                "supplier_name": receipt["supplier_name"],
-                "date": receipt["date"][:10],  # Extract YYYY-MM-DD
-                "stock_ins": stockins_data  # Attach stock-in records with inventory & item details
-            })
-
-        return JsonResponse({
-            "receipts": formatted_receipts, 
-            "units": units,
-            "categories": categories,
-            "items": items,
-            }, safe=False)
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
@@ -1456,3 +1350,167 @@ def add_stockin_data(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+    
+
+@api_view(['PUT'])
+@authentication_classes([])
+@permission_classes([AllowAny]) 
+def edit_receipt_stockin_data(request, receipt_id):
+    """
+    Updates receipt details (receipt_no, supplier_name, date) and the associated stock-in entries.
+    For each stock-in update:
+      - If a 'delete' flag is present and True, delete the existing record (if any) and adjust inventory.
+      - Else, if an 'id' is provided, update the existing record.
+      - If no 'id' is provided, insert a new stock-in entry.
+    Inventory quantities are adjusted based on the changes.
+    All changes are only committed when the user clicks the submit button.
+    Returns the updated receipt (including updated stock_ins) so the frontend can immediately show new IDs.
+    """
+    try:
+        data = json.loads(request.body)
+
+        # Extract receipt details
+        receipt_no = data.get("receipt_no")
+        supplier_name = data.get("supplier_name")
+        date = data.get("date")
+        stock_in_updates = data.get("stock_in_updates", [])
+
+        # Validate receipt fields
+        if not receipt_no or not supplier_name or not date:
+            return JsonResponse(
+                {"error": "Receipt fields (receipt_no, supplier_name, date) are required."},
+                status=400,
+            )
+
+        # Update receipt details
+        receipt_update = supabase_service.table("receipts").update({
+            "receipt_no": receipt_no,
+            "supplier_name": supplier_name,
+            "date": date
+        }).eq("id", receipt_id).execute()
+
+        # Process stock_in updates if provided
+        for stock in stock_in_updates:
+            # If marked for deletion, process deletion
+            if stock.get("delete"):
+                if "id" in stock and stock["id"]:
+                    stockin_response = supabase_service.table("stockin").select("*").eq("id", stock["id"]).execute()
+                    if not stockin_response.data:
+                        return JsonResponse({"error": f"Stock-in record with id {stock['id']} not found."}, status=404)
+                    existing_stock = stockin_response.data[0]
+                    inventory_id = existing_stock.get("inventory_id")
+                    inv_response = supabase_service.table("inventory").select("quantity").eq("id", inventory_id).execute()
+                    if not inv_response.data:
+                        return JsonResponse({"error": f"Inventory record not found for inventory_id {inventory_id}"}, status=404)
+                    current_quantity = int(inv_response.data[0].get("quantity", 0))
+                    quantity_to_subtract = int(existing_stock.get("quantity_in", 0))
+                    new_inv_quantity = current_quantity - quantity_to_subtract
+                    supabase_service.table("inventory").update({"quantity": new_inv_quantity}).eq("id", inventory_id).execute()
+                    supabase_service.table("stockin").delete().eq("id", stock["id"]).execute()
+                # For new entries marked for deletion, nothing to do.
+                continue
+
+            # If the stock update is not marked for deletion:
+            if "id" in stock and stock["id"]:
+                # Update existing stock-in entry
+                stockin_id = stock["id"]
+                stockin_response = supabase_service.table("stockin").select("*").eq("id", stockin_id).execute()
+                if not stockin_response.data:
+                    return JsonResponse({"error": f"Stock-in record with id {stockin_id} not found."}, status=404)
+                existing_stock = stockin_response.data[0]
+                old_quantity = int(stock.get("old_quantity", existing_stock.get("quantity_in", 0)))
+                new_quantity = int(stock.get("quantity_in", 0))
+                price = float(stock.get("price", 0))
+                diff = new_quantity - old_quantity
+
+                # Update stockin record
+                supabase_service.table("stockin").update({
+                    "quantity_in": new_quantity,
+                    "price": price
+                }).eq("id", stockin_id).execute()
+
+                # Adjust inventory quantity for this stockin's inventory record
+                inventory_id = existing_stock.get("inventory_id")
+                inv_response = supabase_service.table("inventory").select("quantity").eq("id", inventory_id).execute()
+                if not inv_response.data:
+                    return JsonResponse({"error": f"Inventory record not found for inventory_id {inventory_id}"}, status=404)
+                current_quantity = int(inv_response.data[0].get("quantity", 0))
+                new_inv_quantity = current_quantity + diff
+                supabase_service.table("inventory").update({"quantity": new_inv_quantity}).eq("id", inventory_id).execute()
+
+            else:
+                # Insert a new stock-in entry
+                inventory_id = stock.get("inventory_id")
+                item_id = stock.get("item_id")
+                if not inventory_id or not item_id or stock.get("quantity_in") is None or stock.get("price") is None:
+                    return JsonResponse({"error": "For new stock-in entries, inventory_id, item_id, quantity_in, and price are required."}, status=400)
+                try:
+                    quantity_in = int(stock.get("quantity_in"))
+                    price = float(stock.get("price"))
+                except ValueError:
+                    return JsonResponse({"error": "Invalid quantity or price format."}, status=400)
+                insert_response = supabase_service.table("stockin").insert({
+                    "receipt_id": receipt_id,
+                    "inventory_id": inventory_id,
+                    "item_id": item_id,
+                    "quantity_in": quantity_in,
+                    "price": price
+                }).execute()
+                if not insert_response.data:
+                    return JsonResponse({"error": f"Failed to add new stock-in entry for inventory_id {inventory_id}."}, status=500)
+                # Update inventory by adding the new quantity
+                inv_response = supabase_service.table("inventory").select("quantity").eq("id", inventory_id).execute()
+                if not inv_response.data:
+                    return JsonResponse({"error": f"Inventory record not found for inventory_id {inventory_id}."}, status=404)
+                current_quantity = int(inv_response.data[0].get("quantity", 0))
+                new_quantity = current_quantity + quantity_in
+                supabase_service.table("inventory").update({"quantity": new_quantity}).eq("id", inventory_id).execute()
+
+        # After processing, fetch the updated receipt (with its stock_in entries)
+        updated_receipt_resp = supabase_service.table("receipts").select("*").eq("id", receipt_id).execute()
+        if not updated_receipt_resp.data:
+            return JsonResponse({"error": "Receipt not found after update."}, status=404)
+        updated_receipt = updated_receipt_resp.data[0]
+        stockins_resp = supabase_service.table("stockin").select("*").eq("receipt_id", receipt_id).execute()
+        if stockins_resp.data:
+            updated_receipt["stock_ins"] = stockins_resp.data
+        else:
+            updated_receipt["stock_ins"] = []
+
+        return JsonResponse({
+            "message": "Receipt and stock-in details updated successfully.",
+            "receipt": updated_receipt
+        }, status=200)
+
+    except ValueError:
+        return JsonResponse({"error": "Invalid quantity or price format. Ensure numeric values."}, status=400)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@api_view(['DELETE'])
+@authentication_classes([])
+@permission_classes([AllowAny]) 
+def delete_receipt(request, receipt_id):
+    """
+    This view handles the deletion of an existing receipt and, optionally,
+    its associated stock-in entries.
+    """
+    try:
+        # Check if the receipt exists.
+        receipt_response = supabase_service.table("receipts").select("*").eq("id", receipt_id).execute()
+        if not receipt_response.data:
+            return JsonResponse({"error": "Receipt not found."}, status=404)
+        
+        # Optionally, delete associated stock-in entries.
+        supabase_service.table("stockin").delete().eq("receipt_id", receipt_id).execute()
+        
+        # Delete the receipt.
+        delete_response = supabase_service.table("receipts").delete().eq("id", receipt_id).execute()
+        if delete_response.data:
+            return JsonResponse({"message": "Receipt deleted successfully."}, status=200)
+        else:
+            return JsonResponse({"error": "Failed to delete receipt."}, status=500)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+

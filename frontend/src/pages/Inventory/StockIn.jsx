@@ -21,6 +21,7 @@ const StockIn = () => {
   };
 
   const openEditStockInModal = (receipt) => {
+    console.log("Selected Receipt ID:", receipt.receipt_id);
     setSelectedReceipt(receipt);
     setIsEditStockInOpen(true);
   };
@@ -160,6 +161,8 @@ const StockIn = () => {
         receipt={selectedReceipt}
         unitMeasurements={unitMeasurements}
         items={items}
+        inventory={inventory}
+        onUpdate={fetchReceipts}
       />
     </div>
   );
