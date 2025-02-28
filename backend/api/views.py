@@ -1034,13 +1034,17 @@ def add_inventory(request): # MAIN PURPOSE OF THIS IS TO MAKE A NEW DATA ENTRY W
     Will be used only if there is no existing data when stocking in 
     """
     try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
         data = json.loads(request.body)
         item_id = data.get("item")
         if not item_id:
             return JsonResponse({"error": "Item field is required."}, status=400)
 
         # Insert a new inventory record with quantity set to 0
-        insert_response = supabase_service.table("inventory").insert({
+        insert_response = supabase_client.table("inventory").insert({
             "item": item_id,
             "quantity": 0
         }).execute()
@@ -1056,6 +1060,7 @@ def add_inventory(request): # MAIN PURPOSE OF THIS IS TO MAKE A NEW DATA ENTRY W
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 
+
 @api_view(['POST'])
 @authentication_classes([SupabaseAuthentication])
 @permission_classes([SupabaseIsAdmin])
@@ -1064,6 +1069,10 @@ def add_item(request):
     Handles adding a new item to the database.
     """
     try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
         data = json.loads(request.body)
         name = data.get("name")
         stock_trigger = data.get("stock_trigger")
@@ -1074,7 +1083,7 @@ def add_item(request):
             return JsonResponse({"error": "All fields are required."}, status=400)
 
         # Insert new item
-        insert_response = supabase_service.table("items").insert({
+        insert_response = supabase_client.table("items").insert({
             "name": name,
             "stock_trigger": stock_trigger,
             "measurement": unit_id,
@@ -1082,12 +1091,16 @@ def add_item(request):
         }).execute()
 
         if insert_response.data:
-            return JsonResponse({"message": "Item added successfully.", "item": insert_response.data[0]}, status=201)
+            return JsonResponse({
+                "message": "Item added successfully.",
+                "item": insert_response.data[0]
+            }, status=201)
         else:
             return JsonResponse({"error": "Failed to add item."}, status=500)
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
     
 @api_view(['PUT'])
 @authentication_classes([SupabaseAuthentication])
@@ -1097,33 +1110,36 @@ def edit_item(request, item_id):
     This view handles the update of an existing item.
     """
     try:
-        # Parse the JSON data from the request body
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
         data = json.loads(request.body)
         name = data.get("name")
         stock_trigger = data.get("stock_trigger")
         unit_id = data.get("measurement")
         category_id = data.get("category")
 
-        # Validate input
         if not name or not stock_trigger or not unit_id or not category_id:
-            return JsonResponse({"error": "All fields (name, stock_trigger, unit_id, category_id) are required."}, status=400)
+            return JsonResponse({
+                "error": "All fields (name, stock_trigger, unit_id, category_id) are required."
+            }, status=400)
 
-        # Find the item to update
-        item_response = supabase_service.table("items").select("*").eq("id", item_id).execute()
+        # Check if the item exists
+        item_response = supabase_client.table("items").select("*").eq("id", item_id).execute()
         item = item_response.data[0] if item_response.data else None
 
         if not item:
             return JsonResponse({"error": "Item not found."}, status=404)
 
-        # Update the item in the database
-        update_response = supabase_service.table("items").update({
+        # Update the item
+        update_response = supabase_client.table("items").update({
             "name": name,
             "stock_trigger": stock_trigger,
             "measurement": unit_id,
             "category": category_id
         }).eq("id", item_id).execute()
 
-        # Check if the update was successful
         if update_response.data:
             return JsonResponse({"message": "Item updated successfully."}, status=200)
         else:
@@ -1140,15 +1156,18 @@ def delete_item(request, item_id):
     This view handles the deletion of an existing item.
     """
     try:
-        # Check if the item exists
-        item_response = supabase_service.table("items").select("*").eq("id", item_id).execute()
+         # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        # Verify the item exists
+        item_response = supabase_client.table("items").select("*").eq("id", item_id).execute()
         if not item_response.data:
             return JsonResponse({"error": "Item not found."}, status=404)
-        
-        # Delete the item from the database
-        delete_response = supabase_service.table("items").delete().eq("id", item_id).execute()
-        
-        # Check if the deletion was successful
+
+        # Delete the item
+        delete_response = supabase_client.table("items").delete().eq("id", item_id).execute()
+
         if delete_response.data:
             return JsonResponse({"message": "Item deleted successfully."}, status=200)
         else:
@@ -1166,21 +1185,27 @@ def add_category(request):
     Handles adding a new category to the databae
     """
     try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
         data = json.loads(request.body)
         name = data.get("name")
 
         if not name:
-            return JsonResponse({"error" : "All fields are required"}, status=400)
-        
-        # Insert new item
-        insert_response = supabase_service.table("item_category").insert({
+            return JsonResponse({"error": "All fields are required"}, status=400)
+
+        # Insert new item category
+        insert_response = supabase_client.table("item_category").insert({
             "name": name
         }).execute()
 
         if insert_response.data:
-            return JsonResponse({"message" : "Item Category added successfully"}, status=201)
+            return JsonResponse({
+                "message": "Item Category added successfully"
+            }, status=201)
         else:
-            return JsonResponse({"error" : "Failed to add Item Category"}, status=500)
+            return JsonResponse({"error": "Failed to add Item Category"}, status=500)
         
     except Exception as e:
         return JsonResponse({"error" : str(e)}, status=500)
@@ -1193,6 +1218,10 @@ def edit_category(request, category_id):
     Handles updating an existing category name
     """
     try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
         data = json.loads(request.body)
         new_name = data.get("name")
 
@@ -1200,12 +1229,14 @@ def edit_category(request, category_id):
             return JsonResponse({"error": "Name is required."}, status=400)
 
         # Check if category exists
-        category_response = supabase_service.table("item_category").select("*").eq("id", category_id).execute()
+        category_response = supabase_client.table("item_category").select("*").eq("id", category_id).execute()
         if not category_response.data:
             return JsonResponse({"error": "Item Category not found."}, status=404)
 
         # Update category name
-        update_response = supabase_service.table("item_category").update({"name": new_name}).eq("id", category_id).execute()
+        update_response = supabase_client.table("item_category").update({
+            "name": new_name
+        }).eq("id", category_id).execute()
 
         if update_response.data:
             return JsonResponse({"message": "Item Category updated successfully."}, status=200)
@@ -1224,11 +1255,17 @@ def delete_category(request, category_id):
     This view handles the deletion of an existing category
     """
     try:
-        category_response = supabase_service.table("item_category").select("*").eq("id", category_id).execute()
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        # Verify category exists
+        category_response = supabase_client.table("item_category").select("*").eq("id", category_id).execute()
         if not category_response.data:
-            return JsonResponse({"error" : "Item Category not found."}, status=404)
-        
-        delete_response = supabase_service.table("item_category").delete().eq("id", category_id).execute()
+            return JsonResponse({"error": "Item Category not found."}, status=404)
+
+        # Delete category
+        delete_response = supabase_client.table("item_category").delete().eq("id", category_id).execute()
 
         if delete_response.data:
             return JsonResponse({"message": "Item Category deleted successfully."}, status=200)
@@ -1383,38 +1420,45 @@ def edit_receipt_stockin_data(request, receipt_id):
             )
 
         # Update receipt details
-        receipt_update = supabase_service.table("receipts").update({
+        supabase_service.table("receipts").update({
             "receipt_no": receipt_no,
             "supplier_name": supplier_name,
             "date": date
         }).eq("id", receipt_id).execute()
 
-        # Process stock_in updates if provided
+        # Process stock_in updates
         for stock in stock_in_updates:
-            # If marked for deletion, process deletion
+            # If marked for deletion, process deletion and adjust inventory.
             if stock.get("delete"):
                 if "id" in stock and stock["id"]:
-                    stockin_response = supabase_service.table("stockin").select("*").eq("id", stock["id"]).execute()
+                    stockin_response = supabase_service.table("stockin") \
+                        .select("*") \
+                        .eq("id", stock["id"]).execute()
                     if not stockin_response.data:
                         return JsonResponse({"error": f"Stock-in record with id {stock['id']} not found."}, status=404)
                     existing_stock = stockin_response.data[0]
                     inventory_id = existing_stock.get("inventory_id")
-                    inv_response = supabase_service.table("inventory").select("quantity").eq("id", inventory_id).execute()
+                    inv_response = supabase_service.table("inventory") \
+                        .select("quantity") \
+                        .eq("id", inventory_id).execute()
                     if not inv_response.data:
                         return JsonResponse({"error": f"Inventory record not found for inventory_id {inventory_id}"}, status=404)
                     current_quantity = int(inv_response.data[0].get("quantity", 0))
                     quantity_to_subtract = int(existing_stock.get("quantity_in", 0))
                     new_inv_quantity = current_quantity - quantity_to_subtract
-                    supabase_service.table("inventory").update({"quantity": new_inv_quantity}).eq("id", inventory_id).execute()
-                    supabase_service.table("stockin").delete().eq("id", stock["id"]).execute()
+                    supabase_service.table("inventory") \
+                        .update({"quantity": new_inv_quantity}) \
+                        .eq("id", inventory_id).execute()
+                    supabase_service.table("stockin") \
+                        .delete().eq("id", stock["id"]).execute()
                 # For new entries marked for deletion, nothing to do.
                 continue
 
-            # If the stock update is not marked for deletion:
+            # Process updates for existing records.
             if "id" in stock and stock["id"]:
-                # Update existing stock-in entry
                 stockin_id = stock["id"]
-                stockin_response = supabase_service.table("stockin").select("*").eq("id", stockin_id).execute()
+                stockin_response = supabase_service.table("stockin") \
+                    .select("*").eq("id", stockin_id).execute()
                 if not stockin_response.data:
                     return JsonResponse({"error": f"Stock-in record with id {stockin_id} not found."}, status=404)
                 existing_stock = stockin_response.data[0]
@@ -1423,23 +1467,23 @@ def edit_receipt_stockin_data(request, receipt_id):
                 price = float(stock.get("price", 0))
                 diff = new_quantity - old_quantity
 
-                # Update stockin record
                 supabase_service.table("stockin").update({
                     "quantity_in": new_quantity,
                     "price": price
                 }).eq("id", stockin_id).execute()
 
-                # Adjust inventory quantity for this stockin's inventory record
                 inventory_id = existing_stock.get("inventory_id")
-                inv_response = supabase_service.table("inventory").select("quantity").eq("id", inventory_id).execute()
+                inv_response = supabase_service.table("inventory") \
+                    .select("quantity").eq("id", inventory_id).execute()
                 if not inv_response.data:
                     return JsonResponse({"error": f"Inventory record not found for inventory_id {inventory_id}"}, status=404)
                 current_quantity = int(inv_response.data[0].get("quantity", 0))
                 new_inv_quantity = current_quantity + diff
-                supabase_service.table("inventory").update({"quantity": new_inv_quantity}).eq("id", inventory_id).execute()
+                supabase_service.table("inventory").update({"quantity": new_inv_quantity}) \
+                    .eq("id", inventory_id).execute()
 
             else:
-                # Insert a new stock-in entry
+                # Process insertion for new stockin entries.
                 inventory_id = stock.get("inventory_id")
                 item_id = stock.get("item_id")
                 if not inventory_id or not item_id or stock.get("quantity_in") is None or stock.get("price") is None:
@@ -1458,24 +1502,24 @@ def edit_receipt_stockin_data(request, receipt_id):
                 }).execute()
                 if not insert_response.data:
                     return JsonResponse({"error": f"Failed to add new stock-in entry for inventory_id {inventory_id}."}, status=500)
-                # Update inventory by adding the new quantity
-                inv_response = supabase_service.table("inventory").select("quantity").eq("id", inventory_id).execute()
+                inv_response = supabase_service.table("inventory") \
+                    .select("quantity").eq("id", inventory_id).execute()
                 if not inv_response.data:
                     return JsonResponse({"error": f"Inventory record not found for inventory_id {inventory_id}."}, status=404)
                 current_quantity = int(inv_response.data[0].get("quantity", 0))
                 new_quantity = current_quantity + quantity_in
-                supabase_service.table("inventory").update({"quantity": new_quantity}).eq("id", inventory_id).execute()
+                supabase_service.table("inventory").update({"quantity": new_quantity}) \
+                    .eq("id", inventory_id).execute()
 
-        # After processing, fetch the updated receipt (with its stock_in entries)
-        updated_receipt_resp = supabase_service.table("receipts").select("*").eq("id", receipt_id).execute()
+        # Fetch updated receipt (with stockin entries)
+        updated_receipt_resp = supabase_service.table("receipts") \
+            .select("*").eq("id", receipt_id).execute()
         if not updated_receipt_resp.data:
             return JsonResponse({"error": "Receipt not found after update."}, status=404)
         updated_receipt = updated_receipt_resp.data[0]
-        stockins_resp = supabase_service.table("stockin").select("*").eq("receipt_id", receipt_id).execute()
-        if stockins_resp.data:
-            updated_receipt["stock_ins"] = stockins_resp.data
-        else:
-            updated_receipt["stock_ins"] = []
+        stockins_resp = supabase_service.table("stockin") \
+            .select("*").eq("receipt_id", receipt_id).execute()
+        updated_receipt["stock_ins"] = stockins_resp.data if stockins_resp.data else []
 
         return JsonResponse({
             "message": "Receipt and stock-in details updated successfully.",
@@ -1488,13 +1532,14 @@ def edit_receipt_stockin_data(request, receipt_id):
         return JsonResponse({"error": str(e)}, status=500)
 
 
+
 @api_view(['DELETE'])
 @authentication_classes([])
 @permission_classes([AllowAny]) 
 def delete_receipt(request, receipt_id):
     """
-    This view handles the deletion of an existing receipt and, optionally,
-    its associated stock-in entries.
+    This view handles the deletion of an existing receipt and its associated stock-in entries.
+    Before deletion, for each stock-in entry the inventory quantity is decreased by the stock-in quantity.
     """
     try:
         # Check if the receipt exists.
@@ -1502,15 +1547,30 @@ def delete_receipt(request, receipt_id):
         if not receipt_response.data:
             return JsonResponse({"error": "Receipt not found."}, status=404)
         
-        # Optionally, delete associated stock-in entries.
-        supabase_service.table("stockin").delete().eq("receipt_id", receipt_id).execute()
+        # Retrieve all associated stock-in entries.
+        stockins_response = supabase_service.table("stockin").select("*").eq("receipt_id", receipt_id).execute()
+        if stockins_response.data:
+            for stock in stockins_response.data:
+                inventory_id = stock.get("inventory_id")
+                quantity_in = int(stock.get("quantity_in", 0))
+                # Get the current inventory quantity.
+                inv_response = supabase_service.table("inventory").select("quantity").eq("id", inventory_id).execute()
+                if inv_response.data:
+                    current_quantity = int(inv_response.data[0].get("quantity", 0))
+                    # Subtract the stock-in quantity.
+                    new_quantity = current_quantity - quantity_in
+                    supabase_service.table("inventory").update({"quantity": new_quantity}).eq("id", inventory_id).execute()
+                else:
+                    return JsonResponse({"error": f"Inventory record not found for inventory_id {inventory_id}"}, status=404)
+        
+            # Delete all stock-in entries for this receipt.
+            supabase_service.table("stockin").delete().eq("receipt_id", receipt_id).execute()
         
         # Delete the receipt.
         delete_response = supabase_service.table("receipts").delete().eq("id", receipt_id).execute()
         if delete_response.data:
-            return JsonResponse({"message": "Receipt deleted successfully."}, status=200)
+            return JsonResponse({"message": "Receipt and associated stock-in entries deleted successfully."}, status=200)
         else:
             return JsonResponse({"error": "Failed to delete receipt."}, status=500)
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-

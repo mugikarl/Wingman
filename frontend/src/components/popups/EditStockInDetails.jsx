@@ -15,7 +15,7 @@ const EditStockInDetails = ({
 
   // Local state for the stock-in data and receipt details used for editing.
   const [stockInData, setStockInData] = useState([]);
-  const [editedStockData, setEditedStockData] = useState([]); // a copy used for edits
+  const [editedStockData, setEditedStockData] = useState([]); // copy used for edits
   const [editedReceipt, setEditedReceipt] = useState({ ...receipt });
   const [selectedStock, setSelectedStock] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -40,7 +40,7 @@ const EditStockInDetails = ({
           old_quantity: stock.quantity_in,
           inventory_id: stock.inventory?.id || null,
           item_id: stock.inventory?.item?.id || null,
-          // New flag for deferred deletion.
+          // Flag for deferred deletion.
           to_delete: false,
         };
       });
@@ -337,7 +337,7 @@ const EditStockInDetails = ({
               onChange={handleChange}
               disabled={!isEditing}
               className={`p-2 border rounded-lg shadow ${
-                isEditing ? "bg-white" : "bg-gray-100"
+                isEditing ? "bg-white" : "bg-gray-200"
               }`}
             />
           </div>
@@ -350,7 +350,7 @@ const EditStockInDetails = ({
               onChange={handleChange}
               disabled={!isEditing}
               className={`p-2 border rounded-lg shadow ${
-                isEditing ? "bg-white" : "bg-gray-100"
+                isEditing ? "bg-white" : "bg-gray-200"
               }`}
             />
           </div>
@@ -363,7 +363,7 @@ const EditStockInDetails = ({
               onChange={handleChange}
               disabled={!isEditing}
               className={`p-2 border rounded-lg shadow ${
-                isEditing ? "bg-white" : "bg-gray-100"
+                isEditing ? "bg-white" : "bg-gray-200"
               }`}
             />
           </div>
