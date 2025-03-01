@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import Table from "../../components/tables/Table";
 import axios from "axios";
 
 const EditStockInDetails = ({
@@ -17,9 +16,13 @@ const EditStockInDetails = ({
   const [stockInData, setStockInData] = useState([]);
   const [editedStockData, setEditedStockData] = useState([]); // copy used for edits
   const [editedReceipt, setEditedReceipt] = useState({ ...receipt });
-  const [selectedStock, setSelectedStock] = useState(null);
+  const [selectedStock, setSelectedStock] = useState({
+    name: "",
+    measurement: "",
+    quantity: "",
+    price: "",
+  });
   const [isEditing, setIsEditing] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
 
   // On mount or when receipt changes, initialize local state from props.
   useEffect(() => {
@@ -77,8 +80,12 @@ const EditStockInDetails = ({
       setEditedReceipt({ ...receipt });
     }
     setIsEditing(!isEditing);
-    setSelectedStock(null);
-    setIsUpdating(false);
+    setSelectedStock({
+      name: "",
+      measurement: "",
+      quantity: "",
+      price: "",
+    });
   };
 
   // Update receipt fields locally.
@@ -87,24 +94,18 @@ const EditStockInDetails = ({
   };
 
   // Update an existing stock item in local state.
-  const handleUpdateStock = () => {
-    if (!selectedStock || !selectedStock.id) return;
-    setEditedStockData((prev) =>
-      prev.map((stock) =>
-        stock.id === selectedStock.id
-          ? {
-              ...stock,
-              price: parseFloat(selectedStock.price),
-              quantity: parseInt(selectedStock.quantity, 10),
-              totalCost:
-                parseFloat(selectedStock.price) *
-                (parseInt(selectedStock.quantity, 10) || 0),
-            }
-          : stock
-      )
-    );
-    setSelectedStock(null);
-    setIsUpdating(false);
+  const handleStockChange = (index, field, value) => {
+    const updatedStock = [...editedStockData];
+    updatedStock[index] = {
+      ...updatedStock[index],
+      [field]: value,
+    };
+    if (field === "quantity" || field === "price") {
+      updatedStock[index].totalCost =
+        parseFloat(updatedStock[index].price) *
+        parseInt(updatedStock[index].quantity, 10);
+    }
+    setEditedStockData(updatedStock);
   };
 
   // For adding new stock entries, update local state.
@@ -153,12 +154,17 @@ const EditStockInDetails = ({
         to_delete: false,
       };
       setEditedStockData((prev) => [...prev, newStock]);
-      setSelectedStock(null);
+      setSelectedStock({
+        name: "",
+        measurement: "",
+        quantity: "",
+        price: "",
+      });
     }
   };
 
   // Update local selectedStock from inputs.
-  const handleStockChange = (e) => {
+  const handleStockInputChange = (e) => {
     const { name, value } = e.target;
     if (name === "name") {
       const selectedItem = items.find((item) => item.name === value);
@@ -369,165 +375,181 @@ const EditStockInDetails = ({
           </div>
         </div>
 
-        {/* Stock-In Items Editing */}
-        <div className="flex space-x-4 mb-6 items-end">
-          <div className="flex flex-col w-1/3">
-            <label className="font-bold">Items:</label>
-            <select
-              className={`p-2 border rounded-lg shadow ${
-                isEditing ? "bg-white" : "bg-gray-100"
-              }`}
-              disabled={!isEditing}
-              value={selectedStock?.name || ""}
-              name="name"
-              onChange={handleStockChange}
-            >
-              <option value="">Select Item</option>
-              {items.map((item) => (
-                <option key={item.id} value={item.name}>
-                  {item.name}
-                </option>
+        {/* Table with Editable Rows and Add Row */}
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white border border-gray-200">
+            <thead>
+              <tr className="bg-[#FFCF03]">
+                {[
+                  "ID",
+                  "ITEM NAME",
+                  "UNIT",
+                  "COST",
+                  "QUANTITY",
+                  "TOTAL COST",
+                  "ACTION",
+                ].map((column, index) => (
+                  <th
+                    key={index}
+                    className="px-4 py-2 border-b border-gray-200 text-left text-sm font-semibold text-gray-700"
+                  >
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {editedStockData.map((stock, index) => (
+                <tr
+                  key={index}
+                  className={`hover:bg-yellow-200 ${
+                    index % 2 === 0 ? "bg-[#FFEEA6]" : "bg-[#FFEEA6]"
+                  }`}
+                >
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    {stock.id}
+                  </td>
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    {stock.name}
+                  </td>
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    {stock.measurement}
+                  </td>
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        value={stock.price}
+                        onChange={(e) =>
+                          handleStockChange(index, "price", e.target.value)
+                        }
+                        className="p-1 border rounded"
+                      />
+                    ) : (
+                      stock.price
+                    )}
+                  </td>
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        value={stock.quantity}
+                        onChange={(e) =>
+                          handleStockChange(index, "quantity", e.target.value)
+                        }
+                        className="p-1 border rounded"
+                      />
+                    ) : (
+                      stock.quantity
+                    )}
+                  </td>
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    {stock.totalCost}
+                  </td>
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    <div>
+                      {stock.to_delete ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            cancelStockDeletion(index);
+                          }}
+                          className="bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
+                        >
+                          Cancel Delete
+                        </button>
+                      ) : (
+                        <button
+                          disabled={!isEditing}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isEditing) return;
+                            if (
+                              window.confirm(
+                                "Are you sure you want to delete this stock-in detail?"
+                              )
+                            ) {
+                              markStockForDeletion(index);
+                            }
+                          }}
+                          className={`bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 ${
+                            !isEditing ? "opacity-50 cursor-not-allowed" : ""
+                          }`}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
               ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col w-1/6">
-            <label className="font-bold">Unit:</label>
-            <input
-              type="text"
-              placeholder="Unit"
-              className="p-2 border rounded-lg shadow bg-gray-100"
-              name="measurement"
-              value={selectedStock?.measurement || ""}
-              disabled
-            />
-          </div>
-
-          <div className="flex flex-col w-1/6">
-            <label className="font-bold">Quantity:</label>
-            <input
-              type="number"
-              placeholder="Quantity"
-              className={`p-2 border rounded-lg shadow ${
-                isEditing ? "bg-white" : "bg-gray-100"
-              }`}
-              disabled={!isEditing}
-              name="quantity"
-              value={selectedStock?.quantity || ""}
-              onChange={handleStockChange}
-            />
-          </div>
-
-          <div className="flex flex-col w-1/6">
-            <label className="font-bold">Cost per Unit:</label>
-            <input
-              type="number"
-              placeholder="Cost/Unit"
-              className={`p-2 border rounded-lg shadow ${
-                isEditing ? "bg-white" : "bg-gray-100"
-              }`}
-              disabled={!isEditing}
-              name="price"
-              value={selectedStock?.price || ""}
-              onChange={handleStockChange}
-            />
-          </div>
-
-          {isEditing &&
-            (isUpdating ? (
-              <div className="flex space-x-2 w-full justify-end mt-4">
-                <button
-                  onClick={() => {
-                    setSelectedStock(null);
-                    setIsUpdating(false);
-                  }}
-                  className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleUpdateStock}
-                  className="bg-yellow-500 text-white px-4 py-2 rounded-lg shadow hover:bg-yellow-600"
-                >
-                  Update
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleAddStock}
-                className="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600"
-              >
-                Add
-              </button>
-            ))}
+              {/* Add Row */}
+              {isEditing && (
+                <tr className="bg-[#FFEEA6] hover:bg-gray-50">
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    {/* ID (empty for new entries) */}
+                  </td>
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    <select
+                      className="p-1 border rounded"
+                      value={selectedStock.name}
+                      name="name"
+                      onChange={handleStockInputChange}
+                    >
+                      <option value="">Select Item</option>
+                      {items.map((item) => (
+                        <option key={item.id} value={item.name}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    <input
+                      type="text"
+                      placeholder="Unit"
+                      className="p-1 border rounded bg-gray-100"
+                      name="measurement"
+                      value={selectedStock.measurement}
+                      disabled
+                    />
+                  </td>
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    <input
+                      type="number"
+                      placeholder="Cost/Unit"
+                      className="p-1 border rounded"
+                      name="price"
+                      value={selectedStock.price}
+                      onChange={handleStockInputChange}
+                    />
+                  </td>
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    <input
+                      type="number"
+                      placeholder="Quantity"
+                      className="p-1 border rounded"
+                      name="quantity"
+                      value={selectedStock.quantity}
+                      onChange={handleStockInputChange}
+                    />
+                  </td>
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    {/* Total Cost (calculated after adding) */}
+                  </td>
+                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                    <button
+                      onClick={handleAddStock}
+                      className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                    >
+                      Add
+                    </button>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-
-        {/* Table with Delete Button in each row */}
-        <Table
-          columns={[
-            "ID",
-            "PRODUCT NAME",
-            "UNIT",
-            "COST",
-            "QUANTITY",
-            "TOTAL COST",
-            "ACTION",
-          ]}
-          data={editedStockData.map((stock, index) => {
-            return [
-              stock.id,
-              stock.name,
-              stock.measurement,
-              stock.price,
-              stock.quantity,
-              stock.totalCost,
-              <div>
-                {stock.to_delete ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      cancelStockDeletion(index);
-                    }}
-                    className="bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
-                  >
-                    Cancel Delete
-                  </button>
-                ) : (
-                  <button
-                    disabled={!isEditing}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isEditing) return;
-                      if (
-                        window.confirm(
-                          "Are you sure you want to delete this stock-in detail?"
-                        )
-                      ) {
-                        markStockForDeletion(index);
-                      }
-                    }}
-                    className={`bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 ${
-                      !isEditing ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    Delete
-                  </button>
-                )}
-              </div>,
-            ];
-          })}
-          rowOnClick={(rowIndex) => {
-            const selected = editedStockData[rowIndex];
-            setSelectedStock({
-              id: selected.id,
-              name: selected.name,
-              measurement: selected.measurement,
-              price: selected.price,
-              quantity: selected.quantity,
-            });
-            setIsUpdating(true);
-          }}
-        />
       </div>
     </div>
   );

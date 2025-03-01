@@ -22,6 +22,11 @@ const Items = () => {
   const closeModal = () => setIsModalOpen(false);
   const closeCategoryModal = () => setIsCategoryModalOpen(false);
 
+  const role = localStorage.getItem("role"); // Check user's role
+
+{/* Conditionally render the Menu button only for Admin */}
+
+
 
   const openEditModal = (item) => {
     setSelectedItem(item); // Set the selected item
@@ -86,16 +91,28 @@ const Items = () => {
                 <span className="text-white">Stock In</span>
               </button>
             </Link>
-            <Link to="/disposeditems">
-              <button className="flex items-center bg-[#FF0000] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
-                <img
-                  src="/images/stockout/trash.png"
-                  alt="Disposed"
-                  className="w-8 h-8 mr-2"
-                />
-                <span className="text-white">Disposed</span>
-              </button>
-            </Link>
+            {role === "Admin" && (
+  <Link to="/dashboard-admin/menu">
+    <button className="flex items-center bg-[#00BA34] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+      <img
+        src="/images/stockout/stock.png"
+        alt="Stock In"
+        className="w-8 h-8 mr-2"
+      />
+      <span className="text-white">Menu</span>
+    </button>
+  </Link>
+)}
+            <Link to="/stockoutitems">
+                <button className="flex items-center bg-[#FF0000] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+                  <img
+                    src="/images/stockout/trash.png"
+                    alt="Disposed"
+                    className="w-8 h-8 mr-2"
+                  />
+                  <span className="text-white">Disposed</span>
+                </button>
+              </Link>
           </div>
           <div className="w-full">
             <div className="flex items-center justify-between space-x-2 mb-4">

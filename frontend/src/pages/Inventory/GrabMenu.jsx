@@ -1,13 +1,17 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import NewMenuModal from "../../components/popups/NewMenuModal";
+import NewMenuModal from "../../components/popups/NewMenuModal"; // Import the NewMenuModal
 import EditMenuModal from "../../components/popups/EditMenuModal"; // Import the EditMenuModal
 
-const Menu = () => {
+const GrabMenu = () => {
   // Dummy function for handling item clicks
   const handleAddItem = (item) => {
     console.log("Item added:", item);
   };
+
+  // State for percentage deduction
+  const [percentage, setPercentage] = useState("10"); // Default value
+  const [isEditable, setIsEditable] = useState(false);
 
   // State to control modal visibility
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,7 +42,7 @@ const Menu = () => {
         onClick={() => onClick(item)}
       >
         {/* Image (50% height of the ItemBox) */}
-        <div className="w-full h-32 flex items-center justify-center mb-2"> {/* 50% of h-64 */}
+        <div className="w-full h-32 flex items-center justify-center mb-2">
           <img
             src={item.image || "../../images/chicken.jpg"}
             alt={item.name}
@@ -56,7 +60,6 @@ const Menu = () => {
   };
 
   return (
-    
     <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
       {/* Top Section */}
       <button
@@ -68,10 +71,8 @@ const Menu = () => {
           <div className="h-4"></div>
       <div className="flex justify-between items-start mb-8">
         {/* Left Section: Search Bar and Scrollable Buttons */}
-        
         <div className="w-3/4">
           {/* Search Bar */}
-          
           <div className="mb-4">
             <input
               type="text"
@@ -112,7 +113,7 @@ const Menu = () => {
           onClick={() => setIsModalOpen(true)}
         >
           <img
-            src="/images/stockout/trash.png"
+            src=""
             alt="Disposed"
             className="w-32 h-14 mb-2"
           />
@@ -120,23 +121,55 @@ const Menu = () => {
         </button>
       </div>
 
-      {/* Order, Foodpanda, Grab Buttons */}
-      <div className="flex space-x-4 mb-8">
-        <Link to="/dashboard-admin/menu">
-          <button className="flex items-center justify-center bg-[#FF0000] text-white p-2 rounded-lg shadow min-w-[15%] text-sm">
-            Order
-          </button>
-        </Link>
-        <Link to="/dashboard-admin/fpmenu">
-          <button className="flex items-center justify-center bg-[#FF0000] text-white p-2 rounded-lg shadow min-w-[15%] text-sm">
-            Foodpanda
-          </button>
-        </Link>
-        <Link to="/dashboard-admin/grabmenu">
+      {/* Order, Foodpanda, Grab Buttons and Percentage Deduction Section */}
+      <div className="flex justify-between items-center mb-8">
+        {/* Order, Foodpanda, Grab Buttons */}
+        <div className="flex space-x-4">
+          <Link to="/dashboard-admin/menu">
+            <button className="flex items-center justify-center bg-[#FF0000] text-white p-2 rounded-lg shadow min-w-[15%] text-sm">
+              Order
+            </button>
+          </Link>
+          <Link to="/dashboard-admin/fpmenu">
+            <button className="flex items-center justify-center bg-[#FF0000] text-white p-2 rounded-lg shadow min-w-[15%] text-sm">
+              Foodpanda
+            </button>
+          </Link>
           <button className="flex items-center justify-center bg-[#FF0000] text-white p-2 rounded-lg shadow min-w-[15%] text-sm">
             Grab
           </button>
-        </Link>
+        </div>
+
+        {/* Percentage Deduction Section */}
+        <div className="flex items-center space-x-4">
+          {/* Percentage Deduction Label */}
+          <span className="text-base font-medium">Percentage Deduction</span>
+
+          {/* Textbox with % Label */}
+          <div className="flex items-center border rounded-lg shadow">
+            <input
+              type="text"
+              value={percentage}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (/^\d{0,2}$/.test(value)) {
+                  setPercentage(value);
+                }
+              }}
+              disabled={!isEditable}
+              className="p-2 w-12 text-center border-none rounded-l-lg focus:outline-none"
+            />
+            <span className="p-2 bg-gray-100 rounded-r-lg">%</span>
+          </div>
+
+          {/* Edit Button */}
+          <button
+            onClick={() => setIsEditable(!isEditable)}
+            className="flex items-center justify-center bg-[#FF0000] text-white p-2 rounded-lg shadow min-w-[15%] text-sm"
+          >
+            {isEditable ? "Save" : "Edit"}
+          </button>
+        </div>
       </div>
 
       {/* Grid Layout for Images */}
@@ -173,4 +206,4 @@ const Menu = () => {
   );
 };
 
-export default Menu;
+export default GrabMenu;

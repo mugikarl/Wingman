@@ -14,6 +14,8 @@ const Inventory = () => {
   const [categories, setCategories] = useState([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false); // State for the edit modal
 
+  const role = localStorage.getItem("role"); // Check user's role
+
   const openModal = () => {
     setIsModalOpen(true);
   };
@@ -62,7 +64,6 @@ const Inventory = () => {
           <div className="flex space-x-4">
             <Link to="/inventory">
               <button
-                onClick={openModal}
                 className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]"
               >
                 <img
@@ -96,7 +97,21 @@ const Inventory = () => {
               </button>
             </Link>
 
-            <Link to="/disposeditems">
+            {/* Conditionally render the Menu button only for Admin */}
+            {role === "Admin" && (
+              <Link to="/dashboard-admin/menu">
+                <button className="flex items-center bg-[#00BA34] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+                  <img
+                    src="/images/stockout/stock.png"
+                    alt="Stock In"
+                    className="w-8 h-8 mr-2"
+                  />
+                  <span className="text-white">Menu</span>
+                </button>
+              </Link>
+            )}
+
+            <Link to="/stockoutitems">
               <button className="flex items-center bg-[#FF0000] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
                 <img
                   src="/images/stockout/trash.png"
@@ -160,7 +175,6 @@ const Inventory = () => {
                   ];
                 })
           }
-          //  rowOnClick={(rowIndex) => openEditModal(inventoryData[rowIndex])} // Pass row click handler
         />
 
         {/* New Product Modal */}
