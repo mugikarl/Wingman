@@ -75,7 +75,8 @@ const Inventory = () => {
               </button>
             </Link>
             {/* Other Buttons */}
-            <Link to="/items">
+            {role === "Admin" && (
+              <Link to="/items">
               <button className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
                 <img
                   src="/images/stockout/menu.png"
@@ -85,7 +86,7 @@ const Inventory = () => {
                 <span className="text-white">Items</span>
               </button>
             </Link>
-
+            )}
             <Link to="/stockin">
               <button className="flex items-center bg-[#00BA34] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
                 <img
