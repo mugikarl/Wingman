@@ -3,16 +3,16 @@ import { Link, useNavigate } from "react-router-dom";
 import NewItem from "../components/popups/NewItem";
 import Table from "../components/tables/Table";
 import axios from "axios";
-// import EditInventory from "../components/popups/EditInventory"; // Import the EditInventory component
+import DisposedInventory from "../components/popups/DisposedInventory";
 
 const Inventory = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [inventoryData, setInventoryData] = useState([]); // State to hold inventory data
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState(null); // State to track selected item for editing
   const [units, setUnits] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // State for the edit modal
+  const [isDisposedModalOpen, setIsDisposedModalOpen] = useState(false);
+  const [selectedInventory, setSelectedInventory] = useState(null);
 
   const navigate = useNavigate();
   const role = localStorage.getItem("role");
@@ -24,22 +24,9 @@ const Inventory = () => {
   //   }
   // }, [role, navigate]);
 
-  const openModal = () => {
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-  };
-
-  const openEditModal = (item) => {
-    setSelectedItem(item); // Set the selected item to be edited
-    setIsEditModalOpen(true); // Open the edit modal
-  };
-
-  const closeEditModal = () => {
-    setSelectedItem(null); // Clear selected item
-    setIsEditModalOpen(false); // Close the edit modal
+  const handleRowClick = (item) => {
+    setSelectedInventory(item);
+    setIsDisposedModalOpen(true);
   };
 
   // Fetch inventory data from the API
@@ -71,9 +58,7 @@ const Inventory = () => {
           {/* Side Buttons with Image and Text (Moved Above Search Bar) */}
           <div className="flex space-x-4">
             <Link to="/inventory">
-              <button
-                className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]"
-              >
+              <button className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
                 <img
                   src="/images/stockout/cart.png"
                   alt="New Product"
@@ -85,15 +70,15 @@ const Inventory = () => {
             {/* Other Buttons */}
             {role === "Admin" && (
               <Link to="/dashboard-admin/items">
-              <button className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
-                <img
-                  src="/images/stockout/menu.png"
-                  alt="Menu"
-                  className="w-8 h-8 mr-2"
-                />
-                <span className="text-white">Items</span>
-              </button>
-            </Link>
+                <button className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+                  <img
+                    src="/images/stockout/menu.png"
+                    alt="Menu"
+                    className="w-8 h-8 mr-2"
+                  />
+                  <span className="text-white">Items</span>
+                </button>
+              </Link>
             )}
             <Link to="/stockin">
               <button className="flex items-center bg-[#00BA34] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
@@ -184,31 +169,15 @@ const Inventory = () => {
                   ];
                 })
           }
+          rowOnClick={handleRowClick}
         />
 
-        {/* New Product Modal */}
-        <NewItem isOpen={isModalOpen} closeModal={closeModal} />
-
-        {/* Edit Inventory Modal
-        <EditInventory
-          isOpen={isEditModalOpen}
-          closeModal={closeEditModal}
-          item={selectedItem}
-          fetchInventoryData={() => {
-            // Fetch updated data after editing
-            const fetchInventoryData = async () => {
-              try {
-                const response = await axios.get(
-                  "http://127.0.0.1:8000/fetch-item-data/"
-                );
-                setInventoryData(response.data.inventory);
-              } catch (error) {
-                console.error("Error fetching inventory data:", error);
-              }
-            };
-            fetchInventoryData();
-          }}
-        /> */}
+        {/* Disposed Inventory Modal */}
+        <DisposedInventory
+          isOpen={isDisposedModalOpen}
+          closeModal={() => setIsDisposedModalOpen(false)}
+          inventoryName={selectedInventory?.name}
+        />
       </div>
     </div>
   );
