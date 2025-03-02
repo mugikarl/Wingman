@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { Datepicker } from "flowbite-react";
 
 // Helper: Converts a Date object to a "YYYY-MM-DD" string in local time.
@@ -94,9 +95,10 @@ const customTheme = {
   },
 };
 
-const StockOutItems = () => {
+const StockOut = () => {
   const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
   const [showDatepicker, setShowDatepicker] = useState(false);
+  const role = localStorage.getItem("role");
   const [data, setData] = useState([
     { id: 1, itemName: "Item 1", disposer: "User A", unit: "pcs", disposed: 10, reason: "Expired" },
     { id: 2, itemName: "Item 2", disposer: "User B", unit: "kg", disposed: 15, reason: "Damaged" },
@@ -129,13 +131,67 @@ const StockOutItems = () => {
   return (
     <div className="p-4 mx-auto">
       <div className="flex justify-between mb-4">
-        <div className="flex gap-2">
-          <button
-            onClick={() => (window.location.href = "/inventory")}
-            className="bg-orange-500 text-white px-4 py-2 rounded"
-          >
-            Return to Inventory
-          </button>
+        <div className="flex space-x-4">
+          <Link to="/inventory">
+            <button
+              className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]"
+            >
+              <img
+                src="/images/stockout/cart.png"
+                alt="New Product"
+                className="w-8 h-8 mr-2"
+              />
+              <span className="text-white">Inventory</span>
+            </button>
+          </Link>
+          {/* Other Buttons */}
+          {role === "Admin" && (
+            <Link to="/dashboard-admin/items">
+            <button className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+              <img
+                src="/images/stockout/menu.png"
+                alt="Menu"
+                className="w-8 h-8 mr-2"
+              />
+              <span className="text-white">Items</span>
+            </button>
+          </Link>
+          )}
+          <Link to="/stockin">
+            <button className="flex items-center bg-[#00BA34] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+              <img
+                src="/images/stockout/stock.png"
+                alt="Stock In"
+                className="w-8 h-8 mr-2"
+              />
+              <span className="text-white">Stock In</span>
+            </button>
+          </Link>
+
+          {/* Conditionally render the Menu button only for Admin */}
+          {role === "Admin" && (
+            <Link to="/dashboard-admin/menu">
+              <button className="flex items-center bg-[#00BA34] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+                <img
+                  src="/images/stockout/stock.png"
+                  alt="Stock In"
+                  className="w-8 h-8 mr-2"
+                />
+                <span className="text-white">Menu</span>
+              </button>
+            </Link>
+          )}
+
+          <Link to="/stockout">
+            <button className="flex items-center bg-[#FF0000] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+              <img
+                src="/images/stockout/trash.png"
+                alt="Disposed"
+                className="w-8 h-8 mr-2"
+              />
+              <span className="text-white">Disposed</span>
+            </button>
+          </Link>
         </div>
       </div>
       {/* Top navigation: arrows and current date */}
@@ -228,4 +284,4 @@ const StockOutItems = () => {
   );
 };
 
-export default StockOutItems;
+export default StockOut;

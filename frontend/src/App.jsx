@@ -16,7 +16,7 @@ import Sales from "./pages/Sales";
 import Login from "./pages/Login";
 import Attendance from "./pages/Attendance/Attendance";
 import TestConnection from "./pages/TestConnection";
-import StockOutItems from "./pages/Inventory/StockOutItems";
+import StockOut from "./pages/Inventory/StockOut";
 import Schedule from "./pages/Staff Profile/Schedule";
 import LegendModal from "./components/popups/LegendModal";
 import EmployeeLeave from "./components/popups/EmployeeLeave";
@@ -30,7 +30,7 @@ import AdminRoute from "./components/admin/AdminRoute";
 import AttendanceReview from "./pages/Attendance/AttendanceReview";
 import Items from "./pages/Inventory/Items";
 import EditItem from "./components/popups/EditItem";
-import EditInventory from "./components/popups/EditInventory";
+// import EditInventory from "./components/popups/EditInventory";
 import NewCategory from "./components/popups/NewCategory";
 import FPMenu from "./pages/Inventory/FPMenu";
 import GrabMenu from "./pages/Inventory/GrabMenu";
@@ -71,47 +71,7 @@ const App = () => {
                 </AdminRoute>
               }
             />
-            <Route
-  path="/dashboard-admin/menu"
-  element={
-    <AdminRoute>
-      <Menu />
-    </AdminRoute>
-  }
-/>
-<Route
-  path="/dashboard-admin/grabmenu"
-  element={
-    <AdminRoute>
-      <GrabMenu />
-    </AdminRoute>
-  }
-/>
-<Route
-  path="/dashboard-admin/fpmenu"
-  element={
-    <AdminRoute>
-      <FPMenu />
-    </AdminRoute>
-  }
-/>
-<Route
-  path="/dashboard-admin/newmenumodal"
-  element={
-    <AdminRoute>
-      <NewMenuModal />
-    </AdminRoute>
-  }
-/>
-<Route
-  path="/dashboard-admin/editmenumodal"
-  element={
-    <AdminRoute>
-      <EditMenuModal />
-    </AdminRoute>
-  }
-/>
-
+            {/** INVENTORY */}
             <Route
               path="/dashboard-admin/inventory"
               element={
@@ -120,6 +80,70 @@ const App = () => {
                 </AdminRoute>
               }
             />
+            <Route
+              path="/dashboard-admin/items"
+              element={
+                <AdminRoute>
+                  <Items />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/dashboard-admin/stockin"
+              element={
+                <AdminRoute>
+                  <StockIn />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/dashboard-admin/menu"
+              element={
+                <AdminRoute>
+                  <Menu />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/dashboard-admin/grabmenu"
+              element={
+                <AdminRoute>
+                  <GrabMenu />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/dashboard-admin/fpmenu"
+              element={
+                <AdminRoute>
+                  <FPMenu />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/dashboard-admin/stockout"
+              element={
+                <AdminRoute>
+                  <StockOut />
+                </AdminRoute>
+              }
+            />
+            {/* <Route
+              path="/dashboard-admin/newmenumodal"
+              element={
+                <AdminRoute>
+                  <NewMenuModal />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/dashboard-admin/editmenumodal"
+              element={
+                <AdminRoute>
+                  <EditMenuModal />
+                </AdminRoute>
+              }
+            /> */}
             <Route
               path="/dashboard-admin/staffprofile"
               element={
@@ -155,26 +179,74 @@ const App = () => {
             />
 
             {/* Other non-admin routes */}
+            {/* INVENTORY */}
+            <Route
+              path="/inventory"
+              element={
+                localStorage.getItem("role") === "Admin" ? (
+                  <Navigate to="/dashboard-admin/inventory" replace />
+                ) : (
+                  <Inventory />
+                )
+              }
+            />
+            <Route
+              path="/items"
+              element={
+                localStorage.getItem("role") === "Admin" ? (
+                  <Navigate to="/dashboard-admin/items" replace />
+                ) : (
+                  <Items />
+                )
+              }
+            />
+            <Route 
+              path="/stockin" 
+              element={
+                localStorage.getItem("role") === "Admin" ? (
+                  <Navigate to="/dashboard-admin/stockin" replace />
+                ) : (
+                  <StockIn />
+                ) 
+              } 
+            />
+            <Route 
+              path="/menu" 
+              element={
+                localStorage.getItem("role") === "Admin" ? (
+                  <Navigate to="/dashboard-admin/menu" replace />
+                ) : (
+                  <Menu />
+                ) 
+              } 
+            />
+            <Route 
+              path="/stockout" 
+              element={
+                localStorage.getItem("role") === "Admin" ? (
+                  <Navigate to="/dashboard-admin/stockout" replace />
+                ) : (
+                  <StockOut/>
+                ) 
+              } 
+            />
             <Route path="/ordertable" element={<Ordertable />} />
-            <Route path="/inventory" element={<Inventory />} />
             <Route path="/attendance" element={<Attendance />} />
-            <Route path="/stockoutitems" element={<StockOutItems />} />
             <Route path="/schedule" element={<Schedule />} />
             <Route path="/legendmodal" element={<LegendModal />} />
             <Route path="/employeeleave" element={<EmployeeLeave />} />
             <Route path="/holidays" element={<Holidays />} />
 
             <Route path="/salescalendar" element={<SalesCalendar />} />
-        
-            <Route path="/stockin" element={<StockIn />} />
+      
             <Route path="/order" element={<Order />} />
             <Route path="/chooseorder" element={<ChooseOrder />} />
             <Route path="/testconnection" element={<TestConnection />} />
             <Route path="/attendancereview" element={<AttendanceReview />} />
-            <Route path="/items" element={<Items />} />
-            <Route path="/edititem" element={<EditItem />} />
-            <Route path="/editinventory" element={<EditInventory />} />
-            <Route path="/newcategory" element={<NewCategory />} />
+            {/* <Route path="/items" element={<Items />} />
+            <Route path="/edititem" element={<EditItem />} /> */}
+            {/* <Route path="/editinventory" element={<EditInventory />} /> */}
+            {/* <Route path="/newcategory" element={<NewCategory />} /> */}
     
             {/* Fallback Route */}
             <Route

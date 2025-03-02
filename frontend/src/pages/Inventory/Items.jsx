@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Datepicker } from "flowbite-react";
 import NewItem from "../../components/popups/NewItem";
 import Table from "../../components/tables/Table";
@@ -22,10 +22,15 @@ const Items = () => {
   const closeModal = () => setIsModalOpen(false);
   const closeCategoryModal = () => setIsCategoryModalOpen(false);
 
-  const role = localStorage.getItem("role"); // Check user's role
+  const navigate = useNavigate();
+  const role = localStorage.getItem("role");
 
-{/* Conditionally render the Menu button only for Admin */}
-
+  // Redirect admin to the dashboard-admin route
+  // useEffect(() => {
+  //   if (role === "Admin") {
+  //     navigate("/dashboard-admin/items", { replace: true });
+  //   }
+  // }, [role, navigate]);
 
 
   const openEditModal = (item) => {
@@ -62,7 +67,9 @@ const Items = () => {
         <div className="flex flex-col space-y-4 mb-4">
           <div className="flex space-x-4">
             <Link to="/inventory">
-              <button className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+              <button
+                className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]"
+              >
                 <img
                   src="/images/stockout/cart.png"
                   alt="New Product"
@@ -71,7 +78,9 @@ const Items = () => {
                 <span className="text-white">Inventory</span>
               </button>
             </Link>
-            <Link to="">
+            {/* Other Buttons */}
+            {role === "Admin" && (
+              <Link to="/dashboard-admin/items">
               <button className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
                 <img
                   src="/images/stockout/menu.png"
@@ -81,6 +90,7 @@ const Items = () => {
                 <span className="text-white">Items</span>
               </button>
             </Link>
+            )}
             <Link to="/stockin">
               <button className="flex items-center bg-[#00BA34] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
                 <img
@@ -91,28 +101,31 @@ const Items = () => {
                 <span className="text-white">Stock In</span>
               </button>
             </Link>
+
+            {/* Conditionally render the Menu button only for Admin */}
             {role === "Admin" && (
-  <Link to="/dashboard-admin/menu">
-    <button className="flex items-center bg-[#00BA34] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
-      <img
-        src="/images/stockout/stock.png"
-        alt="Stock In"
-        className="w-8 h-8 mr-2"
-      />
-      <span className="text-white">Menu</span>
-    </button>
-  </Link>
-)}
-            <Link to="/stockoutitems">
-                <button className="flex items-center bg-[#FF0000] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+              <Link to="/dashboard-admin/menu">
+                <button className="flex items-center bg-[#00BA34] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
                   <img
-                    src="/images/stockout/trash.png"
-                    alt="Disposed"
+                    src="/images/stockout/stock.png"
+                    alt="Stock In"
                     className="w-8 h-8 mr-2"
                   />
-                  <span className="text-white">Disposed</span>
+                  <span className="text-white">Menu</span>
                 </button>
               </Link>
+            )}
+
+            <Link to="/stockout">
+              <button className="flex items-center bg-[#FF0000] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
+                <img
+                  src="/images/stockout/trash.png"
+                  alt="Disposed"
+                  className="w-8 h-8 mr-2"
+                />
+                <span className="text-white">Disposed</span>
+              </button>
+            </Link>
           </div>
           <div className="w-full">
             <div className="flex items-center justify-between space-x-2 mb-4">

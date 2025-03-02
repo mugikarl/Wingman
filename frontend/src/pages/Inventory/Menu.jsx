@@ -111,7 +111,7 @@ const Menu = () => {
             </Link>
           )}
 
-          <Link to="/stockoutitems">
+          <Link to="/stockout">
             <button className="flex items-center bg-[#FF0000] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
               <img
                 src="/images/stockout/trash.png"
@@ -184,7 +184,7 @@ const Menu = () => {
             Order
           </button>
         </Link>
-        <Link to="/dashboard-admin/fpmenu">
+        {/* <Link to="/dashboard-admin/fpmenu">
           <button className="flex items-center justify-center bg-[#FF0000] text-white p-2 rounded-lg shadow min-w-[15%] text-sm">
             Foodpanda
           </button>
@@ -193,7 +193,7 @@ const Menu = () => {
           <button className="flex items-center justify-center bg-[#FF0000] text-white p-2 rounded-lg shadow min-w-[15%] text-sm">
             Grab
           </button>
-        </Link>
+        </Link> */}
       </div>
 
       {/* Grid Layout for Images */}

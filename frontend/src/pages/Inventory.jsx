@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import NewItem from "../components/popups/NewItem";
 import Table from "../components/tables/Table";
 import axios from "axios";
-import EditInventory from "../components/popups/EditInventory"; // Import the EditInventory component
+// import EditInventory from "../components/popups/EditInventory"; // Import the EditInventory component
 
 const Inventory = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -14,7 +14,15 @@ const Inventory = () => {
   const [categories, setCategories] = useState([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false); // State for the edit modal
 
-  const role = localStorage.getItem("role"); // Check user's role
+  const navigate = useNavigate();
+  const role = localStorage.getItem("role");
+
+  // Redirect admin to the dashboard-admin route
+  // useEffect(() => {
+  //   if (role === "Admin") {
+  //     navigate("/dashboard-admin/inventory", { replace: true });
+  //   }
+  // }, [role, navigate]);
 
   const openModal = () => {
     setIsModalOpen(true);
@@ -76,7 +84,7 @@ const Inventory = () => {
             </Link>
             {/* Other Buttons */}
             {role === "Admin" && (
-              <Link to="/items">
+              <Link to="/dashboard-admin/items">
               <button className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
                 <img
                   src="/images/stockout/menu.png"
@@ -112,7 +120,7 @@ const Inventory = () => {
               </Link>
             )}
 
-            <Link to="/stockoutitems">
+            <Link to="/stockout">
               <button className="flex items-center bg-[#FF0000] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
                 <img
                   src="/images/stockout/trash.png"
@@ -181,7 +189,7 @@ const Inventory = () => {
         {/* New Product Modal */}
         <NewItem isOpen={isModalOpen} closeModal={closeModal} />
 
-        {/* Edit Inventory Modal */}
+        {/* Edit Inventory Modal
         <EditInventory
           isOpen={isEditModalOpen}
           closeModal={closeEditModal}
@@ -200,7 +208,7 @@ const Inventory = () => {
             };
             fetchInventoryData();
           }}
-        />
+        /> */}
       </div>
     </div>
   );
