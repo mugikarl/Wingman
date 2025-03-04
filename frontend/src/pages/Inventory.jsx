@@ -11,20 +11,16 @@ const Inventory = () => {
   const [selectedItem, setSelectedItem] = useState(null); // State to track selected item for editing
   const [units, setUnits] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [reason, setReason] = useState([]);
   const [isDisposedModalOpen, setIsDisposedModalOpen] = useState(false);
   const [selectedInventory, setSelectedInventory] = useState(null);
 
   const navigate = useNavigate();
   const role = localStorage.getItem("role");
 
-  // Redirect admin to the dashboard-admin route
-  // useEffect(() => {
-  //   if (role === "Admin") {
-  //     navigate("/dashboard-admin/inventory", { replace: true });
-  //   }
-  // }, [role, navigate]);
-
-  const handleRowClick = (item) => {
+  const openDisposedModal = (item) => {
+    console.log("Row clicked:", item);
     setSelectedInventory(item);
     setIsDisposedModalOpen(true);
   };
@@ -39,6 +35,8 @@ const Inventory = () => {
         setInventoryData(response.data.inventory); // Store formatted inventory data in state
         setUnits(response.data.units || []); // Store units
         setCategories(response.data.categories || []); // Store categories
+        setEmployees(response.data.employees || []); // Store employees
+        setReason(response.data.disposalreason || []); // Store reason of disposal
       } catch (error) {
         console.error("Error fetching inventory data:", error);
       } finally {
@@ -169,14 +167,17 @@ const Inventory = () => {
                   ];
                 })
           }
-          rowOnClick={handleRowClick}
+          rowOnClick={(rowIndex) => openDisposedModal(inventoryData[rowIndex])}
         />
 
         {/* Disposed Inventory Modal */}
         <DisposedInventory
           isOpen={isDisposedModalOpen}
           closeModal={() => setIsDisposedModalOpen(false)}
-          inventoryName={selectedInventory?.name}
+          selectedInventory={selectedInventory}
+          employees={employees}
+          units={units}
+          reason={reason}
         />
       </div>
     </div>

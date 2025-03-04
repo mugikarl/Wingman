@@ -22,6 +22,7 @@ urlpatterns = [
     path('add-stockin-data/', views.add_stockin_data, name='add_stockin_data'),
     path('edit-receipt-stockin-data/<int:receipt_id>/', views.edit_receipt_stockin_data, name='edit_receipt_stockin_data'),
     path('delete-receipt/<int:receipt_id>/', views.delete_receipt, name='delete_receipt'),
+    path('dispose-item/', views.dispose_item, name='dispose_item'),
     # path('fetch-stockin-data/', views.fetch_stockin_data, name='fetch_stockin_data'),
     # path('register-time-in/', views.register_time_in, name='register_time_in'),
     # path('api/user/register/', CreateUserView.as_view(), name="register"),

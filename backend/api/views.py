@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 import base64
 import io
 from django.utils.timezone import now
+from .utils.conversion import convert_value
 
 
 #AUTHETICATE USER/ADMIN
@@ -172,7 +173,7 @@ def login_view(request):
         passcode = data.get("passcode")
 
         if not email or not passcode:
-            return JsonResponse({"error": "Both email and passcode are required"}, status=400)
+            return Response({"error": "Both email and passcode are required"}, status=400)
 
         # Use Supabase Auth to authenticate the user
         auth_response = supabase_anon.auth.sign_in_with_password({
@@ -180,44 +181,44 @@ def login_view(request):
             "password": passcode
         })
         if not auth_response or not auth_response.user:
-            return JsonResponse({"error": "Invalid credentials"}, status=401)
+            return Response({"error": "Invalid credentials"}, status=401)
 
         user = auth_response.user
 
         # Fetch the employee record from Supabase
         employee_response = supabase_anon.table("employee").select("*").eq("user_id", user.id).execute()
         if not employee_response.data:
-            return JsonResponse({"error": "Employee record not found"}, status=404)
+            return Response({"error": "Employee record not found"}, status=404)
         employee = employee_response.data[0]
 
         # Fetch roles assigned to this employee
         role_response = supabase_anon.table("employee_role").select("role_id").eq("employee_id", employee["id"]).execute()
         if not role_response.data:
-            return JsonResponse({"error": "User has no roles assigned"}, status=403)
+            return Response({"error": "User has no roles assigned"}, status=403)
 
         # Retrieve the Admin role's ID
         admin_role_response = supabase_anon.table("role").select("id").eq("role_name", "Admin").execute()
         if not admin_role_response.data:
-            return JsonResponse({"error": "Admin role not found"}, status=500)
+            return Response({"error": "Admin role not found"}, status=500)
         admin_role_id = admin_role_response.data[0]["id"]
 
         # Check if the employee has the Admin role
         is_admin = any(role["role_id"] == admin_role_id for role in role_response.data)
         if not is_admin:
-            return JsonResponse({"error": "Access denied: Only Admins can log in"}, status=403)
+            return Response({"error": "Access denied: Only Admins can log in"}, status=403)
 
         # Extract the Supabase JWT token from the session
         supabase_token = auth_response.session.access_token
 
-        return JsonResponse({"access_token": supabase_token, "is_admin": True})
+        return Response({"access_token": supabase_token, "is_admin": True})
 
     except Exception as e:
         print("Error in login_view:", str(e))
-        return JsonResponse({"error": "Internal server error"}, status=500)
+        return Response({"error": "Internal server error"}, status=500)
 
         
 def test_connection(request):
-    return JsonResponse({"message": "Backend and frontend are connected successfully!"})
+    return Response({"message": "Backend and frontend are connected successfully!"})
 
 
 #STAFF PROFILING
@@ -290,14 +291,14 @@ def fetch_employee_data(request):
                 "status": status_value
             })
 
-        return JsonResponse({
+        return Response({
             "statuses": statuses,
             "roles": roles,
             "employees": formatted_employees
-        }, safe=False)
+        })
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
 
 @api_view(['POST'])
 @authentication_classes([SupabaseAuthentication])
@@ -326,7 +327,7 @@ def add_employee(request):
         role_names = [role["role_name"] for role in role_names_response.data if "role_name" in role]
 
         if "Admin" not in role_names:
-            return JsonResponse({"error": "Forbidden. Only Admin users can add employees."}, status=403)
+            return Response({"error": "Forbidden. Only Admin users can add employees."}, status=403)
 
         # Step 4: Extract new employee data from the request body.
         data = json.loads(request.body.decode("utf-8"))
@@ -353,7 +354,7 @@ def add_employee(request):
                 "email_confirm": True  # Auto-confirm email.
             })
             if not auth_response or not hasattr(auth_response, 'user'):
-                return JsonResponse({"error": "Failed to create user in Supabase Auth"}, status=500)
+                return Response({"error": "Failed to create user in Supabase Auth"}, status=500)
             new_employee_user_uuid = auth_response.user.id
 
         # Step 6: Insert the new employee record.
@@ -368,7 +369,7 @@ def add_employee(request):
         }
         response = supabase_client.table("employee").insert(insert_data).execute()
         if not response.data:
-            return JsonResponse({"error": "Failed to create employee"}, status=500)
+            return Response({"error": "Failed to create employee"}, status=500)
 
         # Retrieve the new employee record's primary key (an integer).
         new_employee_pk = response.data[0]["id"]
@@ -378,10 +379,10 @@ def add_employee(request):
             role_entries = [{"employee_id": new_employee_pk, "role_id": role} for role in roles]
             supabase_client.table("employee_role").insert(role_entries).execute()
 
-        return JsonResponse({"message": "Employee added successfully"}, status=201)
+        return Response({"message": "Employee added successfully"}, status=201)
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
 
 @api_view(['DELETE'])
 @authentication_classes([SupabaseAuthentication])
@@ -395,13 +396,13 @@ def delete_employee(request, employee_id):
 
         # Prevent self-deletion: An admin cannot delete their own record.
         if authenticated_employee_pk == employee_id:
-            return JsonResponse({"error": "Admins cannot delete their own records."}, status=403)
+            return Response({"error": "Admins cannot delete their own records."}, status=403)
 
         # Fetch the employee record to be deleted.
         response = supabase_client.table("employee").select("id, user_id").eq("id", employee_id).single().execute()
 
         if not response.data:
-            return JsonResponse({"error": "Employee not found"}, status=404)
+            return Response({"error": "Employee not found"}, status=404)
 
         target_employee_user_id = response.data["user_id"]
 
@@ -416,10 +417,10 @@ def delete_employee(request, employee_id):
         # Delete the employee record.
         supabase_client.table("employee").delete().eq("id", employee_id).execute()
 
-        return JsonResponse({"message": "Employee deleted successfully"}, status=200)
+        return Response({"message": "Employee deleted successfully"}, status=200)
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
 
 
 @api_view(['PUT'])
@@ -443,7 +444,7 @@ def edit_employee(request, employee_id):
         role_ids = [role["role_id"] for role in user_roles]
 
         if not role_ids:
-            return JsonResponse({"error": "Unauthorized. No roles assigned."}, status=403)
+            return Response({"error": "Unauthorized. No roles assigned."}, status=403)
 
         # Fetch role names
         role_names_response = client.table("role") \
@@ -457,7 +458,7 @@ def edit_employee(request, employee_id):
 
         # Restrict access: Only Admins can edit
         if not is_admin:
-            return JsonResponse({"error": "Forbidden. Only Admins can edit employee records."}, status=403)
+            return Response({"error": "Forbidden. Only Admins can edit employee records."}, status=403)
 
         # Step 3: Parse request data
         data = json.loads(request.body.decode("utf-8"))
@@ -486,7 +487,7 @@ def edit_employee(request, employee_id):
         # Step 5: Update Supabase Auth if email or password is changed
         employee_record = client.table("employee").select("user_id").eq("id", employee_id).execute()
         if not employee_record.data:
-            return JsonResponse({"error": "Employee record not found after update"}, status=404)
+            return Response({"error": "Employee record not found after update"}, status=404)
 
         auth_user_id = employee_record.data[0]["user_id"]
         auth_update_data = {}
@@ -514,10 +515,10 @@ def edit_employee(request, employee_id):
             if role_entries:
                 client.table("employee_role").insert(role_entries).execute()
 
-        return JsonResponse({"message": "Employee updated successfully", "employee_id": employee_id}, status=200)
+        return Response({"message": "Employee updated successfully", "employee_id": employee_id}, status=200)
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)    
+        return Response({"error": str(e)}, status=500)    
 
 
 # ATTENDANCE 
@@ -644,10 +645,10 @@ def fetch_attendance_data(request):
                 "timeOut": time_out,
             })
         
-        return JsonResponse(attendance_data, safe=False)
+        return Response(attendance_data)
     
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
 
 
 @api_view(['POST'])
@@ -679,7 +680,7 @@ def time_in(request):
         provided_email = request.data.get("email")  # Email entered by the user
 
         if not employee_id or not entered_passcode or not provided_email:
-            return JsonResponse({"error": "Missing required fields."}, status=400)
+            return Response({"error": "Missing required fields."}, status=400)
 
         # Query the employee record.
         employee_response = (
@@ -690,20 +691,20 @@ def time_in(request):
             .execute()
         )
         if not employee_response.data:
-            return JsonResponse({"error": "Employee not found."}, status=404)
+            return Response({"error": "Employee not found."}, status=404)
 
         employee = employee_response.data
         if not employee.get("user_id"):
-            return JsonResponse({"error": "Employee not linked to an auth user."}, status=400)
+            return Response({"error": "Employee not linked to an auth user."}, status=400)
 
         # Fetch user details using the admin client.
         user_response = supabase_service.auth.admin.get_user_by_id(employee["user_id"])
         if not (user_response and user_response.user):
-            return JsonResponse({"error": "Unable to fetch user authentication details."}, status=404)
+            return Response({"error": "Unable to fetch user authentication details."}, status=404)
 
         # Ensure the provided email matches the employee's registered email.
         if provided_email.lower() != user_response.user.email.lower():
-            return JsonResponse(
+            return Response(
                 {"error": "Provided email does not match the selected employee's email."},
                 status=400,
             )
@@ -714,7 +715,7 @@ def time_in(request):
             "password": entered_passcode
         })
         if not getattr(sign_in_response, "user", None):
-            return JsonResponse({"error": "Invalid passcode."}, status=401)
+            return Response({"error": "Invalid passcode."}, status=401)
         # Sign out after successful sign in.
         supabase_service.auth.sign_out()
 
@@ -746,7 +747,7 @@ def time_in(request):
                     {"attendance_status": 1}
                 ).eq("id", attendance_id).execute()
                 if not update_response.data:
-                    return JsonResponse({"error": "Error updating attendance status."}, status=500)
+                    return Response({"error": "Error updating attendance status."}, status=500)
         else:
             # 1. Insert a new record into the attendance_time table.
             new_time_record = {
@@ -755,7 +756,7 @@ def time_in(request):
             }
             time_response = supabase_service.table("attendance_time").insert(new_time_record).execute()
             if not time_response.data:
-                return JsonResponse({"error": "Error inserting time record."}, status=500)
+                return Response({"error": "Error inserting time record."}, status=500)
             attendance_time_id = time_response.data[0]["id"]
 
             # 2. Insert a new attendance record referencing the new attendance_time.
@@ -766,13 +767,13 @@ def time_in(request):
             }
             attendance_response = supabase_service.table("attendance").insert(new_attendance).execute()
             if not attendance_response.data:
-                return JsonResponse({"error": "Error inserting attendance record."}, status=500)
+                return Response({"error": "Error inserting attendance record."}, status=500)
             attendance_id = attendance_response.data[0]["id"]
 
         # Build the full employee name.
         full_name = f"{employee.get('first_name', '')} {employee.get('last_name', '')}".strip()
 
-        return JsonResponse({
+        return Response({
             "success": True,
             "message": "Time in successful.",
             "employee": {
@@ -782,7 +783,7 @@ def time_in(request):
         })
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
     
 @api_view(["POST"])
 @authentication_classes([])
@@ -811,7 +812,7 @@ def time_out(request):
         entered_passcode = request.data.get("passcode")
 
         if not employee_id or not provided_email or not entered_passcode:
-            return JsonResponse({"error": "Missing required fields."}, status=400)
+            return Response({"error": "Missing required fields."}, status=400)
 
         # Query the employee record
         employee_response = (
@@ -823,20 +824,20 @@ def time_out(request):
         )
 
         if not employee_response.data:
-            return JsonResponse({"error": "Employee not found."}, status=404)
+            return Response({"error": "Employee not found."}, status=404)
 
         employee = employee_response.data
         if not employee.get("user_id"):
-            return JsonResponse({"error": "Employee not linked to an auth user."}, status=400)
+            return Response({"error": "Employee not linked to an auth user."}, status=400)
 
         # Fetch user details using the admin client
         user_response = supabase_service.auth.admin.get_user_by_id(employee["user_id"])
         if not (user_response and user_response.user):
-            return JsonResponse({"error": "Unable to fetch user authentication details."}, status=404)
+            return Response({"error": "Unable to fetch user authentication details."}, status=404)
 
         # Ensure provided email matches the employee's registered email
         if provided_email.lower() != user_response.user.email.lower():
-            return JsonResponse({"error": "Email mismatch."}, status=400)
+            return Response({"error": "Email mismatch."}, status=400)
 
         # Authenticate using the provided passcode
         sign_in_response = supabase_service.auth.sign_in_with_password({
@@ -844,7 +845,7 @@ def time_out(request):
             "password": entered_passcode
         })
         if not getattr(sign_in_response, "user", None):
-            return JsonResponse({"error": "Invalid passcode."}, status=401)
+            return Response({"error": "Invalid passcode."}, status=401)
         # Sign out after successful sign-in
         supabase_service.auth.sign_out()
 
@@ -866,13 +867,13 @@ def time_out(request):
                     break
 
         if not attendance_record:
-            return JsonResponse({"error": "No time-in record found for today."}, status=400)
+            return Response({"error": "No time-in record found for today."}, status=400)
 
         attendance_time_id = attendance_record["attendance_time"]["id"]
         time_out_val = attendance_record["attendance_time"]["time_out"]
 
         if time_out_val:
-            return JsonResponse({"error": "Time-out already recorded."}, status=400)
+            return Response({"error": "Time-out already recorded."}, status=400)
 
         # Update attendance_time with the time-out
         update_response = supabase_service.table("attendance_time").update(
@@ -880,15 +881,15 @@ def time_out(request):
         ).eq("id", attendance_time_id).execute()
 
         if not update_response.data:
-            return JsonResponse({"error": "Failed to update time-out."}, status=500)
+            return Response({"error": "Failed to update time-out."}, status=500)
 
-        return JsonResponse({
+        return Response({
             "success": True,
             "message": "Time out successful."
         })
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
 
 
 @api_view(['GET'])
@@ -1015,15 +1016,29 @@ def fetch_item_data(request):
                 "stock_ins": stockins_data
             })
 
-        return JsonResponse({
+            # Fetch employees
+        employees_response = supabase_anon.table("employee") \
+            .select("id, first_name, last_name") \
+            .execute()
+        employees = employees_response.data if employees_response.data else []
+
+            # Fetch reasons of disposal
+        reason_disposal_response = supabase_anon.table("reason_of_disposal") \
+            .select("id, name") \
+            .execute()
+        reason_disposal = reason_disposal_response.data if reason_disposal_response.data else []
+
+        return Response({
+            "employees": employees,
             "units": units,
             "categories": categories,
             "items": formatted_items,
             "inventory": formatted_inventory,
-            "receipts": formatted_receipts
-        }, safe=False)
+            "receipts": formatted_receipts,
+            "disposalreason": reason_disposal,
+        })
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
 
 @api_view(['POST'])
 @authentication_classes([SupabaseAuthentication])
@@ -1041,7 +1056,7 @@ def add_inventory(request): # MAIN PURPOSE OF THIS IS TO MAKE A NEW DATA ENTRY W
         data = json.loads(request.body)
         item_id = data.get("item")
         if not item_id:
-            return JsonResponse({"error": "Item field is required."}, status=400)
+            return Response({"error": "Item field is required."}, status=400)
 
         # Insert a new inventory record with quantity set to 0
         insert_response = supabase_client.table("inventory").insert({
@@ -1051,14 +1066,14 @@ def add_inventory(request): # MAIN PURPOSE OF THIS IS TO MAKE A NEW DATA ENTRY W
 
         if insert_response.data:
             # Return the created inventory record
-            return JsonResponse({
+            return Response({
                 "message": "Inventory record created.",
                 "inventory": insert_response.data[0]
             }, status=201)
         else:
-            return JsonResponse({"error": "Failed to create inventory record."}, status=500)
+            return Response({"error": "Failed to create inventory record."}, status=500)
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
 
 
 @api_view(['POST'])
@@ -1080,7 +1095,7 @@ def add_item(request):
         category_id = data.get("category")
 
         if not name or not stock_trigger or not unit_id or not category_id:
-            return JsonResponse({"error": "All fields are required."}, status=400)
+            return Response({"error": "All fields are required."}, status=400)
 
         # Insert new item
         insert_response = supabase_client.table("items").insert({
@@ -1091,15 +1106,15 @@ def add_item(request):
         }).execute()
 
         if insert_response.data:
-            return JsonResponse({
+            return Response({
                 "message": "Item added successfully.",
                 "item": insert_response.data[0]
             }, status=201)
         else:
-            return JsonResponse({"error": "Failed to add item."}, status=500)
+            return Response({"error": "Failed to add item."}, status=500)
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
 
     
 @api_view(['PUT'])
@@ -1121,7 +1136,7 @@ def edit_item(request, item_id):
         category_id = data.get("category")
 
         if not name or not stock_trigger or not unit_id or not category_id:
-            return JsonResponse({
+            return Response({
                 "error": "All fields (name, stock_trigger, unit_id, category_id) are required."
             }, status=400)
 
@@ -1130,7 +1145,7 @@ def edit_item(request, item_id):
         item = item_response.data[0] if item_response.data else None
 
         if not item:
-            return JsonResponse({"error": "Item not found."}, status=404)
+            return Response({"error": "Item not found."}, status=404)
 
         # Update the item
         update_response = supabase_client.table("items").update({
@@ -1141,12 +1156,12 @@ def edit_item(request, item_id):
         }).eq("id", item_id).execute()
 
         if update_response.data:
-            return JsonResponse({"message": "Item updated successfully."}, status=200)
+            return Response({"message": "Item updated successfully."}, status=200)
         else:
-            return JsonResponse({"error": "Failed to update item."}, status=500)
+            return Response({"error": "Failed to update item."}, status=500)
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
     
 @api_view(['DELETE'])
 @authentication_classes([SupabaseAuthentication])  # Use appropriate authentication
@@ -1163,18 +1178,18 @@ def delete_item(request, item_id):
         # Verify the item exists
         item_response = supabase_client.table("items").select("*").eq("id", item_id).execute()
         if not item_response.data:
-            return JsonResponse({"error": "Item not found."}, status=404)
+            return Response({"error": "Item not found."}, status=404)
 
         # Delete the item
         delete_response = supabase_client.table("items").delete().eq("id", item_id).execute()
 
         if delete_response.data:
-            return JsonResponse({"message": "Item deleted successfully."}, status=200)
+            return Response({"message": "Item deleted successfully."}, status=200)
         else:
-            return JsonResponse({"error": "Failed to delete item."}, status=500)
+            return Response({"error": "Failed to delete item."}, status=500)
     
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
 
 
 @api_view(['POST'])
@@ -1193,7 +1208,7 @@ def add_category(request):
         name = data.get("name")
 
         if not name:
-            return JsonResponse({"error": "All fields are required"}, status=400)
+            return Response({"error": "All fields are required"}, status=400)
 
         # Insert new item category
         insert_response = supabase_client.table("item_category").insert({
@@ -1201,14 +1216,14 @@ def add_category(request):
         }).execute()
 
         if insert_response.data:
-            return JsonResponse({
+            return Response({
                 "message": "Item Category added successfully"
             }, status=201)
         else:
-            return JsonResponse({"error": "Failed to add Item Category"}, status=500)
+            return Response({"error": "Failed to add Item Category"}, status=500)
         
     except Exception as e:
-        return JsonResponse({"error" : str(e)}, status=500)
+        return Response({"error" : str(e)}, status=500)
 
 @api_view(['PUT'])
 @authentication_classes([SupabaseAuthentication])
@@ -1226,12 +1241,12 @@ def edit_category(request, category_id):
         new_name = data.get("name")
 
         if not new_name:
-            return JsonResponse({"error": "Name is required."}, status=400)
+            return Response({"error": "Name is required."}, status=400)
 
         # Check if category exists
         category_response = supabase_client.table("item_category").select("*").eq("id", category_id).execute()
         if not category_response.data:
-            return JsonResponse({"error": "Item Category not found."}, status=404)
+            return Response({"error": "Item Category not found."}, status=404)
 
         # Update category name
         update_response = supabase_client.table("item_category").update({
@@ -1239,12 +1254,12 @@ def edit_category(request, category_id):
         }).eq("id", category_id).execute()
 
         if update_response.data:
-            return JsonResponse({"message": "Item Category updated successfully."}, status=200)
+            return Response({"message": "Item Category updated successfully."}, status=200)
         else:
-            return JsonResponse({"error": "Failed to update Item Category."}, status=500)
+            return Response({"error": "Failed to update Item Category."}, status=500)
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
 
 
 @api_view(['DELETE'])
@@ -1262,18 +1277,18 @@ def delete_category(request, category_id):
         # Verify category exists
         category_response = supabase_client.table("item_category").select("*").eq("id", category_id).execute()
         if not category_response.data:
-            return JsonResponse({"error": "Item Category not found."}, status=404)
+            return Response({"error": "Item Category not found."}, status=404)
 
         # Delete category
         delete_response = supabase_client.table("item_category").delete().eq("id", category_id).execute()
 
         if delete_response.data:
-            return JsonResponse({"message": "Item Category deleted successfully."}, status=200)
+            return Response({"message": "Item Category deleted successfully."}, status=200)
         else:
-            return JsonResponse({"error": "Failed to delete Item Category."}, status=500)
+            return Response({"error": "Failed to delete Item Category."}, status=500)
     
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
     
 @api_view(['POST'])
 @authentication_classes([])
@@ -1292,7 +1307,7 @@ def add_stockin_data(request):
 
         # Validate receipt fields and stock in arrays
         if not receipt_no or not supplier_name or not date or not stock_ins:
-            return JsonResponse(
+            return Response(
                 {"error": "Receipt fields and at aleast one stock in entry are required"},
                 status=400
             )
@@ -1304,12 +1319,12 @@ def add_stockin_data(request):
         }).execute()
 
         if not receipt_response.data:
-            return JsonResponse({"error": "Failed to add receipt."}, status=500)
+            return Response({"error": "Failed to add receipt."}, status=500)
         
         # Get the newly created receipt ID
         receipt_id = receipt_response.data[0].get("id")
         if not receipt_id:
-            return JsonResponse({"error": "Receipt ID not returned."}, status=500)
+            return Response({"error": "Receipt ID not returned."}, status=500)
         
         # Process each stock in entry
         for entry in stock_ins:
@@ -1319,7 +1334,7 @@ def add_stockin_data(request):
             price = entry.get("price")
 
             if not inventory_id or not item_id or quantity_in is None or price is None:
-                return JsonResponse(
+                return Response(
                     {"error": "All fields (inventory_id, item_id, quantity_in, price) are required for each stock in entry."},
                     status=400
                 )
@@ -1328,7 +1343,7 @@ def add_stockin_data(request):
                 quantity_in = int(quantity_in)
                 price = float(price)
             except Exception:
-                return JsonResponse({"error": "Invalid quantity or price format."}, status=400)
+                return Response({"error": "Invalid quantity or price format."}, status=400)
             
             # Insert the Stock In records with the Receipt ID
             stock_in_response = supabase_anon.table("stockin").insert({\
@@ -1340,7 +1355,7 @@ def add_stockin_data(request):
             }).execute()
             
             if not stock_in_response.data:
-                return JsonResponse(
+                return Response(
                     {"error": f"Failed to add stock in entry for ID {inventory_id}."},
                     status=500
                 )
@@ -1352,7 +1367,7 @@ def add_stockin_data(request):
                 .execute()
             
             if not inventory_response.data or len(inventory_response.data) == 0:
-                return JsonResponse(
+                return Response(
                     {"error": f"Inventory record not found for ID {inventory_id}"},
                     status=404
                 )
@@ -1362,7 +1377,7 @@ def add_stockin_data(request):
 
             # Validate that the inventory's item matches the provided Item ID
             if str(inventory_record.get("item")) != str(item_id):
-                return JsonResponse(
+                return Response(
                     {"error": f"Mismatch between provided Item ID {item_id} and inventory record for Inventory ID {inventory_id}."},
                     status=400
                 )
@@ -1375,18 +1390,18 @@ def add_stockin_data(request):
             }).eq("id", inventory_id).execute()
 
             if not update_response.data:
-                return JsonResponse(
+                return Response(
                     {"error": f"Failed to update inventory for inventory_id {inventory_id}."},
                     status=500
                 )
             
-        return JsonResponse(
+        return Response(
             {"message": "Receipt and stock in entries added; inventory updated successfully."},
             status=201
         )
 
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
     
 
 @api_view(['PUT'])
@@ -1414,7 +1429,7 @@ def edit_receipt_stockin_data(request, receipt_id):
 
         # Validate receipt fields
         if not receipt_no or not supplier_name or not date:
-            return JsonResponse(
+            return Response(
                 {"error": "Receipt fields (receipt_no, supplier_name, date) are required."},
                 status=400,
             )
@@ -1435,14 +1450,14 @@ def edit_receipt_stockin_data(request, receipt_id):
                         .select("*") \
                         .eq("id", stock["id"]).execute()
                     if not stockin_response.data:
-                        return JsonResponse({"error": f"Stock-in record with id {stock['id']} not found."}, status=404)
+                        return Response({"error": f"Stock-in record with id {stock['id']} not found."}, status=404)
                     existing_stock = stockin_response.data[0]
                     inventory_id = existing_stock.get("inventory_id")
                     inv_response = supabase_service.table("inventory") \
                         .select("quantity") \
                         .eq("id", inventory_id).execute()
                     if not inv_response.data:
-                        return JsonResponse({"error": f"Inventory record not found for inventory_id {inventory_id}"}, status=404)
+                        return Response({"error": f"Inventory record not found for inventory_id {inventory_id}"}, status=404)
                     current_quantity = int(inv_response.data[0].get("quantity", 0))
                     quantity_to_subtract = int(existing_stock.get("quantity_in", 0))
                     new_inv_quantity = current_quantity - quantity_to_subtract
@@ -1460,7 +1475,7 @@ def edit_receipt_stockin_data(request, receipt_id):
                 stockin_response = supabase_service.table("stockin") \
                     .select("*").eq("id", stockin_id).execute()
                 if not stockin_response.data:
-                    return JsonResponse({"error": f"Stock-in record with id {stockin_id} not found."}, status=404)
+                    return Response({"error": f"Stock-in record with id {stockin_id} not found."}, status=404)
                 existing_stock = stockin_response.data[0]
                 old_quantity = int(stock.get("old_quantity", existing_stock.get("quantity_in", 0)))
                 new_quantity = int(stock.get("quantity_in", 0))
@@ -1476,7 +1491,7 @@ def edit_receipt_stockin_data(request, receipt_id):
                 inv_response = supabase_service.table("inventory") \
                     .select("quantity").eq("id", inventory_id).execute()
                 if not inv_response.data:
-                    return JsonResponse({"error": f"Inventory record not found for inventory_id {inventory_id}"}, status=404)
+                    return Response({"error": f"Inventory record not found for inventory_id {inventory_id}"}, status=404)
                 current_quantity = int(inv_response.data[0].get("quantity", 0))
                 new_inv_quantity = current_quantity + diff
                 supabase_service.table("inventory").update({"quantity": new_inv_quantity}) \
@@ -1487,12 +1502,12 @@ def edit_receipt_stockin_data(request, receipt_id):
                 inventory_id = stock.get("inventory_id")
                 item_id = stock.get("item_id")
                 if not inventory_id or not item_id or stock.get("quantity_in") is None or stock.get("price") is None:
-                    return JsonResponse({"error": "For new stock-in entries, inventory_id, item_id, quantity_in, and price are required."}, status=400)
+                    return Response({"error": "For new stock-in entries, inventory_id, item_id, quantity_in, and price are required."}, status=400)
                 try:
                     quantity_in = int(stock.get("quantity_in"))
                     price = float(stock.get("price"))
                 except ValueError:
-                    return JsonResponse({"error": "Invalid quantity or price format."}, status=400)
+                    return Response({"error": "Invalid quantity or price format."}, status=400)
                 insert_response = supabase_service.table("stockin").insert({
                     "receipt_id": receipt_id,
                     "inventory_id": inventory_id,
@@ -1501,11 +1516,11 @@ def edit_receipt_stockin_data(request, receipt_id):
                     "price": price
                 }).execute()
                 if not insert_response.data:
-                    return JsonResponse({"error": f"Failed to add new stock-in entry for inventory_id {inventory_id}."}, status=500)
+                    return Response({"error": f"Failed to add new stock-in entry for inventory_id {inventory_id}."}, status=500)
                 inv_response = supabase_service.table("inventory") \
                     .select("quantity").eq("id", inventory_id).execute()
                 if not inv_response.data:
-                    return JsonResponse({"error": f"Inventory record not found for inventory_id {inventory_id}."}, status=404)
+                    return Response({"error": f"Inventory record not found for inventory_id {inventory_id}."}, status=404)
                 current_quantity = int(inv_response.data[0].get("quantity", 0))
                 new_quantity = current_quantity + quantity_in
                 supabase_service.table("inventory").update({"quantity": new_quantity}) \
@@ -1515,21 +1530,21 @@ def edit_receipt_stockin_data(request, receipt_id):
         updated_receipt_resp = supabase_service.table("receipts") \
             .select("*").eq("id", receipt_id).execute()
         if not updated_receipt_resp.data:
-            return JsonResponse({"error": "Receipt not found after update."}, status=404)
+            return Response({"error": "Receipt not found after update."}, status=404)
         updated_receipt = updated_receipt_resp.data[0]
         stockins_resp = supabase_service.table("stockin") \
             .select("*").eq("receipt_id", receipt_id).execute()
         updated_receipt["stock_ins"] = stockins_resp.data if stockins_resp.data else []
 
-        return JsonResponse({
+        return Response({
             "message": "Receipt and stock-in details updated successfully.",
             "receipt": updated_receipt
         }, status=200)
 
     except ValueError:
-        return JsonResponse({"error": "Invalid quantity or price format. Ensure numeric values."}, status=400)
+        return Response({"error": "Invalid quantity or price format. Ensure numeric values."}, status=400)
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
 
 
 
@@ -1545,7 +1560,7 @@ def delete_receipt(request, receipt_id):
         # Check if the receipt exists.
         receipt_response = supabase_service.table("receipts").select("*").eq("id", receipt_id).execute()
         if not receipt_response.data:
-            return JsonResponse({"error": "Receipt not found."}, status=404)
+            return Response({"error": "Receipt not found."}, status=404)
         
         # Retrieve all associated stock-in entries.
         stockins_response = supabase_service.table("stockin").select("*").eq("receipt_id", receipt_id).execute()
@@ -1561,7 +1576,7 @@ def delete_receipt(request, receipt_id):
                     new_quantity = current_quantity - quantity_in
                     supabase_service.table("inventory").update({"quantity": new_quantity}).eq("id", inventory_id).execute()
                 else:
-                    return JsonResponse({"error": f"Inventory record not found for inventory_id {inventory_id}"}, status=404)
+                    return Response({"error": f"Inventory record not found for inventory_id {inventory_id}"}, status=404)
         
             # Delete all stock-in entries for this receipt.
             supabase_service.table("stockin").delete().eq("receipt_id", receipt_id).execute()
@@ -1569,8 +1584,89 @@ def delete_receipt(request, receipt_id):
         # Delete the receipt.
         delete_response = supabase_service.table("receipts").delete().eq("id", receipt_id).execute()
         if delete_response.data:
-            return JsonResponse({"message": "Receipt and associated stock-in entries deleted successfully."}, status=200)
+            return Response({"message": "Receipt and associated stock-in entries deleted successfully."}, status=200)
         else:
-            return JsonResponse({"error": "Failed to delete receipt."}, status=500)
+            return Response({"error": "Failed to delete receipt."}, status=500)
     except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+        return Response({"error": str(e)}, status=500)
+    
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny]) 
+def dispose_item(request):
+    try:
+        data = json.loads(request.body)
+        inventory_id = int(data.get("inventory_id"))
+        disposed_quantity = float(data.get("disposed_quantity", 0))
+        disposed_unit_id = int(data.get("disposed_unit"))
+        reason = data.get("reason_of_disposal", "")
+        
+        # 1. Fetch the inventory record.
+        inv_response = supabase_anon.table("inventory").select("*").eq("id", inventory_id).execute()
+        if not inv_response.data:
+            return Response({"error": "Inventory record not found."}, status=404)
+        inventory_record = inv_response.data[0]
+        current_inventory_quantity = float(inventory_record["quantity"])
+        
+        # 2. Fetch the related item record.
+        item_id = inventory_record["item"]
+        item_response = supabase_anon.table("items").select("*").eq("id", item_id).execute()
+        if not item_response.data:
+            return Response({"error": "Item record not found."}, status=404)
+        item_record = item_response.data[0]
+        
+        # 3. Get the item’s measurement unit (default unit in which inventory quantity is stored).
+        item_measurement_id = item_record["measurement"]
+        item_unit_response = supabase_anon.table("unit_of_measurement").select("*").eq("id", item_measurement_id).execute()
+        if not item_unit_response.data:
+            return Response({"error": "Item measurement unit not found."}, status=404)
+        item_unit = item_unit_response.data[0]  # e.g. {"id": 1, "name": "kg", "category": "weight"}
+        
+        # 4. Fetch the disposed unit (the unit in which the user entered disposed quantity).
+        disposed_unit_response = supabase_anon.table("unit_of_measurement").select("*").eq("id", disposed_unit_id).execute()
+        if not disposed_unit_response.data:
+            return Response({"error": "Disposed unit not found."}, status=404)
+        disposed_unit = disposed_unit_response.data[0]  # e.g. {"id": 2, "name": "g", "category": "weight"}
+        
+        # # 5. Check that both units belong to the same category.
+        # if item_unit["unit_category"] != disposed_unit["unit_category"]:
+        #     return Response({"error": "Unit categories do not match."}, status=400)
+        
+        # 6. Convert the disposed quantity (from the disposed unit) to the item's unit.
+        #    This way you can compare the disposed amount with the inventory quantity.
+        
+        category_str = "Weight" if item_unit["unit_category"] == 1 else "Volume"
+
+        converted_disposed_qty = convert_value(
+            disposed_quantity,
+            from_unit=disposed_unit["symbol"],
+            to_unit=item_unit["symbol"],
+            category=category_str
+        )
+        
+        # 7. Validate: the disposed quantity (in the item’s unit) should not exceed current inventory.
+        if converted_disposed_qty > current_inventory_quantity:
+            return Response({"error": "Disposed quantity exceeds current inventory quantity."}, status=400)
+        
+        # 8. Update the inventory record by subtracting the disposed amount.
+        new_inventory_qty = current_inventory_quantity - converted_disposed_qty
+        update_response = supabase_anon.table("inventory").update({"quantity": new_inventory_qty}).eq("id", inventory_id).execute()
+        
+        # 9. Insert a record in the disposed_inventory table.
+        disposed_data = {
+            "inventory_id": inventory_id,
+            "disposed_quantity": disposed_quantity,  # store the original quantity as provided
+            "disposed_unit": disposed_unit_id,
+            "reason_id": reason
+        }
+        insert_response = supabase_anon.table("disposed_inventory").insert(disposed_data).execute()
+        
+        return Response({
+            "status": "success",
+            "inventory_update": update_response.data,
+            "disposed_record": insert_response.data
+        }, status=200)
+    
+    except Exception as e:
+        return Response({"error": f"Unexpected error: {e}"}, status=500)
