@@ -12,7 +12,14 @@ module.exports = {
     flowbite.plugin(),
   ],
 };
-
+module.exports = {
+  // ...
+  variants: {
+    extend: {
+      backgroundColor: ['even'],
+    }
+  },
+}
 export default {
   content: [
     "./index.html",

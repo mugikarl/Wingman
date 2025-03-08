@@ -4,6 +4,7 @@ const Table = ({ columns, data, rowOnClick }) => {
   return (
     <div className="table-container border rounded-lg shadow overflow-x-auto">
       <table className="table-auto w-full text-left">
+        {/* Table Header */}
         <thead className="bg-[#FFCF03] font-bold">
           <tr>
             {columns.map((column, index) => (
@@ -13,12 +14,16 @@ const Table = ({ columns, data, rowOnClick }) => {
             ))}
           </tr>
         </thead>
+
+        {/* Table Body */}
         <tbody>
           {data.length > 0 ? (
             data.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className="bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
+                className={`border-b cursor-pointer hover:bg-yellow-200 ${
+                  rowIndex % 2 === 0 ? "bg-white" : "bg-[#FFEEA6]" // Even rows: yellow, Odd rows: white
+                }`}
                 onClick={() => rowOnClick && rowOnClick(rowIndex)} // Call rowOnClick
               >
                 {row.map((cell, cellIndex) => (

@@ -55,9 +55,6 @@ const StockIn = () => {
   };
   const role = localStorage.getItem("role"); // Check user's role
 
-
-  
-  
   useEffect(() => {
     fetchReceipts();
   }, []);
@@ -72,87 +69,114 @@ const StockIn = () => {
   return (
     <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
       {/* Navigation Buttons */}
-      <div className="flex space-x-4 mb-4">
+      <div className="flex space-x-4">
+        {/* Inventory Button */}
         <Link to="/inventory">
-          <button
-            className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]"
-          >
-            <img
-              src="/images/stockout/cart.png"
-              alt="New Product"
-              className="w-8 h-8 mr-2"
-            />
-            <span className="text-white">Inventory</span>
+          <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
+            {/* Darker Left Section for Icon */}
+            <div className="flex items-center justify-center bg-[#D87A03] p-3">
+              <img
+                src="/images/stockout/trolley.png"
+                alt="New Product"
+                className="w-6 h-6"
+              />
+            </div>
+            {/* Text Aligned Left in Normal Color Section */}
+            <span className="flex-1 text-left pl-3">Inventory</span>
           </button>
         </Link>
-        {/* Other Buttons */}
+      
+        {/* Items Button (Admin Only) */}
         {role === "Admin" && (
           <Link to="/dashboard-admin/items">
-          <button className="flex items-center bg-[#E88504] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
-            <img
-              src="/images/stockout/menu.png"
-              alt="Menu"
-              className="w-8 h-8 mr-2"
-            />
-            <span className="text-white">Items</span>
-          </button>
-        </Link>
-        )}
-        <Link to="/stockin">
-          <button className="flex items-center bg-[#00BA34] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
-            <img
-              src="/images/stockout/stock.png"
-              alt="Stock In"
-              className="w-8 h-8 mr-2"
-            />
-            <span className="text-white">Stock In</span>
-          </button>
-        </Link>
-
-        {/* Conditionally render the Menu button only for Admin */}
-        {role === "Admin" && (
-          <Link to="/dashboard-admin/menu">
-            <button className="flex items-center bg-[#00BA34] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
-              <img
-                src="/images/stockout/stock.png"
-                alt="Stock In"
-                className="w-8 h-8 mr-2"
-              />
-              <span className="text-white">Menu</span>
+            <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
+              {/* Darker Left Section for Icon */}
+              <div className="flex items-center justify-center bg-[#D87A03] p-3">
+                <img
+                  src="/images/stockout/menu.png"
+                  alt="Menu"
+                  className="w-6 h-6"
+                />
+              </div>
+              {/* Text Aligned Left in Normal Color Section */}
+              <span className="flex-1 text-left pl-3">Items</span>
             </button>
           </Link>
         )}
-
+      {role === "Admin" && (
+                  <Link to="/dashboard-admin/menu">
+                  <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
+                  <div className="flex items-center justify-center bg-[#D87A03] p-3">
+                  
+                      <img
+                        src="/images/restaurant.png"
+                        alt="Stock In"
+                        className="w-6 h-6"
+                      />
+                      </div>
+                      <span className="flex-1 text-left pl-3">Menu</span>
+                    </button>
+                  </Link>
+                )}
+        {/* Stock In Button */}
+        <Link to="/stockin">
+          <button className="flex items-center bg-gradient-to-r from-[#009E2A] to-[#00BA34] text-white rounded-md shadow-md hover:from-[#008C25] hover:to-[#009E2A] transition-colors duration-200 w-48 overflow-hidden">
+            {/* Darker Left Section for Icon */}
+            <div className="flex items-center justify-center bg-[#009E2A] p-3">
+              <img
+                src="/images/stockout/stock.png"
+                alt="Stock In"
+                className="w-6 h-6"
+              />
+            </div>
+            {/* Text Aligned Left in Normal Color Section */}
+            <span className="flex-1 text-left pl-3">Stock In</span>
+          </button>
+        </Link>
+      
+        {/* Disposed Button */}
         <Link to="/stockout">
-          <button className="flex items-center bg-[#FF0000] p-2 rounded-lg shadow hover:shadow-lg min-w-[25%]">
-            <img
-              src="/images/stockout/trash.png"
-              alt="Disposed"
-              className="w-8 h-8 mr-2"
-            />
-            <span className="text-white">Disposed</span>
+          <button className="flex items-center bg-gradient-to-r from-[#E60000] to-[#FF0000] text-white rounded-md shadow-md hover:from-[#CC0000] hover:to-[#E60000] transition-colors duration-200 w-48 overflow-hidden">
+            {/* Darker Left Section for Icon */}
+            <div className="flex items-center justify-center bg-[#E60000] p-3">
+              <img
+                src="/images/stockout/trash-can.png"
+                alt="Disposed"
+                className="w-6 h-6"
+              />
+            </div>
+            {/* Text Aligned Left in Normal Color Section */}
+            <span className="flex-1 text-left pl-3">Disposed</span>
           </button>
         </Link>
       </div>
-
-      {/* New Receipt Button */}
+      <div className="h-4">    
+      </div>
+      {/* Search Bar and New Receipt Button */}
       <div className="w-full">
         <div className="flex items-center justify-between space-x-2 mb-4">
+          {/* Search Bar */}
           <input
             type="text"
             placeholder="Search..."
             className="w-1/2 p-2 border rounded-lg shadow"
           />
+
+          {/* New Receipt Button */}
           <button
             onClick={openAddStockInModal}
-            className="flex items-center bg-[#1c4686] p-2 rounded-lg shadow hover:shadow-lg min-w-[15%]"
+            className="flex items-center bg-gradient-to-r from-[#1c4686] to-[#2a5ca7] text-white rounded-md shadow-md hover:from-[#163a6f] hover:to-[#1c4686] transition-colors duration-200 w-48 overflow-hidden"
           >
-            <img
-              src="/images/stockout/trash.png"
-              alt="New Item"
-              className="w-8 h-8 mr-2"
-            />
-            <span className="text-white">New Receipt</span>
+            {/* Darker Left Section for Icon */}
+            <div className="flex items-center justify-center bg-[#1c4686] p-3">
+              <img
+                src="/images/stockout/trash.png"
+                alt="New Receipt"
+                className="w-6 h-6"
+              />
+            </div>
+            {/* Text Aligned Left in Normal Color Section */}
+            <span className="flex-1 text-left pl-3">New Receipt</span>
           </button>
         </div>
       </div>

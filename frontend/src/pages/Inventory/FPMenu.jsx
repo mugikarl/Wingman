@@ -12,7 +12,7 @@ const FPMenu = () => {
   // State for percentage deduction
   const [percentage, setPercentage] = useState("10"); // Default value
   const [isEditable, setIsEditable] = useState(false);
-
+  const role = localStorage.getItem("role");
   // State to control modal visibility
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -62,14 +62,89 @@ const FPMenu = () => {
   return (
     <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
       {/* Top Section */}
-      <button
-            onClick={() => (window.location.href = "/inventory")}
-            className="bg-orange-500 text-white px-4 py-2 rounded w-60"
-          >
-            Return to Inventory
-          </button>
+      <div className="flex space-x-4">
+                  {/* Inventory Button */}
+                  <Link to="/inventory">
+                    <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
+                      {/* Darker Left Section for Icon */}
+                      <div className="flex items-center justify-center bg-[#D87A03] p-3">
+                        <img
+                          src="/images/stockout/trolley.png"
+                          alt="New Product"
+                          className="w-6 h-6"
+                        />
+                      </div>
+                      {/* Text Aligned Left in Normal Color Section */}
+                      <span className="flex-1 text-left pl-3">Inventory</span>
+                    </button>
+                  </Link>
+                
+                  {/* Items Button (Admin Only) */}
+                  {role === "Admin" && (
+                    <Link to="/dashboard-admin/items">
+                      <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
+                        {/* Darker Left Section for Icon */}
+                        <div className="flex items-center justify-center bg-[#D87A03] p-3">
+                          <img
+                            src="/images/stockout/menu.png"
+                            alt="Menu"
+                            className="w-6 h-6"
+                          />
+                        </div>
+                        {/* Text Aligned Left in Normal Color Section */}
+                        <span className="flex-1 text-left pl-3">Items</span>
+                      </button>
+                    </Link>
+                  )}
+                {role === "Admin" && (
+                            <Link to="/dashboard-admin/menu">
+                            <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
+                            <div className="flex items-center justify-center bg-[#D87A03] p-3">
+                            
+                                <img
+                                  src="/images/restaurant.png"
+                                  alt="Stock In"
+                                  className="w-6 h-6"
+                                />
+                                </div>
+                                <span className="flex-1 text-left pl-3">Menu</span>
+                              </button>
+                            </Link>
+                          )}
+                  {/* Stock In Button */}
+                  <Link to="/stockin">
+                    <button className="flex items-center bg-gradient-to-r from-[#009E2A] to-[#00BA34] text-white rounded-md shadow-md hover:from-[#008C25] hover:to-[#009E2A] transition-colors duration-200 w-48 overflow-hidden">
+                      {/* Darker Left Section for Icon */}
+                      <div className="flex items-center justify-center bg-[#009E2A] p-3">
+                        <img
+                          src="/images/stockout/stock.png"
+                          alt="Stock In"
+                          className="w-6 h-6"
+                        />
+                      </div>
+                      {/* Text Aligned Left in Normal Color Section */}
+                      <span className="flex-1 text-left pl-3">Stock In</span>
+                    </button>
+                  </Link>
+                
+                  {/* Disposed Button */}
+                  <Link to="/stockout">
+                    <button className="flex items-center bg-gradient-to-r from-[#E60000] to-[#FF0000] text-white rounded-md shadow-md hover:from-[#CC0000] hover:to-[#E60000] transition-colors duration-200 w-48 overflow-hidden">
+                      {/* Darker Left Section for Icon */}
+                      <div className="flex items-center justify-center bg-[#E60000] p-3">
+                        <img
+                          src="/images/stockout/trash-can.png"
+                          alt="Disposed"
+                          className="w-6 h-6"
+                        />
+                      </div>
+                      {/* Text Aligned Left in Normal Color Section */}
+                      <span className="flex-1 text-left pl-3">Disposed</span>
+                    </button>
+                  </Link>
+                </div>
           <div className="h-4"></div>
-      <div className="flex justify-between items-start mb-8">
+      <div className="flex justify-between items-start mb-6">
         {/* Left Section: Search Bar and Scrollable Buttons */}
         <div className="w-3/4">
           {/* Search Bar */}
@@ -81,63 +156,51 @@ const FPMenu = () => {
             />
           </div>
 
-          {/* Scrollable Buttons */}
-          <div className="scrollable-buttons flex space-x-4 overflow-x-auto">
-            <button className="flex items-center justify-center bg-blue-500 text-white p-2 rounded-lg shadow min-w-[15%] text-sm whitespace-nowrap">
-              All
-            </button>
-            <button className="flex items-center justify-center bg-green-500 text-white p-2 rounded-lg shadow min-w-[15%] text-sm whitespace-nowrap">
-              Uni Wings
-            </button>
-            <button className="flex items-center justify-center bg-yellow-500 text-white p-2 rounded-lg shadow min-w-[15%] text-sm whitespace-nowrap">
-              Add one
-            </button>
-            <button className="flex items-center justify-center bg-red-500 text-white p-2 rounded-lg shadow min-w-[15%] text-sm whitespace-nowrap">
-              Sandwiches
-            </button>
-            <button className="flex items-center justify-center bg-purple-500 text-white p-2 rounded-lg shadow min-w-[15%] text-sm whitespace-nowrap">
-              Sizzlers
-            </button>
-            <button className="flex items-center justify-center bg-pink-500 text-white p-2 rounded-lg shadow min-w-[15%] text-sm whitespace-nowrap">
-              Drinks
-            </button>
-            <button className="flex items-center justify-center bg-gray-500 text-white p-2 rounded-lg shadow min-w-[15%] text-sm whitespace-nowrap">
-              New Menu
-            </button>
-          </div>
+          
         </div>
 
         {/* Disposed Button */}
         <button
-          className="flex flex-col items-center bg-[#209528] p-4 rounded-lg shadow"
+          className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden"
           onClick={() => setIsModalOpen(true)}
         >
-          <img
-            src="/images/stockout/trash.png"
-            alt="Disposed"
-            className="w-32 h-14 mb-2"
-          />
-          <span className="text-white font-bold">New Menu</span>
+          {/* Darker Left Section for Icon */}
+          <div className="flex items-center justify-center bg-[#D87A03] p-3">
+            <img
+              src="/images/menu (2).png" // Ensure correct image path
+              alt="New Menu"
+              className="w-6 h-6"
+            />
+          </div>
+          {/* Text Aligned Left in Normal Color Section */}
+          <span className="flex-1 text-left pl-3">New Menu</span>
         </button>
+                                
       </div>
 
       {/* Order, Foodpanda, Grab Buttons and Percentage Deduction Section */}
       <div className="flex justify-between items-center mb-8">
         {/* Order, Foodpanda, Grab Buttons */}
-        <div className="flex space-x-4">
+        <div className="flex space-x-6 mb-8">
           <Link to="/dashboard-admin/menu">
-            <button className="flex items-center justify-center bg-[#FF0000] text-white p-2 rounded-lg shadow min-w-[15%] text-sm">
-              Order
-            </button>
-          </Link>
-          <button className="flex items-center justify-center bg-[#FF0000] text-white p-2 rounded-lg shadow min-w-[15%] text-sm">
-            Foodpanda
-          </button>
-          <Link to="/dashboard-admin/grabmenu">
-            <button className="flex items-center justify-center bg-[#FF0000] text-white p-2 rounded-lg shadow min-w-[15%] text-sm">
-              Grab
-            </button>
-          </Link>
+                    <button className="flex items-center justify-center bg-[#FF0000] text-white py-3 px-6 rounded-lg shadow-lg min-w-[180px] text-lg font-bold">
+                      Order
+                    </button>
+                  </Link>
+                                
+                  {/* Foodpanda Button (Pink with Custom Font) */}
+                  <Link to="/dashboard-admin/fpmenu">
+                    <button className="flex items-center justify-center bg-[#D70F64] text-white py-3 px-6 rounded-lg shadow-lg min-w-[180px] text-lg font-['Poppins'] font-bold">
+                      Foodpanda
+                    </button>
+                  </Link>
+                                
+                  {/* Grab Button (Green with Custom Font) */}
+                  <Link to="/dashboard-admin/fpmenu">
+                    <button className="flex items-center justify-center bg-[#00A650] text-white py-3 px-6 rounded-lg shadow-lg min-w-[180px] text-lg font-['Montserrat'] font-bold">
+                      Grab
+                    </button>
+                  </Link>
         </div>
 
         {/* Percentage Deduction Section */}

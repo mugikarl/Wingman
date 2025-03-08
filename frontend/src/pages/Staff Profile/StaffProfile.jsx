@@ -67,56 +67,88 @@ const StaffProfile = () => {
     <div className="flex-grow p-6 bg-[#E2D6D5] min-h-full">
       {/* Top Section */}
       <div className="flex items-start mb-4 space-x-4">
-        <Link to="/attendancereview">
-        <button className="bg-blue-500 text-white p-2 rounded-lg shadow">
-          Attendance Sheet
-        </button>
-        </Link>
-        <button
-          onClick={openAddModal}
-          className="bg-[#E88504] text-white p-2 rounded-lg shadow"
-        >
-          Add New Profile
-        </button>
-        <Link to="/schedule">
-          <button className="bg-green-500 text-white p-2 rounded-lg shadow">
-            Schedule
-          </button>
-        </Link>
+  {/* Attendance Sheet Button */}
+  <Link to="/attendancereview">
+    <button className="flex items-center bg-gradient-to-r from-[#1c4686] to-[#2a5ca7] text-white rounded-md shadow-md hover:from-[#163a6f] hover:to-[#1c4686] transition-colors duration-200 w-48 overflow-hidden">
+      {/* Darker Left Section for Icon */}
+      <div className="flex items-center justify-center bg-[#1c4686] p-3">
+        <img
+          src="/images/google-sheets.png" // Replace with your icon path
+          alt="Attendance Sheet"
+          className="w-6 h-6"
+        />
       </div>
-      <div>
-        <button
-          className={`p-2 shadow w-40 ${
-            filterStatus === 1
-              ? "bg-blue-700 text-white"
-              : "bg-blue-500 text-gray-200"
-          }`}
-          onClick={() => setFilterStatus(1)}
-        >
-          Active
-        </button>
-        <button
-          className={`p-2 shadow w-40 ${
-            filterStatus === 2
-              ? "bg-red-700 text-white"
-              : "bg-red-500 text-gray-200"
-          }`}
-          onClick={() => setFilterStatus(2)}
-        >
-          Inactive
-        </button>
+      {/* Text Aligned Left in Normal Color Section */}
+      <span className="flex-1 text-left pl-3">Attendance Sheet</span>
+    </button>
+  </Link>
+
+  {/* Add New Profile Button */}
+  <button
+    onClick={openAddModal}
+    className="flex items-center bg-gradient-to-r from-[#E88504] to-[#F89A1C] text-white rounded-md shadow-md hover:from-[#D87A03] hover:to-[#E88504] transition-colors duration-200 w-48 overflow-hidden"
+  >
+    {/* Darker Left Section for Icon */}
+    <div className="flex items-center justify-center bg-[#E88504] p-3">
+      <img
+        src="/images/user.png" // Replace with your icon path
+        alt="Add New Profile"
+        className="w-6 h-6"
+      />
+    </div>
+    {/* Text Aligned Left in Normal Color Section */}
+    <span className="flex-1 text-left pl-3">Add New Profile</span>
+  </button>
+
+  {/* Schedule Button */}
+  <Link to="/schedule">
+    <button className="flex items-center bg-gradient-to-r from-[#009E2A] to-[#00BA34] text-white rounded-md shadow-md hover:from-[#008C25] hover:to-[#009E2A] transition-colors duration-200 w-48 overflow-hidden">
+      {/* Darker Left Section for Icon */}
+      <div className="flex items-center justify-center bg-[#009E2A] p-3">
+        <img
+          src="/images/schedule.png" // Replace with your icon path
+          alt="Schedule"
+          className="w-6 h-6"
+        />
       </div>
+      {/* Text Aligned Left in Normal Color Section */}
+      <span className="flex-1 text-left pl-3">Schedule</span>
+    </button>
+  </Link>
+</div>
+<div className="flex space">
+  {/* Active Button */}
+  <button
+    className={`flex items-center justify-center p-2 transition-colors duration-200 w-48 ${
+      filterStatus === 1
+        ? "bg-[#FFCF03] text-black" // Active state (same as table header)
+        : "bg-[#bf9e0b] text-black opacity-70" // Inactive state (same as even rows)
+    }`}
+    onClick={() => setFilterStatus(1)}
+  >
+    Active
+  </button>
+
+  {/* Inactive Button */}
+  <button
+    className={`flex items-center justify-center transition-colors duration-200 w-48 ${
+      filterStatus === 2
+        ? "bg-[#FFCF03] text-black" // Active state (same as table header)
+        : "bg-[#bf9e0b] text-black opacity-70" // Inactive state (same as odd rows)
+    }`}
+    onClick={() => setFilterStatus(2)}
+  >
+    Inactive
+  </button>
+</div>
 
       {/* Table */}
-      <div className="table-container border rounded-lg shadow overflow-x-auto">
+      <div className="table-container border rounded-lg rounded-tl-none shadow overflow-x-auto">
         <table className="table-auto w-full text-left">
           <thead className="bg-[#FFCF03] font-bold">
             <tr>
-              <th className="p-2">ID</th>
               <th className="p-2">NAME</th>
               <th className="p-2">ROLE</th>
-              <th className="p-2">TIME IN</th>
-              <th className="p-2">TIME OUT</th>
             </tr>
           </thead>
           <tbody>
@@ -137,23 +169,14 @@ const StaffProfile = () => {
                   }
                   onClick={() => openEditModal(employee)}
                 >
-                  <td className="p-2">{employee.id}</td>
+                  
                   <td className="p-2">
                     {employee.first_name} {employee.last_name}
                   </td>
                   <td className="p-2">
                     {employee.roles.map((role) => role.role_name).join(", ")}
                   </td>
-                  <td className="p-2">
-                    <button className="bg-blue-500 text-white p-1 rounded shadow">
-                      Time In
-                    </button>
-                  </td>
-                  <td className="p-2">
-                    <button className="bg-red-500 text-white p-1 rounded shadow">
-                      Time Out
-                    </button>
-                  </td>
+                  
                 </tr>
               ))
             ) : (
