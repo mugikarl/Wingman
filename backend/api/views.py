@@ -24,7 +24,8 @@ import base64
 import io
 from django.utils.timezone import now
 from .utils.conversion import convert_value
-
+import uuid
+import  mimetypes
 
 #AUTHETICATE USER/ADMIN
 
@@ -897,7 +898,7 @@ def time_out(request):
 @permission_classes([AllowAny])
 def fetch_item_data(request):
     """
-    Fetches units, categories, items, inventory, and stock-in data.
+    Fetches units, categories, items, inventory, stock-in and out data, menus, menu items, and menu types.
     """
     try:
         # Fetch units
@@ -940,7 +941,7 @@ def fetch_item_data(request):
             .execute()
         inventory_data = inventory_response.data if inventory_response.data else []
 	
-	# Format inventory with item details
+	    # Format inventory with item details
         formatted_inventory = []
         for inventory in inventory_data:
             # Find the corresponding item data
@@ -1016,17 +1017,68 @@ def fetch_item_data(request):
                 "stock_ins": stockins_data
             })
 
-            # Fetch employees
+        # Fetch employees
         employees_response = supabase_anon.table("employee") \
             .select("id, first_name, last_name") \
             .execute()
         employees = employees_response.data if employees_response.data else []
 
-            # Fetch reasons of disposal
+        # Fetch reasons of disposal
         reason_disposal_response = supabase_anon.table("reason_of_disposal") \
             .select("id, name") \
             .execute()
         reason_disposal = reason_disposal_response.data if reason_disposal_response.data else []
+
+        # Fetch menu types
+        menu_types_response = supabase_anon.table("menu_type") \
+            .select("id, name") \
+            .execute()
+        menu_types = menu_types_response.data if menu_types_response.data else []
+
+        # Fetch menu statuses
+        menu_statuses_response = supabase_anon.table("menu_status") \
+            .select("id, name") \
+            .execute()
+        menu_statuses = menu_statuses_response.data if menu_statuses_response.data else []
+
+        # Fetch menu categories
+        menu_categories_response = supabase_anon.table("menu_category") \
+            .select("id, name") \
+            .execute()
+        menu_categories = menu_categories_response.data if menu_categories_response.data else []
+
+        # Fetch menus
+        menus_response = supabase_anon.table("menu") \
+            .select("id, name, type_id, price, image, status_id") \
+            .execute()
+        menus = menus_response.data if menus_response.data else []
+
+        formatted_menus = []
+        for menu in menus:
+            formatted_menus.append({
+                "id": menu["id"],
+                "name": menu["name"],
+                "type_id": menu["type_id"],
+                "price": menu["price"],
+                "image": menu["image"],
+                "status_id": menu["status_id"]
+            })
+
+        # Fetch menu items
+        menu_items_response = supabase_anon.table("menu_item") \
+            .select("id, menu_id, item_id, quantity, unit_id") \
+            .execute()
+        menu_items = menu_items_response.data if menu_items_response.data else []
+
+        formatted_menu_items = []
+        for menu_item in menu_items:
+            formatted_menu_items.append({
+                "id": menu_item["id"],
+                "menu_id": menu_item["menu_id"],
+                "item_id": menu_item["item_id"],
+                "quantity": menu_item["quantity"],
+                "unit_id": menu_item["unit_id"]
+            })
 
         return Response({
             "employees": employees,
@@ -1036,7 +1088,13 @@ def fetch_item_data(request):
             "inventory": formatted_inventory,
             "receipts": formatted_receipts,
             "disposalreason": reason_disposal,
+            "menu_types": menu_types,
+            "menu_statuses": menu_statuses,
+            "menu_categories":menu_categories,
+            "menus": formatted_menus,
+            "menu_items": formatted_menu_items,
         })
+    
     except Exception as e:
         return Response({"error": str(e)}, status=500)
 
@@ -1670,3 +1728,97 @@ def dispose_item(request):
     
     except Exception as e:
         return Response({"error": f"Unexpected error: {e}"}, status=500)
+
+
+@api_view(['POST'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def add_menu_item(request):
+    """
+    Handles adding a new menu item, including uploading the image to Supabase Storage
+    and storing the details in the Menu table.
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        data = json.loads(request.body)
+        name = data.get("name")
+        type_id = data.get("type_id")
+        category_id = data.get("category_id")
+        price = data.get("price")
+        image = request.FILES.get("image")
+        status_id = data.get("status_id")
+
+        # Validate the required fields
+        if not name or not type_id or not price or not status_id or not image:
+            return Response({"error": "All fields (name, type_id, price, image) are required."}, status=400)
+        
+        # Get the MIME type of the uploaded image
+        mime_type = image.content_type  # 'image/png', 'image/jpeg', etc.
+        ext = mimetypes.guess_extension(mime_type)  # Returns '.png', '.jpeg', etc.
+
+        # Handle image upload to Supabase Storage
+        image_filename = f"menu_images/{uuid.uuid4()}{ext}"
+        image_data = image.read() # Read the image file contents
+
+        # Upload image to Supabase Storage
+        storage_response = supabase_client.storage.from_("menu-images").upload(image_filename, image_data, {
+            "Content-Type": mime_type,
+        })
+
+        if storage_response.error:
+            return Response({"error": "Failed to upload image to Supabase."}, status=500)
+        
+        menu_response = supabase_client.table("menu").insert({
+            "name": name,
+            "type_id": type_id,
+            "price": price,
+            "image": image_filename,
+            "status_id": status_id,
+            "category_id": category_id,
+        }).execute()
+
+        if menu_response.error:
+            return Response({"error": "Failed to add menu item"}, status=500)
+        
+        # Get the newly created menu ID
+        menu_id = menu_response.data[0].get("id")
+        if not menu_id:
+            return Response({"error": "Menu ID not returned."}, status=500)
+        
+        # Handle adding menu items
+        menu_items = data.get("menu_items", [])
+        if not menu_items:
+            return Response({"error": "At least one menu item must be provided."}, status=400)
+
+        for item in menu_items:
+            item_id = item.get("item_id")
+            quantity = item.get("quantity")
+            unit_id = item.get("unit_id")
+
+            # Validate menu item fields
+            if not item_id or not quantity or not unit_id:
+                return Response({"error": "All fields (item_id, quantity, unit_id) are required for each menu item."}, status=400)
+
+            try:
+                quantity = float(quantity)
+            except Exception:
+                return Response({"error": "Invalid quantity format."}, status=400)
+
+            # Insert the Menu_Item record
+            menu_item_response = supabase_client.table("menu_item").insert({
+                "menu_id": menu_id,
+                "item_id": item_id,
+                "quantity": quantity,
+                "unit_id": unit_id,
+            }).execute()
+
+            if menu_item_response.error:
+                return Response({"error": f"Failed to add menu item for item_id {item_id}."}, status=500)
+
+        return Response({"message": "Menu and menu items added successfully."}, status=201)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)

@@ -42,7 +42,8 @@ const NewItem = ({ isOpen, closeModal, fetchItemData, categories, units }) => {
         return;
       }
       // Create a new inventory record for the new item with initial quantity 0.
-      await axios.post("http://127.0.0.1:8000/add-inventory/", 
+      await axios.post(
+        "http://127.0.0.1:8000/add-inventory/",
         {
           item: newItem.id,
           quantity: 0,

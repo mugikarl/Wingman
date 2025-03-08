@@ -15,7 +15,7 @@ const Items = () => {
   const [units, setUnits] = useState([]);
   const [categories, setCategories] = useState([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  
+
   const [selectedItem, setSelectedItem] = useState(null); // State to track selected item
 
   const openModal = () => setIsModalOpen(true);
@@ -31,7 +31,6 @@ const Items = () => {
   //     navigate("/dashboard-admin/items", { replace: true });
   //   }
   // }, [role, navigate]);
-
 
   const openEditModal = (item) => {
     setSelectedItem(item); // Set the selected item
@@ -81,7 +80,7 @@ const Items = () => {
                 <span className="flex-1 text-left pl-3">Inventory</span>
               </button>
             </Link>
-          
+
             {/* Items Button (Admin Only) */}
             {role === "Admin" && (
               <Link to="/dashboard-admin/items">
@@ -99,21 +98,20 @@ const Items = () => {
                 </button>
               </Link>
             )}
-          {role === "Admin" && (
-                      <Link to="/dashboard-admin/menu">
-                      <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
-                      <div className="flex items-center justify-center bg-[#D87A03] p-3">
-                      
-                          <img
-                            src="/images/restaurant.png"
-                            alt="Stock In"
-                            className="w-6 h-6"
-                          />
-                          </div>
-                          <span className="flex-1 text-left pl-3">Menu</span>
-                        </button>
-                      </Link>
-                    )}
+            {role === "Admin" && (
+              <Link to="/dashboard-admin/menu">
+                <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
+                  <div className="flex items-center justify-center bg-[#D87A03] p-3">
+                    <img
+                      src="/images/restaurant.png"
+                      alt="Stock In"
+                      className="w-6 h-6"
+                    />
+                  </div>
+                  <span className="flex-1 text-left pl-3">Menu</span>
+                </button>
+              </Link>
+            )}
             {/* Stock In Button */}
             <Link to="/stockin">
               <button className="flex items-center bg-gradient-to-r from-[#009E2A] to-[#00BA34] text-white rounded-md shadow-md hover:from-[#008C25] hover:to-[#009E2A] transition-colors duration-200 w-48 overflow-hidden">
@@ -129,7 +127,7 @@ const Items = () => {
                 <span className="flex-1 text-left pl-3">Stock In</span>
               </button>
             </Link>
-          
+
             {/* Disposed Button */}
             <Link to="/stockout">
               <button className="flex items-center bg-gradient-to-r from-[#E60000] to-[#FF0000] text-white rounded-md shadow-md hover:from-[#CC0000] hover:to-[#E60000] transition-colors duration-200 w-48 overflow-hidden">
@@ -147,42 +145,47 @@ const Items = () => {
             </Link>
           </div>
           <div className="w-full">
-            <div className="flex items-center justify-between space-x-2 mb-4">
-              <input
-                type="text"
-                placeholder="Search..."
-                className="w-1/2 p-2 border rounded-lg shadow"
-              />
-              <button
-                 onClick={openModal}
-                 className="flex items-center bg-gradient-to-r from-[#1c4686] to-[#2a5ca7] text-white rounded-md shadow-md hover:from-[#163a6f] hover:to-[#1c4686] transition-colors duration-200 w-48 overflow-hidden"
-               >
-                 {/* Darker Left Section for Icon */}
-                 <div className="flex items-center justify-center bg-[#1c4686] p-3">
-                   <img
-                     src="/images/groceries.png"
-                     alt="New Item"
-                     className="w-6 h-6"
-                   />
-                 </div>
-                 {/* Text Aligned Left in Normal Color Section */}
-                 <span className="flex-1 text-left pl-3">New Item</span>
-               </button>
+            <div className="flex justify-between items-center w-full space-x-4">
+              <div className="flex w-[400px]">
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="flex-grow p-2 border rounded-lg shadow"
+                />
+              </div>
+              <div className="">
+                <button
+                  onClick={openModal}
+                  className="flex items-center bg-gradient-to-r from-[#1c4686] to-[#2a5ca7] text-white rounded-md shadow-md hover:from-[#163a6f] hover:to-[#1c4686] transition-colors duration-200 w-48 overflow-hidden"
+                >
+                  {/* Darker Left Section for Icon */}
+                  <div className="flex items-center justify-center bg-[#1c4686] p-3">
+                    <img
+                      src="/images/groceries.png"
+                      alt="New Item"
+                      className="w-6 h-6"
+                    />
+                  </div>
+                  {/* Text Aligned Left in Normal Color Section */}
+                  <span className="flex-1 text-left pl-3">New Item</span>
+                </button>
+              </div>
             </div>
-
+          </div>
+          <div className="w-full">
             <div className="flex justify-between items-center w-full">
               <div className="flex space-x-4">
                 <button className="flex items-center justify-center bg-blue-500 text-white p-2 rounded-lg shadow min-w-[12%]">
-                  Button
+                  Meat
                 </button>
                 <button className="flex items-center justify-center bg-green-500 text-white p-2 rounded-lg shadow min-w-[12%]">
-                  Button 2
+                  Beverages
                 </button>
                 <button className="flex items-center justify-center bg-yellow-500 text-white p-2 rounded-lg shadow min-w-[11%]">
-                  Button 3
+                  Spices
                 </button>
                 <button className="flex items-center justify-center bg-red-500 text-white p-2 rounded-lg shadow min-w-[11%]">
-                  Button 4
+                  Blabla
                 </button>
               </div>
               {/* New Category button */}
@@ -213,14 +216,16 @@ const Items = () => {
               : items.map((item) => {
                   // Find the corresponding unit (measurement) and category for each item
                   const unit = units.find((u) => u.id === item.measurement);
-                  const category = categories.find((c) => c.id === item.category);
+                  const category = categories.find(
+                    (c) => c.id === item.category
+                  );
 
                   return [
                     item.id,
                     item.name,
                     unit ? unit.symbol : "", // Display the unit symbol
                     category ? category.name : "", // Display the category name
-                    item.stock_trigger
+                    item.stock_trigger,
                   ];
                 })
           }
@@ -244,10 +249,10 @@ const Items = () => {
           categories={categories}
         />
         <NewCategory
-           isOpen={isCategoryModalOpen}
-           closeModal={closeCategoryModal}
-           fetchItemData={fetchItemData}
-           categories={categories} 
+          isOpen={isCategoryModalOpen}
+          closeModal={closeCategoryModal}
+          fetchItemData={fetchItemData}
+          categories={categories}
         />
       </div>
     </div>

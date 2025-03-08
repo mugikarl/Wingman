@@ -16,18 +16,14 @@ module.exports = {
   // ...
   variants: {
     extend: {
-      backgroundColor: ['even'],
-    }
+      backgroundColor: ["even"],
+    },
   },
-}
+};
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {},
   },
   plugins: [],
-}
-
+};

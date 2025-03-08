@@ -7,7 +7,9 @@ const Table = ({ columns, data, rowOnClick }) => {
         <thead className="bg-[#FFCF03] font-bold">
           <tr>
             {columns.map((column, index) => (
-              <th key={index} className="p-2">{column}</th>
+              <th key={index} className="p-2">
+                {column}
+              </th>
             ))}
           </tr>
         </thead>
@@ -17,10 +19,12 @@ const Table = ({ columns, data, rowOnClick }) => {
               <tr
                 key={rowIndex}
                 className="bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
-                onClick={() => rowOnClick && rowOnClick(rowIndex)} 
+                onClick={() => rowOnClick && rowOnClick(rowIndex)}
               >
                 {row.map((cell, cellIndex) => (
-                  <td key={cellIndex} className="p-2">{cell}</td>
+                  <td key={cellIndex} className="p-2">
+                    {cell}
+                  </td>
                 ))}
               </tr>
             ))

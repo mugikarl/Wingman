@@ -96,13 +96,36 @@ const customTheme = {
 };
 
 const StockOut = () => {
-  const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
+  const [selectedDate, setSelectedDate] = useState(
+    getLocalDateString(new Date())
+  );
   const [showDatepicker, setShowDatepicker] = useState(false);
   const role = localStorage.getItem("role");
   const [data, setData] = useState([
-    { id: 1, itemName: "Item 1", disposer: "User A", unit: "pcs", disposed: 10, reason: "Expired" },
-    { id: 2, itemName: "Item 2", disposer: "User B", unit: "kg", disposed: 15, reason: "Damaged" },
-    { id: 3, itemName: "Item 3", disposer: "User C", unit: "liters", disposed: 20, reason: "Obsolete" },
+    {
+      id: 1,
+      itemName: "Item 1",
+      disposer: "User A",
+      unit: "pcs",
+      disposed: 10,
+      reason: "Expired",
+    },
+    {
+      id: 2,
+      itemName: "Item 2",
+      disposer: "User B",
+      unit: "kg",
+      disposed: 15,
+      reason: "Damaged",
+    },
+    {
+      id: 3,
+      itemName: "Item 3",
+      disposer: "User C",
+      unit: "liters",
+      disposed: 20,
+      reason: "Obsolete",
+    },
   ]);
 
   const totalValues = data.reduce(
@@ -129,7 +152,7 @@ const StockOut = () => {
   };
 
   return (
-    <div className="p-4 mx-auto">
+    <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
       <div className="flex justify-between mb-4">
         <div className="flex space-x-4">
           {/* Inventory Button */}
@@ -147,7 +170,7 @@ const StockOut = () => {
               <span className="flex-1 text-left pl-3">Inventory</span>
             </button>
           </Link>
-        
+
           {/* Items Button (Admin Only) */}
           {role === "Admin" && (
             <Link to="/dashboard-admin/items">
@@ -165,21 +188,20 @@ const StockOut = () => {
               </button>
             </Link>
           )}
-        {role === "Admin" && (
-                    <Link to="/dashboard-admin/menu">
-                    <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
-                    <div className="flex items-center justify-center bg-[#D87A03] p-3">
-                    
-                        <img
-                          src="/images/restaurant.png"
-                          alt="Stock In"
-                          className="w-6 h-6"
-                        />
-                        </div>
-                        <span className="flex-1 text-left pl-3">Menu</span>
-                      </button>
-                    </Link>
-                  )}
+          {role === "Admin" && (
+            <Link to="/dashboard-admin/menu">
+              <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
+                <div className="flex items-center justify-center bg-[#D87A03] p-3">
+                  <img
+                    src="/images/restaurant.png"
+                    alt="Stock In"
+                    className="w-6 h-6"
+                  />
+                </div>
+                <span className="flex-1 text-left pl-3">Menu</span>
+              </button>
+            </Link>
+          )}
           {/* Stock In Button */}
           <Link to="/stockin">
             <button className="flex items-center bg-gradient-to-r from-[#009E2A] to-[#00BA34] text-white rounded-md shadow-md hover:from-[#008C25] hover:to-[#009E2A] transition-colors duration-200 w-48 overflow-hidden">
@@ -195,7 +217,7 @@ const StockOut = () => {
               <span className="flex-1 text-left pl-3">Stock In</span>
             </button>
           </Link>
-        
+
           {/* Disposed Button */}
           <Link to="/stockout">
             <button className="flex items-center bg-gradient-to-r from-[#E60000] to-[#FF0000] text-white rounded-md shadow-md hover:from-[#CC0000] hover:to-[#E60000] transition-colors duration-200 w-48 overflow-hidden">
@@ -262,8 +284,6 @@ const StockOut = () => {
         )}
       </div>
 
-   
-
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse bg-white text-black rounded-lg shadow-md">
@@ -295,7 +315,6 @@ const StockOut = () => {
                 <td className="p-2">{row.reason}</td>
               </tr>
             ))}
-            
           </tbody>
         </table>
       </div>

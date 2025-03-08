@@ -1,20 +1,39 @@
 import React from "react";
 
-const ItemBox = ({ item, onClick }) => {
+const ItemBox = ({
+  item,
+  image,
+  name,
+  price,
+  currency = "₱",
+  inStock = true,
+  onClick,
+}) => {
   return (
     <div
-      className="p-4 bg-[#E2D6D5] rounded-lg shadow cursor-pointer flex flex-col justify-between"
-      onClick={() => onClick(item)}
+      className="w-full max-w-xs rounded-lg overflow-hidden shadow-md bg-white hover:shadow-lg transition-shadow duration-300"
+      onClick={onClick}
     >
-      <img
-        src="/images/chicken.jpg"
-        alt={item.name}
-        className="w-full object-cover mb-2"
-      />
-      <div className="text-center font-bold mb-2">{item.name}</div>
-      <div className="flex justify-between">
-        <span className="text-sm text-gray-700">Left Text</span>
-        <span className="text-sm text-gray-700">Right Text</span>
+      <div className="relative">
+        <img
+          src={image || "/placeholder.svg"}
+          alt={name}
+          className="w-full h-48 object-cover"
+        />
+      </div>
+      <div className="p-4">
+        <h3 className="text-lg font-medium text-gray-900">{name}</h3>
+        <div className="flex justify-between items-center mt-2">
+          <p className="text-gray-900 font-bold">
+            {currency}
+            {price}
+          </p>
+          <span
+            className={`text-sm ${inStock ? "text-green-500" : "text-red-500"}`}
+          >
+            {inStock ? "In Stock" : "Out of Stock"}
+          </span>
+        </div>
       </div>
     </div>
   );

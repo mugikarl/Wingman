@@ -1,59 +1,121 @@
 import React, { useState } from "react";
+import axios from "axios";
 
-const NewMenuModal = ({ onClose, onSave }) => {
-  // State for image upload
+const NewMenuModal = ({
+  onClose,
+  onSave,
+  categories,
+  menuTypes,
+  items,
+  units,
+}) => {
+  // State for form data
   const [image, setImage] = useState(null);
   const [itemName, setItemName] = useState("");
-  const [isAvailable, setIsAvailable] = useState(true);
   const [price, setPrice] = useState("");
-  const [category, setCategory] = useState("");
-  const [recipeInputs, setRecipeInputs] = useState(["", "", ""]);
-  const [recipes, setRecipes] = useState([]);
+  const [categoryId, setCategoryId] = useState(""); // For category dropdown
+  const [typeId, setTypeId] = useState(""); // For type dropdown
+  const [isAvailable, setIsAvailable] = useState(true);
+
+  // State for recipe data (storing added recipes)
+  const [recipes, setRecipes] = useState([]); // Stores added recipes with item, quantity, and unit_id
+  const [currentRecipe, setCurrentRecipe] = useState({
+    item_id: "",
+    quantity: "",
+    unit_id: "",
+  });
 
   // Handle image upload
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result);
-      };
-      reader.readAsDataURL(file);
+      setImage(file); // Set the selected image file
     }
   };
 
-  // Handle recipe input change
-  const handleRecipeInputChange = (index, value) => {
-    const newInputs = [...recipeInputs];
-    newInputs[index] = value;
-    setRecipeInputs(newInputs);
-  };
-
-  // Add recipe
-  const addRecipe = () => {
-    if (recipeInputs.some((input) => input.trim() === "")) return; // Ensure all fields are filled
-    setRecipes([...recipes, recipeInputs.join(", ")]);
-    setRecipeInputs(["", "", ""]); // Reset inputs
-  };
-
-  // Delete recipe
-  const deleteRecipe = (index) => {
-    const newRecipes = recipes.filter((_, i) => i !== index);
-    setRecipes(newRecipes);
-  };
-
   // Handle save
-  const handleSave = () => {
-    const newItem = {
-      image,
-      name: itemName,
-      price: parseFloat(price),
-      category,
-      recipes,
-      status: isAvailable ? "Available" : "Unavailable",
+  const handleSave = async () => {
+    if (
+      !itemName ||
+      !price ||
+      !categoryId ||
+      !typeId ||
+      !image ||
+      recipes.length === 0
+    ) {
+      alert("Please fill in all fields.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("image", image); // Append the image file
+    formData.append("name", itemName);
+    formData.append("price", price);
+    formData.append("category_id", categoryId); // Category ID
+    formData.append("type_id", typeId); // Type ID
+    formData.append("status_id", isAvailable ? "1" : "2");
+
+    // Add selected recipes to form data
+    formData.append("menu_items", JSON.stringify(recipes));
+
+    const token = localStorage.getItem("access_token");
+
+    try {
+      const response = await axios.post(
+        "http://127.0.0.1:8000/add-menu/",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data", // Important for handling file uploads
+          },
+        }
+      );
+
+      console.log("Menu item added:", response.data);
+      onSave(response.data); // Pass the new item to the parent component
+      onClose();
+    } catch (error) {
+      console.error("Error saving menu item:", error.response?.data || error);
+      alert("Failed to add menu item.");
+    }
+  };
+
+  // Handle recipe addition (item, quantity, and unit of measurement)
+  const handleAddRecipe = () => {
+    if (!currentRecipe.quantity || !currentRecipe.unit_id) {
+      alert("Please enter valid quantity and unit of measurement.");
+      return;
+    }
+
+    // Find the unit symbol using the unit_id
+    const selectedUnit = units.find(
+      (unit) => unit.id === parseInt(currentRecipe.unit_id)
+    );
+
+    const newRecipe = {
+      item_id: currentRecipe.item_id,
+      item_name: items.find(
+        (item) => item.id === parseInt(currentRecipe.item_id)
+      ).name,
+      quantity: currentRecipe.quantity,
+      unit: selectedUnit ? selectedUnit.symbol : "", // Store the unit symbol instead of unit_id
     };
-    onSave(newItem); // Pass the new item to the parent component
-    onClose(); // Close the modal
+
+    setRecipes([...recipes, newRecipe]);
+
+    // Reset the current recipe state after adding
+    setCurrentRecipe({
+      item_id: "",
+      quantity: "",
+      unit_id: "",
+    });
+  };
+
+  // Handle recipe deletion
+  const handleDeleteRecipe = (index) => {
+    const updatedRecipes = recipes.filter((_, i) => i !== index);
+    setRecipes(updatedRecipes);
   };
 
   return (
@@ -62,7 +124,10 @@ const NewMenuModal = ({ onClose, onSave }) => {
         {/* Modal Header */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">New Menu</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
             &times;
           </button>
         </div>
@@ -75,15 +140,12 @@ const NewMenuModal = ({ onClose, onSave }) => {
             <div className="h-64 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center mb-4">
               {image ? (
                 <img
-                  src={image}
+                  src={URL.createObjectURL(image)} // Preview the selected image
                   alt="Uploaded"
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <>
-                  <span className="text-4xl">📷</span>
-                  <span className="text-gray-500">Add Photo</span>
-                </>
+                <span className="text-4xl">📷</span>
               )}
               <input
                 type="file"
@@ -156,62 +218,136 @@ const NewMenuModal = ({ onClose, onSave }) => {
               />
             </div>
 
-            {/* Category */}
+            {/* Category Dropdown */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700">
                 Category
               </label>
               <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
                 className="mt-1 p-2 border rounded-lg w-full"
               >
                 <option value="">Select Category</option>
-                <option value="Ala Carte">Ala Carte</option>
-                <option value="Combo">Combo</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
               </select>
             </div>
 
-            {/* Recipe */}
+            {/* Type Dropdown */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700">
-                Recipe
+                Menu Type
               </label>
-              <div className="flex space-x-2">
-                {recipeInputs.map((input, index) => (
-                  <input
-                    key={index}
-                    type="text"
-                    value={input}
-                    onChange={(e) =>
-                      handleRecipeInputChange(index, e.target.value)
-                    }
-                    className="mt-1 p-2 border rounded-lg w-full"
-                    placeholder={`Ingredient ${index + 1}`}
-                  />
-                ))}
-              </div>
-              <button
-                onClick={addRecipe}
-                className="bg-[#209528] text-white px-4 py-2 rounded-lg mt-2"
+              <select
+                value={typeId}
+                onChange={(e) => setTypeId(e.target.value)}
+                className="mt-1 p-2 border rounded-lg w-full"
               >
-                Add Recipe
-              </button>
+                <option value="">Select Type</option>
+                {menuTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {/* Display Recipes */}
-            <div className="mb-4">
-              {recipes.map((recipe, index) => (
-                <div key={index} className="flex justify-between items-center mb-2">
-                  <span>{recipe}</span>
-                  <button
-                    onClick={() => deleteRecipe(index)}
-                    className="text-red-500"
+            {/* Recipes (Menu Items) */}
+            <div className="mb-4 max-h-[300px] overflow-y-auto">
+              <label className="block text-sm font-medium text-gray-700">
+                Recipe (Select Items)
+              </label>
+              <div className="grid grid-cols-3 gap-4">
+                {/* ITEM */}
+                <div>
+                  <select
+                    className="p-2 border rounded-lg w-full"
+                    value={currentRecipe.item_id}
+                    onChange={(e) =>
+                      setCurrentRecipe({
+                        ...currentRecipe,
+                        item_id: e.target.value,
+                      })
+                    }
                   >
-                    Delete
-                  </button>
+                    <option value="">Select Item</option>
+                    {items.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              ))}
+
+                {/* QUANTITY */}
+                <div>
+                  <input
+                    type="number"
+                    className="p-2 border rounded-lg w-full"
+                    value={currentRecipe.quantity}
+                    onChange={(e) =>
+                      setCurrentRecipe({
+                        ...currentRecipe,
+                        quantity: e.target.value,
+                      })
+                    }
+                    placeholder="Quantity"
+                  />
+                </div>
+
+                {/* UM (Unit of Measurement) */}
+                <div>
+                  <select
+                    className="p-2 border rounded-lg w-full"
+                    value={currentRecipe.unit_id}
+                    onChange={(e) =>
+                      setCurrentRecipe({
+                        ...currentRecipe,
+                        unit_id: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Select UM</option>
+                    {units.map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        {unit.symbol}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* ADD BUTTON */}
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={handleAddRecipe}
+                  className="bg-green-500 text-white px-4 py-2 rounded-lg"
+                >
+                  Add Recipe
+                </button>
+              </div>
+
+              {/* Display Added Recipes */}
+              <div className="mt-4">
+                {recipes.map((recipe, index) => (
+                  <div key={index} className="flex items-center mb-2">
+                    <span className="mr-2">{recipe.item_name}</span>
+                    <span className="mr-2">{recipe.quantity}</span>
+                    <span className="mr-2">{recipe.unit}</span>{" "}
+                    {/* Use unit instead of unit_id */}
+                    <button
+                      onClick={() => handleDeleteRecipe(index)}
+                      className="text-red-500 ml-2"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
