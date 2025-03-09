@@ -2,12 +2,20 @@ import React, { useState } from "react";
 import axios from "axios";
 import Table from "../../components/tables/Table";
 
-const AddStockInDetails = ({ isOpen, onClose, unitMeasurements, fetchReceipts, items, inventory }) => {
+const AddStockInDetails = ({
+  isOpen,
+  onClose,
+  unitMeasurements,
+  fetchReceipts,
+  items,
+  inventory,
+  suppliers, // New prop for suppliers
+}) => {
   if (!isOpen) return null;
-  
+
   const [newStockIn, setNewStockIn] = useState({
     receipt_no: "",
-    supplier_name: "",
+    supplier_id: "", // Changed from supplier_name to supplier_id
     date: "",
     stock_ins: [],
   });
@@ -50,7 +58,6 @@ const AddStockInDetails = ({ isOpen, onClose, unitMeasurements, fetchReceipts, i
     }
   };
 
-  
   const handleAddEntry = () => {
     if (
       !newEntry.item_id ||
@@ -61,29 +68,26 @@ const AddStockInDetails = ({ isOpen, onClose, unitMeasurements, fetchReceipts, i
       alert("Please fill in all fields");
       return;
     }
-    
-    // Lookup the inventory record based on the selected item_id
+
     const selectedInventory = inventory.find(
       (inv) => Number(inv.item) === Number(newEntry.item_id)
     );
-    
+
     if (!selectedInventory) {
       alert("No inventory record found for the selected item.");
       return;
     }
-    
-    // Create payload entry (object) for submission
+
     const entryPayload = {
       inventory_id: selectedInventory.id,
       item_id: newEntry.item_id,
       quantity_in: parseFloat(newEntry.quantity),
       price: parseFloat(newEntry.cost),
     };
-    
-    // Create display row for the table
-    const itemName = items.find(
-      (item) => Number(item.id) === Number(newEntry.item_id)
-    )?.name || "Unknown Item";
+
+    const itemName =
+      items.find((item) => Number(item.id) === Number(newEntry.item_id))
+        ?.name || "Unknown Item";
     const totalCost = parseFloat(newEntry.quantity) * parseFloat(newEntry.cost);
     const displayRow = [
       stockInPayload.length + 1,
@@ -93,14 +97,12 @@ const AddStockInDetails = ({ isOpen, onClose, unitMeasurements, fetchReceipts, i
       newEntry.quantity,
       totalCost,
     ];
-    
-    // Update both states
+
     setStockInPayload([...stockInPayload, entryPayload]);
     setStockInRows([...stockInRows, displayRow]);
     setNewEntry({ item_id: "", unit: "", quantity: "", cost: "" });
   };
 
-  // Called when the user is done entering receipt details
   const handleAddReceipt = () => {
     setNewStockIn((prev) => ({ ...prev, stock_ins: stockInData }));
     setReceiptAdded(true);
@@ -111,13 +113,13 @@ const AddStockInDetails = ({ isOpen, onClose, unitMeasurements, fetchReceipts, i
       ...newStockIn,
       stock_ins: stockInPayload,
     };
-  
+
     console.log("Submitting payload:", payload);
     setLoading(true);
     try {
       const response = await axios.post(
         "http://127.0.0.1:8000/add-stockin-data/",
-        payload // set of item arrays
+        payload
       );
       console.log("Response:", response.data);
       fetchReceipts();
@@ -147,7 +149,7 @@ const AddStockInDetails = ({ isOpen, onClose, unitMeasurements, fetchReceipts, i
 
         <h2 className="text-xl font-bold mb-4">Add Stock In</h2>
 
-        {/* Receipt details are always visible */}
+        {/* Receipt Details */}
         <div className="flex space-x-4 mb-6">
           <input
             type="text"
@@ -158,15 +160,21 @@ const AddStockInDetails = ({ isOpen, onClose, unitMeasurements, fetchReceipts, i
             disabled={receiptAdded}
             className="p-2 border rounded-lg shadow w-1/4"
           />
-          <input
-            type="text"
-            name="supplier_name"
-            placeholder="Supplier Name"
-            value={newStockIn.supplier_name}
+          {/* Supplier dropdown instead of textbox */}
+          <select
+            name="supplier_id" // Using supplier_id
+            value={newStockIn.supplier_id || ""}
             onChange={handleChange}
             disabled={receiptAdded}
             className="p-2 border rounded-lg shadow w-1/4"
-          />
+          >
+            <option value="">Select Supplier</option>
+            {(suppliers || []).map((supplier) => (
+              <option key={supplier.id} value={supplier.id}>
+                {supplier.name}
+              </option>
+            ))}
+          </select>
           <input
             type="date"
             name="date"
@@ -175,7 +183,6 @@ const AddStockInDetails = ({ isOpen, onClose, unitMeasurements, fetchReceipts, i
             disabled={receiptAdded}
             className="p-2 border rounded-lg shadow w-1/4"
           />
-          {/* Show "Add Receipt" button only if receipt has not been added */}
           {!receiptAdded && (
             <button
               onClick={handleAddReceipt}
@@ -186,7 +193,7 @@ const AddStockInDetails = ({ isOpen, onClose, unitMeasurements, fetchReceipts, i
           )}
         </div>
 
-        {/* Once the receipt is added, show the stock entry form */}
+        {/* Stock Entry Form */}
         {receiptAdded && (
           <div className="">
             <div className="flex flex-wrap mb-4 gap-4">
