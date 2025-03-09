@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import NewMenuModal from "../../components/popups/NewMenuModal";
 import EditMenuModal from "../../components/popups/EditMenuModal"; // Import the EditMenuModal
+import ItemBox from "../../components/tables/ItemBox"; // Import the updated ItemBox
 
 const Menu = () => {
   const role = localStorage.getItem("role");
@@ -13,7 +14,7 @@ const Menu = () => {
   const [selectedItem, setSelectedItem] = useState(null);
 
   // State to store menu items, categories, and types
-  const [items, setItems] = useState([]);
+  const [menuItems, setMenuItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [menuTypes, setMenuTypes] = useState([]);
   const [units, setUnits] = useState([]);
@@ -31,10 +32,11 @@ const Menu = () => {
             },
           }
         );
-        setItems(response.data.items || []);
         setCategories(response.data.menu_categories || []);
         setMenuTypes(response.data.menu_types || []);
         setUnits(response.data.units || []);
+        setMenuItems(response.data.menus || []);
+        console.log("Fetched menu items:", response.data.menus);
       } catch (error) {
         console.error("Error fetching menus:", error);
       }
@@ -56,33 +58,6 @@ const Menu = () => {
     setMenuItems(updatedItems);
   };
 
-  // Dummy component for item boxes
-  const ItemBox = ({ item, onClick }) => {
-    return (
-      <div
-        className="bg-white shadow p-4 rounded-lg flex flex-col items-center cursor-pointer w-60 h-64"
-        onClick={() => onClick(item)}
-      >
-        {/* Image (50% height of the ItemBox) */}
-        <div className="w-full h-32 flex items-center justify-center mb-2">
-          {" "}
-          {/* 50% of h-64 */}
-          <img
-            src={item.image || "../../images/chicken.jpg"}
-            alt={item.name}
-            className="w-full h-full object-cover rounded-md"
-          />
-        </div>
-
-        {/* Text (Left-aligned) */}
-        <div className="w-full text-left">
-          <p className="text-base font-medium">{item.name}</p>
-          <p className="text-sm text-gray-600">P{item.price}.00</p>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
       {/* Side Buttons with Image and Text (Moved Above Search Bar) */}
@@ -90,7 +65,6 @@ const Menu = () => {
         {/* Inventory Button */}
         <Link to="/inventory">
           <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
-            {/* Darker Left Section for Icon */}
             <div className="flex items-center justify-center bg-[#D87A03] p-3">
               <img
                 src="/images/stockout/trolley.png"
@@ -98,7 +72,6 @@ const Menu = () => {
                 className="w-6 h-6"
               />
             </div>
-            {/* Text Aligned Left in Normal Color Section */}
             <span className="flex-1 text-left pl-3">Inventory</span>
           </button>
         </Link>
@@ -107,7 +80,6 @@ const Menu = () => {
         {role === "Admin" && (
           <Link to="/dashboard-admin/items">
             <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
-              {/* Darker Left Section for Icon */}
               <div className="flex items-center justify-center bg-[#D87A03] p-3">
                 <img
                   src="/images/stockout/menu.png"
@@ -115,11 +87,11 @@ const Menu = () => {
                   className="w-6 h-6"
                 />
               </div>
-              {/* Text Aligned Left in Normal Color Section */}
               <span className="flex-1 text-left pl-3">Items</span>
             </button>
           </Link>
         )}
+
         {role === "Admin" && (
           <Link to="/dashboard-admin/menu">
             <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
@@ -134,10 +106,10 @@ const Menu = () => {
             </button>
           </Link>
         )}
+
         {/* Stock In Button */}
         <Link to="/stockin">
           <button className="flex items-center bg-gradient-to-r from-[#009E2A] to-[#00BA34] text-white rounded-md shadow-md hover:from-[#008C25] hover:to-[#009E2A] transition-colors duration-200 w-48 overflow-hidden">
-            {/* Darker Left Section for Icon */}
             <div className="flex items-center justify-center bg-[#009E2A] p-3">
               <img
                 src="/images/stockout/stock.png"
@@ -145,7 +117,6 @@ const Menu = () => {
                 className="w-6 h-6"
               />
             </div>
-            {/* Text Aligned Left in Normal Color Section */}
             <span className="flex-1 text-left pl-3">Stock In</span>
           </button>
         </Link>
@@ -153,7 +124,6 @@ const Menu = () => {
         {/* Disposed Button */}
         <Link to="/stockout">
           <button className="flex items-center bg-gradient-to-r from-[#E60000] to-[#FF0000] text-white rounded-md shadow-md hover:from-[#CC0000] hover:to-[#E60000] transition-colors duration-200 w-48 overflow-hidden">
-            {/* Darker Left Section for Icon */}
             <div className="flex items-center justify-center bg-[#E60000] p-3">
               <img
                 src="/images/stockout/trash-can.png"
@@ -161,16 +131,13 @@ const Menu = () => {
                 className="w-6 h-6"
               />
             </div>
-            {/* Text Aligned Left in Normal Color Section */}
             <span className="flex-1 text-left pl-3">Disposed</span>
           </button>
         </Link>
       </div>
-      <div className="flex justify-between items-start mb-2">
-        {/* Left Section: Search Bar and Scrollable Buttons */}
 
+      <div className="flex justify-between items-start mb-2">
         <div className="w-[400px]">
-          {/* Search Bar */}
           <input
             type="text"
             placeholder="Search "
@@ -178,55 +145,34 @@ const Menu = () => {
           />
         </div>
 
-        {/* Menu */}
+        {/* New Menu Button */}
         <button
           className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden"
           onClick={() => setIsModalOpen(true)}
         >
-          {/* Darker Left Section for Icon */}
           <div className="flex items-center justify-center bg-[#D87A03] p-3">
             <img
-              src="/images/menu (2).png" // Ensure correct image path
+              src="/images/menu (2).png"
               alt="New Menu"
               className="w-6 h-6"
             />
           </div>
-          {/* Text Aligned Left in Normal Color Section */}
           <span className="text-left pl-3">New Menu</span>
         </button>
       </div>
 
-      {/* Order, Foodpanda, Grab Buttons */}
-      <div className="flex space-x-4 mb-4">
-        {/* Order Button (Red) */}
-        <Link to="/dashboard-admin/menu">
-          <button className="flex items-start justify-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white p-3 rounded-lg shadow-lg w-48">
-            Order
-          </button>
-        </Link>
-
-        {/* Foodpanda Button (Pink with Custom Font) */}
-        <Link to="/dashboard-admin/fpmenu">
-          <button className="flex items-center justify-center bg-[#D70F64] text-white p-3 rounded-lg shadow-lg w-48">
-            Foodpanda
-          </button>
-        </Link>
-
-        {/* Grab Button (Green with Custom Font) */}
-        <Link to="/dashboard-admin/fpmenu">
-          <button className="flex items-center justify-center bg-[#00A650] text-white p-3 rounded-lg shadow-lg w-48">
-            Grab
-          </button>
-        </Link>
-      </div>
-
-      {/* Grid Layout for Images */}
-      <div className="grid grid-cols-5 gap-4 h-[calc(100vh-200px)] overflow-y-auto scrollbar scrollbar-thumb-gray-400 scrollbar-track-gray-200 scrollbar-thin">
-        {items.map((item, index) => (
+      {/* Grid Layout for Menu Items */}
+      <div className="max-w-xs">
+        {menuItems.map((item) => (
           <ItemBox
-            key={index}
-            item={item}
-            onClick={(item) => {
+            key={item.id} // Add key here, not in ItemBox
+            item={item} // Pass the item prop
+            image={item.image || "/placeholder.svg"}
+            name={item.name}
+            price={item.price}
+            currency="₱"
+            inStock={item.status_id}
+            onClick={() => {
               setSelectedItem(item);
               setIsEditModalOpen(true);
             }}
@@ -241,7 +187,6 @@ const Menu = () => {
           onSave={addMenuItem}
           categories={categories}
           menuTypes={menuTypes}
-          items={items}
           units={units}
         />
       )}

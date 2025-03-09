@@ -26,6 +26,7 @@ from django.utils.timezone import now
 from .utils.conversion import convert_value
 import uuid
 import  mimetypes
+from io import BytesIO
 
 #AUTHETICATE USER/ADMIN
 
@@ -903,7 +904,7 @@ def fetch_item_data(request):
     try:
         # Fetch units
         units_response = supabase_anon.table("unit_of_measurement") \
-            .select("id, symbol") \
+            .select("id, symbol, unit_category") \
             .execute()
         units = units_response.data if units_response.data else []
 
@@ -956,12 +957,20 @@ def fetch_item_data(request):
                     "category": item["item_category"].get("id"),
                     "quantity": inventory.get("quantity", 0)
                 })
+        
+        #Fetch suppliers
+
+        suppliers_response = supabase_anon.table("supplier") \
+            .select("id","name") \
+            .execute()
+        suppliers = suppliers_response.data if suppliers_response.data else []
+
         # Fetch receipts
         receipts_response = supabase_anon.table("receipts") \
-            .select("id, receipt_no, supplier_name, date") \
+            .select("id, receipt_no, supplier (id, name), date") \
             .execute()
         receipts = receipts_response.data if receipts_response.data else []
-	
+
         formatted_receipts = []
 
         for receipt in receipts:
@@ -985,7 +994,7 @@ def fetch_item_data(request):
                             .select("id, item, quantity") \
                             .eq("id", inventory_id) \
                             .execute()
-                        
+
                         if inventory_response.data:
                             inventory_details = inventory_response.data[0]
                             item_id = inventory_details.get("item")
@@ -995,7 +1004,7 @@ def fetch_item_data(request):
                                     .select("id, name, category, measurement, stock_trigger") \
                                     .eq("id", item_id) \
                                     .execute()
-                                
+
                                 item_details = item_response.data[0] if item_response.data else None
 
                     stockins_data.append({
@@ -1012,17 +1021,48 @@ def fetch_item_data(request):
             formatted_receipts.append({
                 "receipt_id": receipt["id"],
                 "receipt_no": receipt["receipt_no"],
-                "supplier_name": receipt["supplier_name"],
+                "supplier": receipt["supplier"]["name"] if receipt.get("supplier") else "",
                 "date": receipt["date"][:10],
                 "stock_ins": stockins_data
             })
 
         # Fetch employees
+        active_status_id = 1  # Adjust based on your actual "Active" status ID
+
         employees_response = supabase_anon.table("employee") \
-            .select("id, first_name, last_name") \
+            .select("id, first_name, last_name, status_id") \
+            .eq("status_id", active_status_id) \
             .execute()
+
         employees = employees_response.data if employees_response.data else []
 
+        # Fetch disposed inventory
+        # Fetch disposed inventory with related item details
+        disposed_inventory_response = supabase_anon.table("disposed_inventory") \
+            .select("id, inventory_id, disposed_quantity, disposed_unit(id, symbol), "
+                    "reason_id(id, name), disposer(id, first_name, last_name), disposal_datetime, other_reason, "
+                    "inventory(id, item, quantity, items(name))") \
+            .execute()
+
+        disposed_inventory = disposed_inventory_response.data if disposed_inventory_response.data else []
+
+        formatted_disposed_inventory = []
+        for disposal in disposed_inventory:
+            item_name = disposal.get("inventory", {}).get("items", {}).get("name", "Unknown Item")
+            
+            formatted_disposed_inventory.append({
+                "id": disposal.get("id"),
+                "inventory_id": disposal.get("inventory_id"),
+                "item_name": item_name,  # Include the item name
+                "disposed_quantity": disposal.get("disposed_quantity"),
+                "disposed_unit": disposal["disposed_unit"]["symbol"] if disposal.get("disposed_unit") else None,
+                "reason": disposal["reason_id"]["name"] if disposal.get("reason_id") else None,
+                "disposer": f"{disposal['disposer']['first_name']} {disposal['disposer']['last_name']}" if disposal.get("disposer") else "Unknown",
+                "disposal_datetime": disposal.get("disposal_datetime"),
+                "other_reason": disposal.get("other_reason")
+            })
+
+            
         # Fetch reasons of disposal
         reason_disposal_response = supabase_anon.table("reason_of_disposal") \
             .select("id, name") \
@@ -1086,7 +1126,9 @@ def fetch_item_data(request):
             "categories": categories,
             "items": formatted_items,
             "inventory": formatted_inventory,
+            "supplier": suppliers,
             "receipts": formatted_receipts,
+            "disposed_inventory": formatted_disposed_inventory,
             "disposalreason": reason_disposal,
             "menu_types": menu_types,
             "menu_statuses": menu_statuses,
@@ -1729,7 +1771,6 @@ def dispose_item(request):
     except Exception as e:
         return Response({"error": f"Unexpected error: {e}"}, status=500)
 
-
 @api_view(['POST'])
 @authentication_classes([SupabaseAuthentication])
 @permission_classes([SupabaseIsAdmin])
@@ -1743,34 +1784,30 @@ def add_menu_item(request):
         auth_data = authenticate_user(request)
         supabase_client = auth_data["client"]
 
-        data = json.loads(request.body)
-        name = data.get("name")
-        type_id = data.get("type_id")
-        category_id = data.get("category_id")
-        price = data.get("price")
-        image = request.FILES.get("image")
-        status_id = data.get("status_id")
+        # Access the data directly from request.data and request.FILES
+        name = request.data.get("name")
+        type_id = request.data.get("type_id")
+        category_id = request.data.get("category_id")
+        price = request.data.get("price")
+        status_id = request.data.get("status_id")
+        image = request.FILES.get("image")  # Access image from request.FILES
+
+        # Read the image data
+        image_data = image.read()
 
         # Validate the required fields
         if not name or not type_id or not price or not status_id or not image:
             return Response({"error": "All fields (name, type_id, price, image) are required."}, status=400)
-        
-        # Get the MIME type of the uploaded image
-        mime_type = image.content_type  # 'image/png', 'image/jpeg', etc.
-        ext = mimetypes.guess_extension(mime_type)  # Returns '.png', '.jpeg', etc.
 
         # Handle image upload to Supabase Storage
-        image_filename = f"menu_images/{uuid.uuid4()}{ext}"
-        image_data = image.read() # Read the image file contents
+        image_filename = f"menu_images/menu-{name}-{type_id}.jpeg"
+        storage_response = supabase_client.storage.from_("menu-images").upload(image_filename, image_data, {"content-type": "image.jpeg"})
 
-        # Upload image to Supabase Storage
-        storage_response = supabase_client.storage.from_("menu-images").upload(image_filename, image_data, {
-            "Content-Type": mime_type,
-        })
-
-        if storage_response.error:
+        # Check if an error occurred during the upload
+        if not storage_response:
             return Response({"error": "Failed to upload image to Supabase."}, status=500)
-        
+
+        # Insert menu details into the Menu table
         menu_response = supabase_client.table("menu").insert({
             "name": name,
             "type_id": type_id,
@@ -1780,20 +1817,42 @@ def add_menu_item(request):
             "category_id": category_id,
         }).execute()
 
-        if menu_response.error:
+        # Check for errors in the menu response
+        if hasattr(menu_response, 'error') and menu_response.error:
             return Response({"error": "Failed to add menu item"}, status=500)
-        
-        # Get the newly created menu ID
-        menu_id = menu_response.data[0].get("id")
-        if not menu_id:
-            return Response({"error": "Menu ID not returned."}, status=500)
-        
+
+        if not menu_response.data:
+            return Response({"error": "No data returned from the menu insert operation."}, status=500)
+
+        # Extract the menu ID from the response
+        try:
+            menu_id = menu_response.data[0]["id"]  # Access the 'id' field directly
+            if not menu_id:
+                return Response({"error": "Menu ID not returned."}, status=500)
+        except (IndexError, KeyError) as e:
+            return Response({"error": f"Failed to extract menu ID from response: {e}"}, status=500)
+
         # Handle adding menu items
-        menu_items = data.get("menu_items", [])
+        menu_items = request.data.get("menu_items", [])
         if not menu_items:
             return Response({"error": "At least one menu item must be provided."}, status=400)
 
+        # Parse menu_items if it's a JSON string
+        if isinstance(menu_items, str):
+            try:
+                menu_items = json.loads(menu_items)  # Convert JSON string to a list of dictionaries
+            except json.JSONDecodeError:
+                return Response({"error": "Invalid JSON format for menu_items."}, status=400)
+
+        # Ensure menu_items is a list
+        if not isinstance(menu_items, list):
+            return Response({"error": "menu_items must be a list of dictionaries."}, status=400)
+
         for item in menu_items:
+            # Ensure 'item' is a dictionary
+            if not isinstance(item, dict):
+                return Response({"error": "Each menu item must be a dictionary."}, status=400)
+
             item_id = item.get("item_id")
             quantity = item.get("quantity")
             unit_id = item.get("unit_id")
@@ -1815,10 +1874,11 @@ def add_menu_item(request):
                 "unit_id": unit_id,
             }).execute()
 
-            if menu_item_response.error:
+            # Check for errors in the menu item response
+            if hasattr(menu_item_response, 'error') and menu_item_response.error:
                 return Response({"error": f"Failed to add menu item for item_id {item_id}."}, status=500)
 
         return Response({"message": "Menu and menu items added successfully."}, status=201)
 
     except Exception as e:
-        return Response({"error": str(e)}, status=500)
+        return Response({"error": f"Unexpected error: {e}"}, status=500)

@@ -28,7 +28,9 @@ const NewMenuModal = ({
   // Handle image upload
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
+    console.log("Frontend file size:", file.size);
     if (file) {
+      console.log("Image file selected:", file);
       setImage(file); // Set the selected image file
     }
   };
@@ -55,8 +57,20 @@ const NewMenuModal = ({
     formData.append("type_id", typeId); // Type ID
     formData.append("status_id", isAvailable ? "1" : "2");
 
+    // Prepare menu_items payload (only include item_id, quantity, and unit_id)
+    const menuItemsPayload = recipes.map((recipe) => ({
+      item_id: recipe.item_id,
+      quantity: recipe.quantity,
+      unit_id: recipe.unit_id, // Ensure unit_id is passed here
+    }));
+
+    // Log the payload for debugging
+    console.log("Menu Items Payload:", menuItemsPayload); // Debugging log
+
     // Add selected recipes to form data
-    formData.append("menu_items", JSON.stringify(recipes));
+    formData.append("menu_items", JSON.stringify(menuItemsPayload));
+
+    console.log("FormData contents:", formData);
 
     const token = localStorage.getItem("access_token");
 
@@ -66,13 +80,13 @@ const NewMenuModal = ({
         formData,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${token}`, // Fixed the token string interpolation
             "Content-Type": "multipart/form-data", // Important for handling file uploads
           },
         }
       );
 
-      console.log("Menu item added:", response.data);
+      alert("Menu added successfully!");
       onSave(response.data); // Pass the new item to the parent component
       onClose();
     } catch (error) {
@@ -81,27 +95,40 @@ const NewMenuModal = ({
     }
   };
 
-  // Handle recipe addition (item, quantity, and unit of measurement)
   const handleAddRecipe = () => {
-    if (!currentRecipe.quantity || !currentRecipe.unit_id) {
-      alert("Please enter valid quantity and unit of measurement.");
+    // Check if item_id, quantity, and unit_id are set
+    if (
+      !currentRecipe.item_id ||
+      !currentRecipe.quantity ||
+      !currentRecipe.unit_id
+    ) {
+      alert("Please enter valid item, quantity, and unit of measurement.");
       return;
     }
 
-    // Find the unit symbol using the unit_id
+    // Find the item name for display purposes
+    const selectedItem = items.find(
+      (item) => item.id === parseInt(currentRecipe.item_id)
+    );
+
+    // Find the unit symbol for display purposes
     const selectedUnit = units.find(
       (unit) => unit.id === parseInt(currentRecipe.unit_id)
     );
 
+    // Check if unit_id is correctly set
+    console.log("Selected Unit ID:", currentRecipe.unit_id); // Debugging log
+
+    // Create the new recipe object
     const newRecipe = {
       item_id: currentRecipe.item_id,
-      item_name: items.find(
-        (item) => item.id === parseInt(currentRecipe.item_id)
-      ).name,
+      item_name: selectedItem ? selectedItem.name : "", // For display only
       quantity: currentRecipe.quantity,
-      unit: selectedUnit ? selectedUnit.symbol : "", // Store the unit symbol instead of unit_id
+      unit_id: currentRecipe.unit_id, // Ensure unit_id is part of the new recipe
+      unit: selectedUnit ? selectedUnit.symbol : "", // For display only
     };
 
+    // Add the new recipe to the recipes list
     setRecipes([...recipes, newRecipe]);
 
     // Reset the current recipe state after adding

@@ -6,12 +6,12 @@ const ItemBox = ({
   name,
   price,
   currency = "₱",
-  inStock = true,
+  inStock,
   onClick,
 }) => {
   return (
     <div
-      className="w-full max-w-xs rounded-lg overflow-hidden shadow-md bg-white hover:shadow-lg transition-shadow duration-300"
+      className="w-full max-w-xs rounded-lg overflow-hidden shadow-md bg-white hover:shadow-lg transition-shadow duration-300 cursor-pointer"
       onClick={onClick}
     >
       <div className="relative">
@@ -24,10 +24,10 @@ const ItemBox = ({
       <div className="p-4">
         <h3 className="text-lg font-medium text-gray-900">{name}</h3>
         <div className="flex justify-between items-center mt-2">
-          <p className="text-gray-900 font-bold">
-            {currency}
-            {price}
-          </p>
+          <div className="flex items-center">
+            <span className="text-gray-700">{currency}</span>
+            <p className="text-gray-900 font-bold ml-1">{price}</p>
+          </div>
           <span
             className={`text-sm ${inStock ? "text-green-500" : "text-red-500"}`}
           >
