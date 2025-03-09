@@ -11,19 +11,19 @@ const ItemBox = ({
 }) => {
   return (
     <div
-      className="w-full max-w-xs rounded-lg overflow-hidden shadow-md bg-white hover:shadow-lg transition-shadow duration-300 cursor-pointer"
+      className="w-48 h-full rounded-lg pb-3 overflow-hidden shadow-md bg-white hover:shadow-lg transition-shadow duration-300 cursor-pointer"
       onClick={onClick}
     >
-      <div className="relative">
+      <div className="px-3 pt-3">
         <img
           src={image || "/placeholder.svg"}
           alt={name}
-          className="w-full h-48 object-cover"
+          className="w-full h-32 shadow-md object-cover rounded-lg"
         />
       </div>
-      <div className="p-4">
-        <h3 className="text-lg font-medium text-gray-900">{name}</h3>
-        <div className="flex justify-between items-center mt-2">
+      <div className="px-3 pt-2">
+        <h3 className="text-base font-medium text-gray-900">{name}</h3>
+        <div className="flex justify-between items-center">
           <div className="flex items-center">
             <span className="text-gray-700">{currency}</span>
             <p className="text-gray-900 font-bold ml-1">{price}</p>

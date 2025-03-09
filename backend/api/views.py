@@ -1021,7 +1021,7 @@ def fetch_item_data(request):
             formatted_receipts.append({
                 "receipt_id": receipt["id"],
                 "receipt_no": receipt["receipt_no"],
-                "supplier_name": receipt["supplier_name"],
+                "supplier": receipt["supplier"],
                 "date": receipt["date"][:10],
                 "stock_ins": stockins_data
             })
@@ -1089,18 +1089,28 @@ def fetch_item_data(request):
 
         # Fetch menus
         menus_response = supabase_anon.table("menu") \
-            .select("id, name, type_id, price, image, status_id") \
+            .select("id, name, type_id, price, image, status_id, category_id") \
             .execute()
         menus = menus_response.data if menus_response.data else []
 
         formatted_menus = []
         for menu in menus:
+            # Generate a public URL for the image
+            image_url = None
+            if menu["image"]:
+                try:
+                    image_url = supabase_anon.storage.from_("menu-images").get_public_url(menu["image"])
+
+                except Exception as e:
+                    print(f"Error generating URL for image {menu['image']}: {e}")
+
             formatted_menus.append({
                 "id": menu["id"],
                 "name": menu["name"],
                 "type_id": menu["type_id"],
+                "category_id": menu["category_id"],
                 "price": menu["price"],
-                "image": menu["image"],
+                "image": image_url,
                 "status_id": menu["status_id"]
             })
 
@@ -1119,6 +1129,12 @@ def fetch_item_data(request):
                 "quantity": menu_item["quantity"],
                 "unit_id": menu_item["unit_id"]
             })
+
+        # Combine menu items with their respective menu.
+        for menu in formatted_menus:
+            menu["menu_items"] = [
+                mi for mi in formatted_menu_items if mi["menu_id"] == menu["id"]
+            ]
 
         return Response({
             "employees": employees,
@@ -1977,6 +1993,163 @@ def add_menu_item(request):
                 return Response({"error": f"Failed to add menu item for item_id {item_id}."}, status=500)
 
         return Response({"message": "Menu and menu items added successfully."}, status=201)
+
+    except Exception as e:
+        return Response({"error": f"Unexpected error: {e}"}, status=500)
+    
+
+@api_view(['PUT'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def edit_menu_item(request, menu_id):
+    """
+    Handles editing an existing menu item.
+    """
+    try:
+        # Authenticate the user and get the Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        # Get fields from request data
+        name = request.data.get("name")
+        type_id = request.data.get("type_id")
+        category_id = request.data.get("category_id")
+        price = request.data.get("price")
+        status_id = request.data.get("status_id")
+
+        # Validate required fields
+        if not name or not type_id or not price or not status_id:
+            return Response(
+                {"error": "Fields (name, type_id, price, status_id) are required."},
+                status=400,
+            )
+
+        # Prepare the update data dictionary without image field for now
+        update_data = {
+            "name": name,
+            "type_id": type_id,
+            "price": price,
+            "status_id": status_id,
+            "category_id": category_id,
+        }
+
+        # Check if a new image file is provided; if yes, delete the current image and upload new one.
+        image_file = request.FILES.get("image")
+        if image_file:
+            # Retrieve the current menu record to get the current image filename
+            current_menu_response = supabase_client.table("menu").select("image").eq("id", menu_id).execute()
+            if current_menu_response.data and len(current_menu_response.data) > 0:
+                current_image = current_menu_response.data[0].get("image")
+                if current_image:
+                    # Delete the current image from Supabase Storage
+                    delete_image_response = supabase_client.storage.from_("menu-images").remove([current_image])
+                    # Optionally check for errors in deletion here
+                    if hasattr(delete_image_response, "error") and delete_image_response.error:
+                        # Log or handle deletion error as needed (here we just pass)
+                        pass
+
+            # Upload the new image file
+            image_data = image_file.read()
+            image_filename = f"menu_images/menu-{name}-{type_id}.jpeg"
+            storage_response = supabase_client.storage.from_("menu-images").upload(
+                image_filename, image_data, {"content-type": "image/jpeg"}
+            )
+            if not storage_response:
+                return Response({"error": "Failed to upload image to Supabase."}, status=500)
+            update_data["image"] = image_filename
+
+        # Update the Menu record using update_data
+        menu_update_response = supabase_client.table("menu").update(update_data).eq("id", menu_id).execute()
+
+        if hasattr(menu_update_response, "error") and menu_update_response.error:
+            return Response({"error": "Failed to update menu item."}, status=500)
+
+        # Process recipe (menu_items) data
+        menu_items = request.data.get("menu_items", [])
+        if isinstance(menu_items, str):
+            try:
+                menu_items = json.loads(menu_items)
+            except json.JSONDecodeError:
+                return Response({"error": "Invalid JSON format for menu_items."}, status=400)
+
+        if not isinstance(menu_items, list) or len(menu_items) == 0:
+            return Response({"error": "At least one menu item must be provided."}, status=400)
+
+        # Delete existing menu_item records for this menu
+        delete_response = supabase_client.table("menu_item").delete().eq("menu_id", menu_id).execute()
+        if hasattr(delete_response, "error") and delete_response.error:
+            return Response({"error": "Failed to delete existing menu items."}, status=500)
+
+        # Insert new menu_item records
+        for item in menu_items:
+            if not isinstance(item, dict):
+                return Response({"error": "Each menu item must be a dictionary."}, status=400)
+
+            item_id = item.get("item_id")
+            quantity = item.get("quantity")
+            unit_id = item.get("unit_id")
+            if not item_id or not quantity or not unit_id:
+                return Response(
+                    {"error": "All fields (item_id, quantity, unit_id) are required for each menu item."},
+                    status=400,
+                )
+            try:
+                quantity = float(quantity)
+            except Exception:
+                return Response({"error": "Invalid quantity format."}, status=400)
+
+            menu_item_response = supabase_client.table("menu_item").insert({
+                "menu_id": menu_id,
+                "item_id": item_id,
+                "quantity": quantity,
+                "unit_id": unit_id,
+            }).execute()
+
+            if hasattr(menu_item_response, "error") and menu_item_response.error:
+                return Response({"error": f"Failed to add menu item for item_id {item_id}."}, status=500)
+
+        return Response({"message": "Menu and menu items updated successfully."}, status=200)
+
+    except Exception as e:
+        return Response({"error": f"Unexpected error: {e}"}, status=500)
+
+@api_view(['DELETE'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def delete_menu_item(request, menu_id):
+    """
+    Handles deleting an existing menu item.
+    Deletes the menu record, its associated image from Supabase Storage,
+    and all related menu_item records.
+    """
+    try:
+        # Authenticate the user and get the Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        # Retrieve the current menu record to get the image filename
+        current_menu_response = supabase_client.table("menu").select("image").eq("id", menu_id).execute()
+        if current_menu_response.data and len(current_menu_response.data) > 0:
+            current_image = current_menu_response.data[0].get("image")
+            if current_image:
+                # Delete the current image from Supabase Storage
+                delete_image_response = supabase_client.storage.from_("menu-images").remove([current_image])
+                # Optionally log or handle deletion errors; here we continue even if deletion fails
+                if hasattr(delete_image_response, "error") and delete_image_response.error:
+                    print("Warning: Failed to delete image from storage.")
+
+        # Delete associated menu_item records for this menu
+        delete_menu_items_response = supabase_client.table("menu_item").delete().eq("menu_id", menu_id).execute()
+        
+        if hasattr(delete_menu_items_response, "error") and delete_menu_items_response.error:
+            return Response({"error": "Failed to delete associated menu items."}, status=500)
+
+        # Delete the menu record itself
+        delete_menu_response = supabase_client.table("menu").delete().eq("id", menu_id).execute()
+        if hasattr(delete_menu_response, "error") and delete_menu_response.error:
+            return Response({"error": "Failed to delete menu item."}, status=500)
+
+        return Response({"message": "Menu item and associated records deleted successfully."}, status=200)
 
     except Exception as e:
         return Response({"error": f"Unexpected error: {e}"}, status=500)

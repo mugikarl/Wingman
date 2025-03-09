@@ -15,33 +15,35 @@ const Menu = () => {
 
   // State to store menu items, categories, and types
   const [menuItems, setMenuItems] = useState([]);
+  const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [menuTypes, setMenuTypes] = useState([]);
   const [units, setUnits] = useState([]);
 
   // Fetch menus when the component mounts
-  useEffect(() => {
-    const fetchMenus = async () => {
-      try {
-        const token = localStorage.getItem("access_token");
-        const response = await axios.get(
-          "http://127.0.0.1:8000/fetch-item-data/", // Use the correct endpoint here
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        setCategories(response.data.menu_categories || []);
-        setMenuTypes(response.data.menu_types || []);
-        setUnits(response.data.units || []);
-        setMenuItems(response.data.menus || []);
-        console.log("Fetched menu items:", response.data.menus);
-      } catch (error) {
-        console.error("Error fetching menus:", error);
-      }
-    };
+  const fetchMenus = async () => {
+    try {
+      const token = localStorage.getItem("access_token");
+      const response = await axios.get(
+        "http://127.0.0.1:8000/fetch-item-data/", // Use the correct endpoint here
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setCategories(response.data.menu_categories || []);
+      setMenuTypes(response.data.menu_types || []);
+      setUnits(response.data.units || []);
+      setItems(response.data.items || []);
+      setMenuItems(response.data.menus || []);
+      console.log("Fetched menu items:", response.data.menus);
+    } catch (error) {
+      console.error("Error fetching menus:", error);
+    }
+  };
 
+  useEffect(() => {
     fetchMenus();
   }, []);
 
@@ -162,11 +164,11 @@ const Menu = () => {
       </div>
 
       {/* Grid Layout for Menu Items */}
-      <div className="max-w-xs">
+      <div className="grid grid-cols-6 gap-y-5 pt-1">
         {menuItems.map((item) => (
           <ItemBox
-            key={item.id} // Add key here, not in ItemBox
-            item={item} // Pass the item prop
+            key={item.id}
+            item={item}
             image={item.image || "/placeholder.svg"}
             name={item.name}
             price={item.price}
@@ -187,7 +189,9 @@ const Menu = () => {
           onSave={addMenuItem}
           categories={categories}
           menuTypes={menuTypes}
+          items={items}
           units={units}
+          fetchMenus={fetchMenus}
         />
       )}
 
@@ -197,6 +201,11 @@ const Menu = () => {
           item={selectedItem}
           onClose={() => setIsEditModalOpen(false)}
           onSave={updateMenuItem}
+          categories={categories}
+          menuTypes={menuTypes}
+          items={items}
+          units={units}
+          fetchMenus={fetchMenus}
         />
       )}
     </div>
