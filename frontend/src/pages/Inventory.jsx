@@ -27,24 +27,24 @@ const Inventory = () => {
   };
 
   // Fetch inventory data from the API
-  useEffect(() => {
-    const fetchInventoryData = async () => {
-      try {
-        const response = await axios.get(
-          "http://127.0.0.1:8000/fetch-item-data/"
-        ); // Adjust to your actual API endpoint
-        setInventoryData(response.data.inventory); // Store formatted inventory data in state
-        setUnits(response.data.units || []); // Store units
-        setCategories(response.data.categories || []); // Store categories
-        setEmployees(response.data.employees || []); // Store employees
-        setReason(response.data.disposalreason || []); // Store reason of disposal
-      } catch (error) {
-        console.error("Error fetching inventory data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchInventoryData = async () => {
+    try {
+      const response = await axios.get(
+        "http://127.0.0.1:8000/fetch-item-data/"
+      ); // Adjust to your actual API endpoint
+      setInventoryData(response.data.inventory); // Store formatted inventory data in state
+      setUnits(response.data.units || []); // Store units
+      setCategories(response.data.categories || []); // Store categories
+      setEmployees(response.data.employees || []); // Store employees
+      setReason(response.data.disposalreason || []); // Store reason of disposal
+    } catch (error) {
+      console.error("Error fetching inventory data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchInventoryData();
   }, []);
 
@@ -166,7 +166,7 @@ const Inventory = () => {
         columns={["NAME", "CATEGORY", "QUANTITY"]}
         data={
           loading
-            ? [["", "", "Loading...", ""]]
+            ? [["", "Loading...", ""]]
             : filteredInventoryData.map((item) => {
                 const unit = units.find((u) => u.id === item.measurement);
                 const category = categories.find((c) => c.id === item.category);
@@ -193,6 +193,7 @@ const Inventory = () => {
         employees={employees}
         units={units}
         reason={reason}
+        refreshInventory={fetchInventoryData}
       />
     </div>
   );

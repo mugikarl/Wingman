@@ -904,7 +904,7 @@ def fetch_item_data(request):
     try:
         # Fetch units
         units_response = supabase_anon.table("unit_of_measurement") \
-            .select("id, symbol, unit_category") \
+            .select("id, symbol, unit_category, unit_category") \
             .execute()
         units = units_response.data if units_response.data else []
 
@@ -1021,7 +1021,7 @@ def fetch_item_data(request):
             formatted_receipts.append({
                 "receipt_id": receipt["id"],
                 "receipt_no": receipt["receipt_no"],
-                "supplier": receipt["supplier"]["name"] if receipt.get("supplier") else "",
+                "supplier_name": receipt["supplier_name"],
                 "date": receipt["date"][:10],
                 "stock_ins": stockins_data
             })
@@ -1390,6 +1390,105 @@ def delete_category(request, category_id):
     except Exception as e:
         return Response({"error": str(e)}, status=500)
     
+
+@api_view(['POST'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def add_supplier(request):
+    """
+    Handles adding a new supplier to the databae
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        data = json.loads(request.body)
+        name = data.get("name")
+
+        if not name:
+            return Response({"error": "All fields are required"}, status=400)
+
+        # Insert new supplier
+        insert_response = supabase_client.table("supplier").insert({
+            "name": name
+        }).execute()
+
+        if insert_response.data:
+            return Response({
+                "message": "Supplier added successfully"
+            }, status=201)
+        else:
+            return Response({"error": "Failed to add Supplier"}, status=500)
+        
+    except Exception as e:
+        return Response({"error" : str(e)}, status=500)
+
+@api_view(['PUT'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def edit_supplier(request, supplier_id):
+    """
+    Handles updating an existing supplier name
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        data = json.loads(request.body)
+        new_name = data.get("name")
+
+        if not new_name:
+            return Response({"error": "Name is required."}, status=400)
+
+        # Check if supplier exists
+        supplier_response = supabase_client.table("supplier").select("*").eq("id", supplier_id).execute()
+        if not supplier_response.data:
+            return Response({"error": "Supplier not found."}, status=404)
+
+        # Update supplier name
+        update_response = supabase_client.table("supplier").update({
+            "name": new_name
+        }).eq("id", supplier_id).execute()
+
+        if update_response.data:
+            return Response({"message": "Supplier updated successfully."}, status=200)
+        else:
+            return Response({"error": "Failed to update Supplier."}, status=500)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+@api_view(['DELETE'])
+@authentication_classes([SupabaseAuthentication])  # Use appropriate authentication
+@permission_classes([SupabaseIsAdmin])  # Ensure only admins can delete supplier
+def delete_supplier(request, supplier_id):
+    """
+    This view handles the deletion of an existing supplier
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        # Verify category exists
+        supplier_response = supabase_client.table("supplier").select("*").eq("id", supplier_id).execute()
+        if not supplier_response.data:
+            return Response({"error": "Supplier not found."}, status=404)
+
+        # Delete category
+        delete_response = supabase_client.table("supplier").delete().eq("id", supplier_id).execute()
+
+        if delete_response.data:
+            return Response({"message": "Supplier deleted successfully."}, status=200)
+        else:
+            return Response({"error": "Failed to delete Supplier."}, status=500)
+    
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+    
 @api_view(['POST'])
 @authentication_classes([])
 @permission_classes([AllowAny])
@@ -1401,12 +1500,12 @@ def add_stockin_data(request):
     try:
         data = json.loads(request.body)
         receipt_no = data.get("receipt_no")
-        supplier_name = data.get("supplier_name")
+        supplier = data.get("supplier_id")
         date = data.get("date")
         stock_ins = data.get("stock_ins", [])
 
         # Validate receipt fields and stock in arrays
-        if not receipt_no or not supplier_name or not date or not stock_ins:
+        if not receipt_no or not supplier or not date or not stock_ins:
             return Response(
                 {"error": "Receipt fields and at aleast one stock in entry are required"},
                 status=400
@@ -1414,7 +1513,7 @@ def add_stockin_data(request):
         
         receipt_response = supabase_anon.table("receipts").insert({
             "receipt_no": receipt_no,
-            "supplier_name": supplier_name,
+            "supplier": supplier,
             "date": date 
         }).execute()
 
@@ -1523,12 +1622,12 @@ def edit_receipt_stockin_data(request, receipt_id):
 
         # Extract receipt details
         receipt_no = data.get("receipt_no")
-        supplier_name = data.get("supplier_name")
+        supplier = data.get("supplier")
         date = data.get("date")
         stock_in_updates = data.get("stock_in_updates", [])
 
         # Validate receipt fields
-        if not receipt_no or not supplier_name or not date:
+        if not receipt_no or not supplier or not date:
             return Response(
                 {"error": "Receipt fields (receipt_no, supplier_name, date) are required."},
                 status=400,
@@ -1537,7 +1636,7 @@ def edit_receipt_stockin_data(request, receipt_id):
         # Update receipt details
         supabase_service.table("receipts").update({
             "receipt_no": receipt_no,
-            "supplier_name": supplier_name,
+            "supplier": supplier,
             "date": date
         }).eq("id", receipt_id).execute()
 
@@ -1701,41 +1800,36 @@ def dispose_item(request):
         disposed_quantity = float(data.get("disposed_quantity", 0))
         disposed_unit_id = int(data.get("disposed_unit"))
         reason = data.get("reason_of_disposal", "")
-        
+        other_reason = data.get("other_reason", "")
+        disposer_id = int(data.get("disposer"))  # Get disposer ID
+
         # 1. Fetch the inventory record.
         inv_response = supabase_anon.table("inventory").select("*").eq("id", inventory_id).execute()
         if not inv_response.data:
             return Response({"error": "Inventory record not found."}, status=404)
         inventory_record = inv_response.data[0]
         current_inventory_quantity = float(inventory_record["quantity"])
-        
+
         # 2. Fetch the related item record.
         item_id = inventory_record["item"]
         item_response = supabase_anon.table("items").select("*").eq("id", item_id).execute()
         if not item_response.data:
             return Response({"error": "Item record not found."}, status=404)
         item_record = item_response.data[0]
-        
-        # 3. Get the item’s measurement unit (default unit in which inventory quantity is stored).
+
+        # 3. Fetch units and validate conversion
         item_measurement_id = item_record["measurement"]
         item_unit_response = supabase_anon.table("unit_of_measurement").select("*").eq("id", item_measurement_id).execute()
         if not item_unit_response.data:
             return Response({"error": "Item measurement unit not found."}, status=404)
-        item_unit = item_unit_response.data[0]  # e.g. {"id": 1, "name": "kg", "category": "weight"}
-        
-        # 4. Fetch the disposed unit (the unit in which the user entered disposed quantity).
+        item_unit = item_unit_response.data[0]  
+
         disposed_unit_response = supabase_anon.table("unit_of_measurement").select("*").eq("id", disposed_unit_id).execute()
         if not disposed_unit_response.data:
             return Response({"error": "Disposed unit not found."}, status=404)
-        disposed_unit = disposed_unit_response.data[0]  # e.g. {"id": 2, "name": "g", "category": "weight"}
-        
-        # # 5. Check that both units belong to the same category.
-        # if item_unit["unit_category"] != disposed_unit["unit_category"]:
-        #     return Response({"error": "Unit categories do not match."}, status=400)
-        
-        # 6. Convert the disposed quantity (from the disposed unit) to the item's unit.
-        #    This way you can compare the disposed amount with the inventory quantity.
-        
+        disposed_unit = disposed_unit_response.data[0]  
+
+        # 4. Convert the disposed quantity to the item's unit.
         category_str = "Weight" if item_unit["unit_category"] == 1 else "Volume"
 
         converted_disposed_qty = convert_value(
@@ -1744,32 +1838,36 @@ def dispose_item(request):
             to_unit=item_unit["symbol"],
             category=category_str
         )
-        
-        # 7. Validate: the disposed quantity (in the item’s unit) should not exceed current inventory.
+
+        # 5. Validate: disposed quantity should not exceed current inventory.
         if converted_disposed_qty > current_inventory_quantity:
             return Response({"error": "Disposed quantity exceeds current inventory quantity."}, status=400)
-        
-        # 8. Update the inventory record by subtracting the disposed amount.
+
+        # 6. Update inventory record.
         new_inventory_qty = current_inventory_quantity - converted_disposed_qty
         update_response = supabase_anon.table("inventory").update({"quantity": new_inventory_qty}).eq("id", inventory_id).execute()
-        
-        # 9. Insert a record in the disposed_inventory table.
+
+        # 7. Insert disposal record including disposer.
         disposed_data = {
             "inventory_id": inventory_id,
-            "disposed_quantity": disposed_quantity,  # store the original quantity as provided
+            "disposed_quantity": disposed_quantity,  
             "disposed_unit": disposed_unit_id,
-            "reason_id": reason
+            "reason_id": reason,
+            "other_reason": other_reason if reason == "4" else None,
+            "disposer": disposer_id,  # Store disposer ID
         }
         insert_response = supabase_anon.table("disposed_inventory").insert(disposed_data).execute()
-        
+
         return Response({
             "status": "success",
             "inventory_update": update_response.data,
             "disposed_record": insert_response.data
         }, status=200)
-    
+
     except Exception as e:
         return Response({"error": f"Unexpected error: {e}"}, status=500)
+
+
 
 @api_view(['POST'])
 @authentication_classes([SupabaseAuthentication])

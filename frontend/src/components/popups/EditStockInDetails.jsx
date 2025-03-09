@@ -9,6 +9,7 @@ const EditStockInDetails = ({
   items,
   inventory,
   onUpdate,
+  suppliers,
 }) => {
   if (!isOpen || !receipt) return null;
 
@@ -24,34 +25,44 @@ const EditStockInDetails = ({
   });
   const [isEditing, setIsEditing] = useState(false);
 
-  // On mount or when receipt changes, initialize local state from props.
+  // On mount or when receipt, unitMeasurements, or suppliers change, initialize local state from props.
   useEffect(() => {
-    if (receipt.stock_ins) {
-      const formattedStock = receipt.stock_ins.map((stock) => {
-        const measurementSymbol =
-          unitMeasurements?.find(
-            (unit) => unit.id === stock.inventory?.item?.measurement
-          )?.symbol || "N/A";
-        return {
-          id: stock.id,
-          name: stock.inventory?.item?.name || "Unknown Item",
-          measurement: measurementSymbol,
-          price: stock.price,
-          quantity: stock.quantity_in,
-          totalCost: stock.price * stock.quantity_in,
-          // Save original quantity and IDs for backend calculations.
-          old_quantity: stock.quantity_in,
-          inventory_id: stock.inventory?.id || null,
-          item_id: stock.inventory?.item?.id || null,
-          // Flag for deferred deletion.
-          to_delete: false,
-        };
+    if (receipt) {
+      // Format stock entries if available.
+      if (receipt.stock_ins) {
+        const formattedStock = receipt.stock_ins.map((stock) => {
+          const measurementSymbol =
+            unitMeasurements?.find(
+              (unit) => unit.id === stock.inventory?.item?.measurement
+            )?.symbol || "N/A";
+          return {
+            id: stock.id,
+            name: stock.inventory?.item?.name || "Unknown Item",
+            measurement: measurementSymbol,
+            price: stock.price,
+            quantity: stock.quantity_in,
+            totalCost: stock.price * stock.quantity_in,
+            // Save original quantity and IDs for backend calculations.
+            old_quantity: stock.quantity_in,
+            inventory_id: stock.inventory?.id || null,
+            item_id: stock.inventory?.item?.id || null,
+            // Flag for deferred deletion.
+            to_delete: false,
+          };
+        });
+        setStockInData(formattedStock);
+        setEditedStockData(formattedStock);
+      }
+      // Ensure the supplier id is a number.
+      const supplierId = receipt.supplier ? Number(receipt.supplier) : "";
+      const supplierObj = suppliers.find((s) => s.id === supplierId) || {};
+      setEditedReceipt({
+        ...receipt,
+        supplier_id: supplierId,
+        supplier_name: supplierObj.name || "",
       });
-      setStockInData(formattedStock);
-      setEditedStockData(formattedStock);
-      setEditedReceipt({ ...receipt });
     }
-  }, [receipt, unitMeasurements]);
+  }, [receipt, unitMeasurements, suppliers]);
 
   // Toggle editing mode. If canceling, revert local changes.
   const toggleEditMode = () => {
@@ -90,7 +101,18 @@ const EditStockInDetails = ({
 
   // Update receipt fields locally.
   const handleChange = (e) => {
-    setEditedReceipt({ ...editedReceipt, [e.target.name]: e.target.value });
+    if (e.target.name === "supplier_id") {
+      // Parse the supplier id to a number (or empty string if no selection).
+      const newSupplierId = e.target.value ? Number(e.target.value) : "";
+      const supplierObj = suppliers.find((s) => s.id === newSupplierId) || {};
+      setEditedReceipt({
+        ...editedReceipt,
+        supplier_id: newSupplierId,
+        supplier_name: supplierObj.name || "",
+      });
+    } else {
+      setEditedReceipt({ ...editedReceipt, [e.target.name]: e.target.value });
+    }
   };
 
   // Update an existing stock item in local state.
@@ -230,7 +252,8 @@ const EditStockInDetails = ({
         `http://127.0.0.1:8000/edit-receipt-stockin-data/${editedReceipt.receipt_id}/`,
         {
           receipt_no: editedReceipt.receipt_no,
-          supplier_name: editedReceipt.supplier_name,
+          // Use the supplier id for the update
+          supplier: editedReceipt.supplier_id,
           date: editedReceipt.date,
           stock_in_updates: editedStockData.map((stock) => ({
             id: stock.id || null, // if null, backend treats as new
@@ -284,6 +307,7 @@ const EditStockInDetails = ({
       if (typeof onUpdate === "function") {
         onUpdate();
       }
+      onClose();
     } catch (error) {
       console.error("Failed to update receipt:", error);
       alert("An error occurred while saving the changes.");
@@ -348,17 +372,26 @@ const EditStockInDetails = ({
             />
           </div>
           <div className="flex flex-col w-1/4">
-            <label className="font-bold">Supplier Name:</label>
-            <input
-              type="text"
-              name="supplier_name"
-              value={editedReceipt.supplier_name}
-              onChange={handleChange}
-              disabled={!isEditing}
-              className={`p-2 border rounded-lg shadow ${
-                isEditing ? "bg-white" : "bg-gray-200"
-              }`}
-            />
+            <label className="font-bold">Supplier:</label>
+            {isEditing ? (
+              <select
+                name="supplier_id"
+                value={editedReceipt.supplier_id || ""}
+                onChange={handleChange}
+                className="p-2 border rounded-lg shadow bg-white"
+              >
+                <option value="">Select Supplier</option>
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="p-2 border rounded-lg shadow bg-gray-200">
+                {editedReceipt.supplier_name}
+              </div>
+            )}
           </div>
           <div className="flex flex-col w-1/4">
             <label className="font-bold">Date:</label>

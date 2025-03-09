@@ -8,6 +8,7 @@ const DisposedInventory = ({
   employees,
   units,
   reason,
+  refreshInventory,
 }) => {
   if (!isOpen) return null;
 
@@ -25,30 +26,55 @@ const DisposedInventory = ({
   const [selectedDisposalUnit, setSelectedDisposalUnit] = useState("");
   const [selectedReason, setSelectedReason] = useState("");
   const [selectedDisposer, setSelectedDisposer] = useState("");
+  const [otherReason, setOtherReason] = useState("");
+
+  // Get the current unit object based on the selected inventory
+  const currentUnitObject = selectedInventory
+    ? units.find((unit) => unit.id === selectedInventory.measurement)
+    : null;
+
+  // Get the category ID of the current unit
+  const currentUnitCategory = currentUnitObject
+    ? currentUnitObject.unit_category
+    : null;
+
+  // Filter units to only include those that belong to the same category
+  const filteredUnits = units.filter(
+    (unit) => unit.unit_category === currentUnitCategory
+  );
 
   // Handler to call the dispose_item backend endpoint
+  const handleReasonChange = (event) => {
+    const selectedValue = event.target.value;
+    setSelectedReason(selectedValue);
+
+    // Clear the other reason text if a different option is selected
+    if (selectedValue === "4") {
+      setOtherReason("");
+    }
+  };
+
   const handleDispose = async () => {
-    // Prepare the payload with values from the form and selectedInventory
-    const payload = {
-      inventory_id: selectedInventory.id, // id from selected inventory row
-      disposed_quantity: parseFloat(disposalQuantity),
-      disposed_unit: selectedDisposalUnit, // unit id from dropdown
-      reason_of_disposal: selectedReason, // reason id from dropdown
-      // Optionally add disposer if needed:
-      // disposer: selectedDisposer,
-    };
+    if (!selectedInventory || !selectedReason || !selectedDisposer) {
+      alert("Please select a reason and disposer.");
+      return;
+    }
 
     try {
-      const response = await axios.post(
-        "http://127.0.0.1:8000/dispose-item/",
-        payload
-      );
-      console.log("Dispose response:", response.data);
-      alert("Disposed Successfully!");
+      await axios.post("http://127.0.0.1:8000/dispose-item/", {
+        inventory_id: selectedInventory.id,
+        disposed_quantity: disposalQuantity,
+        disposed_unit: selectedDisposalUnit,
+        reason_of_disposal: selectedReason,
+        other_reason: selectedReason === "4" ? otherReason : "", // Only include if "Other" is selected
+        disposer: selectedDisposer, // Send disposer ID
+      });
+
+      alert("Item disposed successfully.");
       closeModal();
+      refreshInventory();
     } catch (error) {
       console.error("Error disposing item:", error);
-      alert("Error disposing item");
     }
   };
 
@@ -74,7 +100,10 @@ const DisposedInventory = ({
             <select
               className="w-full p-2 border rounded-lg"
               value={selectedDisposer}
-              onChange={(e) => setSelectedDisposer(e.target.value)}
+              onChange={(e) => {
+                console.log("Selected disposer:", e.target.value);
+                setSelectedDisposer(e.target.value);
+              }}
             >
               <option value="" hidden></option>
               {employees.map((employee) => (
@@ -133,7 +162,7 @@ const DisposedInventory = ({
                 onChange={(e) => setSelectedDisposalUnit(e.target.value)}
               >
                 <option value="" hidden></option>
-                {units.map((unit) => (
+                {filteredUnits.map((unit) => (
                   <option key={unit.id} value={unit.id}>
                     {unit.symbol}
                   </option>
@@ -148,17 +177,28 @@ const DisposedInventory = ({
             <select
               className="w-full p-2 border rounded-lg"
               value={selectedReason}
-              onChange={(e) => setSelectedReason(e.target.value)}
+              onChange={handleReasonChange}
             >
               <option value="" hidden></option>
               {reason
-                .filter((r) => r.id !== 1)
+                .filter((r) => r.id !== 1) // Exclude "Ordered"
                 .map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name}
                   </option>
                 ))}
             </select>
+
+            {/* Show input field when "Other" (id: 4) is selected */}
+            {selectedReason === "4" && (
+              <input
+                type="text"
+                placeholder="Other Reason"
+                value={otherReason}
+                onChange={(e) => setOtherReason(e.target.value)}
+                className="w-full p-2 mt-2 border rounded-lg"
+              />
+            )}
           </div>
         </div>
 

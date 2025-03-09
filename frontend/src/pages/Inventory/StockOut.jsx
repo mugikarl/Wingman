@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Datepicker } from "flowbite-react";
+import axios from "axios";
+import Table from "../../components/tables/Table";
 
 // Helper: Converts a Date object to a "YYYY-MM-DD" string in local time.
 const getLocalDateString = (date) => {
@@ -9,9 +11,7 @@ const getLocalDateString = (date) => {
 
 // Custom theme object for Flowbite React Datepicker.
 const customTheme = {
-  root: {
-    base: "relative",
-  },
+  root: { base: "relative" },
   popup: {
     root: {
       base: "absolute top-10 z-50 block pt-2",
@@ -33,9 +33,7 @@ const customTheme = {
         },
       },
     },
-    view: {
-      base: "p-1",
-    },
+    view: { base: "p-1" },
     footer: {
       base: "mt-2 flex space-x-2",
       button: {
@@ -101,39 +99,33 @@ const StockOut = () => {
   );
   const [showDatepicker, setShowDatepicker] = useState(false);
   const role = localStorage.getItem("role");
-  const [data, setData] = useState([
-    {
-      id: 1,
-      itemName: "Item 1",
-      disposer: "User A",
-      unit: "pcs",
-      disposed: 10,
-      reason: "Expired",
-    },
-    {
-      id: 2,
-      itemName: "Item 2",
-      disposer: "User B",
-      unit: "kg",
-      disposed: 15,
-      reason: "Damaged",
-    },
-    {
-      id: 3,
-      itemName: "Item 3",
-      disposer: "User C",
-      unit: "liters",
-      disposed: 20,
-      reason: "Obsolete",
-    },
-  ]);
+  const [disposedInventory, setDisposedInventory] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const totalValues = data.reduce(
-    (totals, row) => ({
-      disposed: totals.disposed + row.disposed,
-    }),
-    { disposed: 0 }
-  );
+  useEffect(() => {
+    fetchDisposedInventory();
+  }, []);
+
+  const fetchDisposedInventory = async () => {
+    try {
+      const response = await axios.get(
+        "http://127.0.0.1:8000/fetch-item-data/"
+      );
+      setDisposedInventory(response.data.disposed_inventory || []);
+    } catch (error) {
+      console.error("Error fetching disposed inventory:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter disposed items based on the selected date.
+  const filteredDisposedData = disposedInventory.filter((item) => {
+    const itemDate = new Date(item.disposal_datetime).toLocaleDateString(
+      "en-CA"
+    );
+    return itemDate === selectedDate;
+  });
 
   // Display the selected date in a human-friendly format.
   const displayDate = new Date(selectedDate).toDateString();
@@ -151,6 +143,17 @@ const StockOut = () => {
     setSelectedDate(getLocalDateString(dateObj));
   };
 
+  const columns = ["ITEM NAME", "DISPOSER", "DISPOSED", "REASON", "DATE"];
+  const data = loading
+    ? [["", "", "Loading...", "", ""]]
+    : filteredDisposedData.map((item) => [
+        item.item_name,
+        item.disposer,
+        `${item.disposed_quantity} ${item.disposed_unit}`,
+        item.reason === "Other" ? `Other - ${item.other_reason}` : item.reason,
+        new Date(item.disposal_datetime).toLocaleDateString(),
+      ]);
+
   return (
     <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
       <div className="flex justify-between mb-4">
@@ -158,32 +161,27 @@ const StockOut = () => {
           {/* Inventory Button */}
           <Link to="/inventory">
             <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
-              {/* Darker Left Section for Icon */}
               <div className="flex items-center justify-center bg-[#D87A03] p-3">
                 <img
                   src="/images/stockout/trolley.png"
-                  alt="New Product"
+                  alt="Inventory"
                   className="w-6 h-6"
                 />
               </div>
-              {/* Text Aligned Left in Normal Color Section */}
               <span className="flex-1 text-left pl-3">Inventory</span>
             </button>
           </Link>
-
           {/* Items Button (Admin Only) */}
           {role === "Admin" && (
             <Link to="/dashboard-admin/items">
               <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
-                {/* Darker Left Section for Icon */}
                 <div className="flex items-center justify-center bg-[#D87A03] p-3">
                   <img
                     src="/images/stockout/menu.png"
-                    alt="Menu"
+                    alt="Items"
                     className="w-6 h-6"
                   />
                 </div>
-                {/* Text Aligned Left in Normal Color Section */}
                 <span className="flex-1 text-left pl-3">Items</span>
               </button>
             </Link>
@@ -194,7 +192,7 @@ const StockOut = () => {
                 <div className="flex items-center justify-center bg-[#D87A03] p-3">
                   <img
                     src="/images/restaurant.png"
-                    alt="Stock In"
+                    alt="Menu"
                     className="w-6 h-6"
                   />
                 </div>
@@ -205,7 +203,6 @@ const StockOut = () => {
           {/* Stock In Button */}
           <Link to="/stockin">
             <button className="flex items-center bg-gradient-to-r from-[#009E2A] to-[#00BA34] text-white rounded-md shadow-md hover:from-[#008C25] hover:to-[#009E2A] transition-colors duration-200 w-48 overflow-hidden">
-              {/* Darker Left Section for Icon */}
               <div className="flex items-center justify-center bg-[#009E2A] p-3">
                 <img
                   src="/images/stockout/stock.png"
@@ -213,15 +210,12 @@ const StockOut = () => {
                   className="w-6 h-6"
                 />
               </div>
-              {/* Text Aligned Left in Normal Color Section */}
               <span className="flex-1 text-left pl-3">Stock In</span>
             </button>
           </Link>
-
           {/* Disposed Button */}
           <Link to="/stockout">
             <button className="flex items-center bg-gradient-to-r from-[#E60000] to-[#FF0000] text-white rounded-md shadow-md hover:from-[#CC0000] hover:to-[#E60000] transition-colors duration-200 w-48 overflow-hidden">
-              {/* Darker Left Section for Icon */}
               <div className="flex items-center justify-center bg-[#E60000] p-3">
                 <img
                   src="/images/stockout/trash-can.png"
@@ -229,7 +223,6 @@ const StockOut = () => {
                   className="w-6 h-6"
                 />
               </div>
-              {/* Text Aligned Left in Normal Color Section */}
               <span className="flex-1 text-left pl-3">Disposed</span>
             </button>
           </Link>
@@ -237,31 +230,24 @@ const StockOut = () => {
       </div>
       {/* Top navigation: arrows and current date */}
       <div className="relative bg-[#c27100] text-lg font-semibold w-full rounded flex justify-between items-center">
-        {/* Leftmost: Decrement Button */}
         <button
           className="px-4 py-2 text-white hover:bg-white hover:text-[#c27100] border-r border-white"
           onClick={decrementDate}
         >
           &lt;
         </button>
-
-        {/* Center: Date Display */}
         <div
           className="absolute left-1/2 transform -translate-x-1/2 cursor-pointer px-2 bg-[#c27100] text-white"
           onClick={() => setShowDatepicker(!showDatepicker)}
         >
           {displayDate}
         </div>
-
-        {/* Rightmost: Increment Button */}
         <button
           className="px-4 py-2 text-white hover:bg-white hover:text-[#c27100] border-l border-white"
           onClick={incrementDate}
         >
           &gt;
         </button>
-
-        {/* Datepicker - Always centered */}
         {showDatepicker && (
           <div className="absolute top-10 left-1/2 transform -translate-x-1/2 mt-2 z-10 bg-white shadow-lg rounded-lg">
             <Datepicker
@@ -283,41 +269,22 @@ const StockOut = () => {
           </div>
         )}
       </div>
-
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse bg-white text-black rounded-lg shadow-md">
-          <thead>
-            <tr className="bg-[#FFCF03] text-left">
-              <th className="p-2">ID</th>
-              <th className="p-2">Item Name</th>
-              <th className="p-2">Disposer</th>
-              <th className="p-2">Unit</th>
-              <th className="p-2">Disposed</th>
-              <th className="p-2">Reason</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row, index) => (
-              <tr
-                key={row.id}
-                className={
-                  index % 2 === 0
-                    ? "bg-[#FFFFFF] border-b border-[#FFCF03]"
-                    : "bg-[#FFEEA6] border-b"
-                }
-              >
-                <td className="p-2">{row.id}</td>
-                <td className="p-2">{row.itemName}</td>
-                <td className="p-2">{row.disposer}</td>
-                <td className="p-2">{row.unit}</td>
-                <td className="p-2">{row.disposed}</td>
-                <td className="p-2">{row.reason}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Table
+        columns={["ITEM NAME", "DISPOSER", "DISPOSED", "REASON"]}
+        data={
+          loading
+            ? [["", "Loading...", "", ""]]
+            : filteredDisposedData.map((item) => [
+                item.item_name,
+                item.disposer,
+                `${item.disposed_quantity} ${item.disposed_unit}`,
+                item.reason === "Other"
+                  ? `Other - ${item.other_reason}`
+                  : item.reason,
+              ])
+        }
+      />
     </div>
   );
 };
