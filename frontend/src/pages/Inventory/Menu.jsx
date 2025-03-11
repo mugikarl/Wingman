@@ -15,7 +15,7 @@ const Menu = () => {
 
   // State to store menu items, categories, and types
   const [menuItems, setMenuItems] = useState([]);
-  const [items, setItems] = useState([]);
+  const [inventory, setInventory] = useState([]);
   const [categories, setCategories] = useState([]);
   const [menuTypes, setMenuTypes] = useState([]);
   const [units, setUnits] = useState([]);
@@ -35,9 +35,9 @@ const Menu = () => {
       setCategories(response.data.menu_categories || []);
       setMenuTypes(response.data.menu_types || []);
       setUnits(response.data.units || []);
-      setItems(response.data.items || []);
-      setMenuItems(response.data.menus || []);
-      console.log("Fetched menu items:", response.data.menus);
+      setInventory(response.data.inventory || []);
+      setMenuItems(response.data.menu_items || []);
+      console.log("Fetched menu items:", response.data.menu_items);
     } catch (error) {
       console.error("Error fetching menus:", error);
     }
@@ -63,7 +63,7 @@ const Menu = () => {
   return (
     <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
       {/* Side Buttons with Image and Text (Moved Above Search Bar) */}
-      <div className="flex space-x-4 mb-4">
+      <div className="grid grid-cols-6 mb-4">
         {/* Inventory Button */}
         <Link to="/inventory">
           <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
@@ -189,7 +189,7 @@ const Menu = () => {
           onSave={addMenuItem}
           categories={categories}
           menuTypes={menuTypes}
-          items={items}
+          inventory={inventory}
           units={units}
           fetchMenus={fetchMenus}
         />
@@ -203,7 +203,7 @@ const Menu = () => {
           onSave={updateMenuItem}
           categories={categories}
           menuTypes={menuTypes}
-          items={items}
+          inventory={inventory}
           units={units}
           fetchMenus={fetchMenus}
         />

@@ -1088,7 +1088,7 @@ def fetch_item_data(request):
         menu_categories = menu_categories_response.data if menu_categories_response.data else []
 
         # Fetch menus
-        menus_response = supabase_anon.table("menu") \
+        menus_response = supabase_anon.table("menu_items") \
             .select("id, name, type_id, price, image, status_id, category_id") \
             .execute()
         menus = menus_response.data if menus_response.data else []
@@ -1114,26 +1114,26 @@ def fetch_item_data(request):
                 "status_id": menu["status_id"]
             })
 
-        # Fetch menu items
-        menu_items_response = supabase_anon.table("menu_item") \
-            .select("id, menu_id, item_id, quantity, unit_id") \
+        # Fetch menu ingredients
+        menu_items_response = supabase_anon.table("menu_ingredients") \
+            .select("id, menu_id, inventory_id, quantity, unit_id") \
             .execute()
-        menu_items = menu_items_response.data if menu_items_response.data else []
+        menu_ingredients = menu_items_response.data if menu_items_response.data else []
 
-        formatted_menu_items = []
-        for menu_item in menu_items:
-            formatted_menu_items.append({
-                "id": menu_item["id"],
-                "menu_id": menu_item["menu_id"],
-                "item_id": menu_item["item_id"],
-                "quantity": menu_item["quantity"],
-                "unit_id": menu_item["unit_id"]
+        formatted_menu_ingredients = []
+        for menu_ingredient in menu_ingredients:
+            formatted_menu_ingredients.append({
+                "id": menu_ingredient["id"],
+                "menu_id": menu_ingredient["menu_id"],
+                "inventory_id": menu_ingredient["inventory_id"],
+                "quantity": menu_ingredient["quantity"],
+                "unit_id": menu_ingredient["unit_id"]
             })
 
         # Combine menu items with their respective menu.
         for menu in formatted_menus:
-            menu["menu_items"] = [
-                mi for mi in formatted_menu_items if mi["menu_id"] == menu["id"]
+            menu["menu_ingredients"] = [
+                mi for mi in formatted_menu_ingredients if mi["menu_id"] == menu["id"]
             ]
 
         return Response({
@@ -1149,8 +1149,8 @@ def fetch_item_data(request):
             "menu_types": menu_types,
             "menu_statuses": menu_statuses,
             "menu_categories":menu_categories,
-            "menus": formatted_menus,
-            "menu_items": formatted_menu_items,
+            "menu_items": formatted_menus,
+            "menu_ingredients": formatted_menu_ingredients,
         })
     
     except Exception as e:
@@ -1379,8 +1379,8 @@ def edit_category(request, category_id):
 
 
 @api_view(['DELETE'])
-@authentication_classes([SupabaseAuthentication])  # Use appropriate authentication
-@permission_classes([SupabaseIsAdmin])  # Ensure only admins can delete categories
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
 def delete_category(request, category_id):
     """
     This view handles the deletion of an existing category
@@ -1922,7 +1922,7 @@ def add_menu_item(request):
             return Response({"error": "Failed to upload image to Supabase."}, status=500)
 
         # Insert menu details into the Menu table
-        menu_response = supabase_client.table("menu").insert({
+        menu_response = supabase_client.table("menu_items").insert({
             "name": name,
             "type_id": type_id,
             "price": price,
@@ -1947,7 +1947,7 @@ def add_menu_item(request):
             return Response({"error": f"Failed to extract menu ID from response: {e}"}, status=500)
 
         # Handle adding menu items
-        menu_items = request.data.get("menu_items", [])
+        menu_items = request.data.get("menu_ingredients", [])
         if not menu_items:
             return Response({"error": "At least one menu item must be provided."}, status=400)
 
@@ -1956,41 +1956,41 @@ def add_menu_item(request):
             try:
                 menu_items = json.loads(menu_items)  # Convert JSON string to a list of dictionaries
             except json.JSONDecodeError:
-                return Response({"error": "Invalid JSON format for menu_items."}, status=400)
+                return Response({"error": "Invalid JSON format for menu_ingredients."}, status=400)
 
         # Ensure menu_items is a list
         if not isinstance(menu_items, list):
-            return Response({"error": "menu_items must be a list of dictionaries."}, status=400)
+            return Response({"error": "menu_ingredients must be a list of dictionaries."}, status=400)
 
         for item in menu_items:
             # Ensure 'item' is a dictionary
             if not isinstance(item, dict):
                 return Response({"error": "Each menu item must be a dictionary."}, status=400)
 
-            item_id = item.get("item_id")
+            inventory_id = item.get("inventory_id")
             quantity = item.get("quantity")
             unit_id = item.get("unit_id")
 
             # Validate menu item fields
-            if not item_id or not quantity or not unit_id:
-                return Response({"error": "All fields (item_id, quantity, unit_id) are required for each menu item."}, status=400)
+            if not inventory_id or not quantity or not unit_id:
+                return Response({"error": "All fields (inventory_id, quantity, unit_id) are required for each menu item."}, status=400)
 
             try:
                 quantity = float(quantity)
             except Exception:
                 return Response({"error": "Invalid quantity format."}, status=400)
 
-            # Insert the Menu_Item record
-            menu_item_response = supabase_client.table("menu_item").insert({
+            # Insert the Menu_Ingredients record
+            menu_item_response = supabase_client.table("menu_ingredients").insert({
                 "menu_id": menu_id,
-                "item_id": item_id,
+                "inventory_id": inventory_id,
                 "quantity": quantity,
                 "unit_id": unit_id,
             }).execute()
 
             # Check for errors in the menu item response
             if hasattr(menu_item_response, 'error') and menu_item_response.error:
-                return Response({"error": f"Failed to add menu item for item_id {item_id}."}, status=500)
+                return Response({"error": f"Failed to add menu item for inventory_id {inventory_id}."}, status=500)
 
         return Response({"message": "Menu and menu items added successfully."}, status=201)
 
@@ -2037,7 +2037,7 @@ def edit_menu_item(request, menu_id):
         image_file = request.FILES.get("image")
         if image_file:
             # Retrieve the current menu record to get the current image filename
-            current_menu_response = supabase_client.table("menu").select("image").eq("id", menu_id).execute()
+            current_menu_response = supabase_client.table("menu_items").select("image").eq("id", menu_id).execute()
             if current_menu_response.data and len(current_menu_response.data) > 0:
                 current_image = current_menu_response.data[0].get("image")
                 if current_image:
@@ -2059,38 +2059,38 @@ def edit_menu_item(request, menu_id):
             update_data["image"] = image_filename
 
         # Update the Menu record using update_data
-        menu_update_response = supabase_client.table("menu").update(update_data).eq("id", menu_id).execute()
+        menu_update_response = supabase_client.table("menu_items").update(update_data).eq("id", menu_id).execute()
 
         if hasattr(menu_update_response, "error") and menu_update_response.error:
             return Response({"error": "Failed to update menu item."}, status=500)
 
         # Process recipe (menu_items) data
-        menu_items = request.data.get("menu_items", [])
+        menu_items = request.data.get("menu_ingredients", [])
         if isinstance(menu_items, str):
             try:
                 menu_items = json.loads(menu_items)
             except json.JSONDecodeError:
-                return Response({"error": "Invalid JSON format for menu_items."}, status=400)
+                return Response({"error": "Invalid JSON format for menu_inventory."}, status=400)
 
         if not isinstance(menu_items, list) or len(menu_items) == 0:
             return Response({"error": "At least one menu item must be provided."}, status=400)
 
-        # Delete existing menu_item records for this menu
-        delete_response = supabase_client.table("menu_item").delete().eq("menu_id", menu_id).execute()
+        # Delete existing menu_ingredients records for this menu
+        delete_response = supabase_client.table("menu_ingredients").delete().eq("menu_id", menu_id).execute()
         if hasattr(delete_response, "error") and delete_response.error:
             return Response({"error": "Failed to delete existing menu items."}, status=500)
 
-        # Insert new menu_item records
+        # Insert new menu_ingredients records
         for item in menu_items:
             if not isinstance(item, dict):
                 return Response({"error": "Each menu item must be a dictionary."}, status=400)
 
-            item_id = item.get("item_id")
+            inventory_id = item.get("inventory_id")
             quantity = item.get("quantity")
             unit_id = item.get("unit_id")
-            if not item_id or not quantity or not unit_id:
+            if not inventory_id or not quantity or not unit_id:
                 return Response(
-                    {"error": "All fields (item_id, quantity, unit_id) are required for each menu item."},
+                    {"error": "All fields (inventory_id, quantity, unit_id) are required for each menu item."},
                     status=400,
                 )
             try:
@@ -2098,15 +2098,15 @@ def edit_menu_item(request, menu_id):
             except Exception:
                 return Response({"error": "Invalid quantity format."}, status=400)
 
-            menu_item_response = supabase_client.table("menu_item").insert({
+            menu_item_response = supabase_client.table("menu_ingredients").insert({
                 "menu_id": menu_id,
-                "item_id": item_id,
+                "inventory_id": inventory_id,
                 "quantity": quantity,
                 "unit_id": unit_id,
             }).execute()
 
             if hasattr(menu_item_response, "error") and menu_item_response.error:
-                return Response({"error": f"Failed to add menu item for item_id {item_id}."}, status=500)
+                return Response({"error": f"Failed to add menu item for inventory_id {inventory_id}."}, status=500)
 
         return Response({"message": "Menu and menu items updated successfully."}, status=200)
 
@@ -2120,7 +2120,7 @@ def delete_menu_item(request, menu_id):
     """
     Handles deleting an existing menu item.
     Deletes the menu record, its associated image from Supabase Storage,
-    and all related menu_item records.
+    and all related menu_ingredients records.
     """
     try:
         # Authenticate the user and get the Supabase client
@@ -2128,7 +2128,7 @@ def delete_menu_item(request, menu_id):
         supabase_client = auth_data["client"]
 
         # Retrieve the current menu record to get the image filename
-        current_menu_response = supabase_client.table("menu").select("image").eq("id", menu_id).execute()
+        current_menu_response = supabase_client.table("menu_items").select("image").eq("id", menu_id).execute()
         if current_menu_response.data and len(current_menu_response.data) > 0:
             current_image = current_menu_response.data[0].get("image")
             if current_image:
@@ -2138,14 +2138,14 @@ def delete_menu_item(request, menu_id):
                 if hasattr(delete_image_response, "error") and delete_image_response.error:
                     print("Warning: Failed to delete image from storage.")
 
-        # Delete associated menu_item records for this menu
-        delete_menu_items_response = supabase_client.table("menu_item").delete().eq("menu_id", menu_id).execute()
+        # Delete associated menu_ingredients records for this menu
+        delete_menu_items_response = supabase_client.table("menu_ingredients").delete().eq("menu_id", menu_id).execute()
         
         if hasattr(delete_menu_items_response, "error") and delete_menu_items_response.error:
             return Response({"error": "Failed to delete associated menu items."}, status=500)
 
         # Delete the menu record itself
-        delete_menu_response = supabase_client.table("menu").delete().eq("id", menu_id).execute()
+        delete_menu_response = supabase_client.table("menu_items").delete().eq("id", menu_id).execute()
         if hasattr(delete_menu_response, "error") and delete_menu_response.error:
             return Response({"error": "Failed to delete menu item."}, status=500)
 
@@ -2153,3 +2153,106 @@ def delete_menu_item(request, menu_id):
 
     except Exception as e:
         return Response({"error": f"Unexpected error: {e}"}, status=500)
+    
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def add_discount(request):
+    """
+    Handles adding a new discount to the database
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        # auth_data = authenticate_user(request)
+        # supabase_client = auth_data["client"]
+
+        data = json.loads(request.body)
+        type = data.get("type")
+        percentage = data.get("percentage")
+
+        if not type or percentage is None:
+            return Response({"error": "All fields are required"}, status=400)
+
+        # Insert new item category
+        insert_response = supabase_service.table("discounts").insert({
+            "type": type,
+            "percentage": percentage,
+        }).execute()
+
+        if insert_response.data:
+            return Response({
+                "message": "Discount added successfully"
+            }, status=201)
+        else:
+            return Response({"error": "Failed to Discount"}, status=500)
+        
+    except Exception as e:
+        return Response({"error" : str(e)}, status=500)
+
+
+@api_view(['PUT'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def edit_discount(request, discount_id):
+    """
+    Handles updating an existing discount
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        # auth_data = authenticate_user(request)
+        # supabase_client = auth_data["client"]
+
+        data = json.loads(request.body)
+        new_type = data.get("type")
+        new_percentage = data.get("percentage")
+
+        if not new_type or new_percentage is None:
+            return Response({"error": "All fields are required."}, status=400)
+
+        # Check if exists
+        response = supabase_service.table("discounts").select("*").eq("id", discount_id).execute()
+        if not response.data:
+            return Response({"error": "Discount not found."}, status=404)
+
+        # Update discounts
+        update_response = supabase_service.table("discounts").update({
+            "type": new_type,
+            "percentage": new_percentage
+        }).eq("id", discount_id).execute()
+
+        if update_response.data:
+            return Response({"message": "Discount updated successfully."}, status=200)
+        else:
+            return Response({"error": "Failed to update Discount."}, status=500)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+    
+@api_view(['DELETE'])
+@authentication_classes([])  # Use appropriate authentication
+@permission_classes([AllowAny])  # Ensure only admins can delete categories
+def delete_discount(request, discount_id):
+    """
+    Handles deleting of discount
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        # auth_data = authenticate_user(request)
+        # supabase_client = auth_data["client"]
+
+        # Verify category exists
+        response = supabase_service.table("discounts").select("*").eq("id", discount_id).execute()
+        if not response.data:
+            return Response({"error": "Discount not found."}, status=404)
+
+        # Delete category
+        delete_response = supabase_service.table("discounts").delete().eq("id", discount_id).execute()
+
+        if delete_response.data:
+            return Response({"message": "Discount deleted successfully."}, status=200)
+        else:
+            return Response({"error": "Failed to delete Discount."}, status=500)
+    
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)

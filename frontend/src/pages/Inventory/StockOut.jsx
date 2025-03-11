@@ -156,8 +156,8 @@ const StockOut = () => {
 
   return (
     <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
-      <div className="flex justify-between mb-4">
-        <div className="flex space-x-4">
+      <div className="flex flex-col space-y-4 mb-4">
+        <div className="grid grid-cols-6">
           {/* Inventory Button */}
           <Link to="/inventory">
             <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">

@@ -7,7 +7,7 @@ const EditMenuModal = ({
   onSave,
   categories,
   menuTypes,
-  items,
+  inventory,
   units,
   fetchMenus,
 }) => {
@@ -23,11 +23,11 @@ const EditMenuModal = ({
   const [isAvailable, setIsAvailable] = useState(item.status_id === 1);
 
   // State for recipe data
-  const [recipes, setRecipes] = useState(item.menu_items || []);
+  const [recipes, setRecipes] = useState(item.menu_ingredients || []);
 
   // State for new recipe row
   const [newRecipe, setNewRecipe] = useState({
-    item_id: "",
+    inventory_id: "",
     quantity: "",
     unit_id: "",
   });
@@ -52,7 +52,7 @@ const EditMenuModal = ({
       setCategoryId(item.category_id || "");
       setTypeId(item.type_id || "");
       setIsAvailable(item.status_id === 1);
-      setRecipes(item.menu_items || []);
+      setRecipes(item.menu_ingredients || []);
     }
   };
 
@@ -82,13 +82,13 @@ const EditMenuModal = ({
 
     // Prepare menu_items payload
     const menuItemsPayload = recipes.map((recipe) => ({
-      item_id: recipe.item_id,
+      inventory_id: recipe.inventory_id,
       quantity: recipe.quantity,
       unit_id: recipe.unit_id,
     }));
 
     // Add selected recipes to form data
-    formData.append("menu_items", JSON.stringify(menuItemsPayload));
+    formData.append("menu_ingredients", JSON.stringify(menuItemsPayload));
 
     const token = localStorage.getItem("access_token");
 
@@ -145,14 +145,14 @@ const EditMenuModal = ({
   // Handle adding a new recipe row
   const handleAddRecipe = () => {
     if (!isEditMode) return;
-    if (!newRecipe.item_id || !newRecipe.quantity || !newRecipe.unit_id) {
+    if (!newRecipe.inventory_id || !newRecipe.quantity || !newRecipe.unit_id) {
       alert("Please fill in all fields for the new recipe item.");
       return;
     }
 
     // Find the item name for display
-    const selectedItem = items.find(
-      (item) => item.id === Number.parseInt(newRecipe.item_id)
+    const selectedItem = inventory.find(
+      (item) => item.id === Number.parseInt(newRecipe.inventory_id)
     );
 
     // Find the unit symbol for display
@@ -163,7 +163,7 @@ const EditMenuModal = ({
     // Create the new recipe object
     const recipeToAdd = {
       id: null, // New item doesn't have an ID yet
-      item_id: newRecipe.item_id,
+      inventory_id: newRecipe.inventory_id,
       item_name: selectedItem ? selectedItem.name : "",
       quantity: newRecipe.quantity,
       unit_id: newRecipe.unit_id,
@@ -175,7 +175,7 @@ const EditMenuModal = ({
 
     // Reset new recipe form
     setNewRecipe({
-      item_id: "",
+      inventory_id: "",
       quantity: "",
       unit_id: "",
     });
@@ -187,14 +187,14 @@ const EditMenuModal = ({
 
     const updatedRecipes = [...recipes];
 
-    if (field === "item_id") {
+    if (field === "inventory_id") {
       // When item changes, update item_name and reset unit if needed
-      const selectedItem = items.find(
+      const selectedItem = inventory.find(
         (item) => item.id === Number.parseInt(value)
       );
       updatedRecipes[index] = {
         ...updatedRecipes[index],
-        item_id: value,
+        inventory_id: value,
         item_name: selectedItem ? selectedItem.name : "",
       };
     } else if (field === "unit_id") {
@@ -434,26 +434,27 @@ const EditMenuModal = ({
                       <div className="px-2 py-1 border-r border-gray-200">
                         {isEditMode ? (
                           <select
-                            value={recipe.item_id}
+                            value={recipe.inventory_id}
                             onChange={(e) =>
                               handleRecipeChange(
                                 index,
-                                "item_id",
+                                "inventory_id",
                                 e.target.value
                               )
                             }
                             className="w-full p-1 text-xs border rounded"
                           >
                             <option value="">Select Item</option>
-                            {items.map((item) => (
+                            {inventory.map((item) => (
                               <option key={item.id} value={item.id}>
                                 {item.name}
                               </option>
                             ))}
                           </select>
                         ) : (
-                          items.find((i) => i.id === Number(recipe.item_id))
-                            ?.name || "Unknown"
+                          inventory.find(
+                            (i) => i.id === Number(recipe.inventory_id)
+                          )?.name || "Unknown"
                         )}
                       </div>
                       <div className="px-2 py-1 border-r border-gray-200">
@@ -522,17 +523,17 @@ const EditMenuModal = ({
                   <div className="grid grid-cols-4 border-t border-gray-200 bg-gray-50 text-xs">
                     <div className="px-2 py-1 border-r border-gray-200">
                       <select
-                        value={newRecipe.item_id}
+                        value={newRecipe.inventory_id}
                         onChange={(e) =>
                           setNewRecipe({
                             ...newRecipe,
-                            item_id: e.target.value,
+                            inventory_id: e.target.value,
                           })
                         }
                         className="w-full p-1 text-xs border rounded"
                       >
                         <option value="">Select Item</option>
-                        {items.map((item) => (
+                        {inventory.map((item) => (
                           <option key={item.id} value={item.id}>
                             {item.name}
                           </option>

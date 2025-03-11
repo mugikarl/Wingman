@@ -6,7 +6,7 @@ const NewMenuModal = ({
   onSave,
   categories,
   menuTypes,
-  items,
+  inventory,
   units,
   fetchMenus,
 }) => {
@@ -21,7 +21,7 @@ const NewMenuModal = ({
   // State for recipe data (storing added recipes)
   const [recipes, setRecipes] = useState([]); // Stores added recipes with item, quantity, and unit_id
   const [currentRecipe, setCurrentRecipe] = useState({
-    item_id: "",
+    inventory_id: "",
     quantity: "",
     unit_id: "",
   });
@@ -56,15 +56,15 @@ const NewMenuModal = ({
     formData.append("type_id", typeId); // Type ID
     formData.append("status_id", isAvailable ? "1" : "2");
 
-    // Prepare menu_items payload (only include item_id, quantity, and unit_id)
+    // Prepare menu_items payload (only include inventory_id, quantity, and unit_id)
     const menuItemsPayload = recipes.map((recipe) => ({
-      item_id: recipe.item_id,
+      inventory_id: recipe.inventory_id,
       quantity: recipe.quantity,
       unit_id: recipe.unit_id, // Ensure unit_id is passed here
     }));
 
     // Add selected recipes to form data
-    formData.append("menu_items", JSON.stringify(menuItemsPayload));
+    formData.append("menu_ingredients", JSON.stringify(menuItemsPayload));
 
     const token = localStorage.getItem("access_token");
 
@@ -92,7 +92,7 @@ const NewMenuModal = ({
   // Handle adding a new recipe
   const handleAddRecipe = () => {
     if (
-      !currentRecipe.item_id ||
+      !currentRecipe.inventory_id ||
       !currentRecipe.quantity ||
       !currentRecipe.unit_id
     ) {
@@ -101,8 +101,8 @@ const NewMenuModal = ({
     }
 
     // Find the item name for display purposes
-    const selectedItem = items.find(
-      (item) => item.id === parseInt(currentRecipe.item_id)
+    const selectedItem = inventory.find(
+      (inventory) => inventory.id === parseInt(currentRecipe.inventory_id)
     );
 
     // Find the unit symbol for display purposes
@@ -112,8 +112,8 @@ const NewMenuModal = ({
 
     // Create the new recipe object
     const newRecipe = {
-      item_id: currentRecipe.item_id,
-      item_name: selectedItem ? selectedItem.name : "", // For display only
+      inventory_id: currentRecipe.inventory_id,
+      inventory_name: selectedItem ? selectedItem.name : "", // For display only
       quantity: currentRecipe.quantity,
       unit_id: currentRecipe.unit_id, // Ensure unit_id is part of the new recipe
       unit: selectedUnit ? selectedUnit.symbol : "", // For display only
@@ -125,7 +125,7 @@ const NewMenuModal = ({
 
     // Reset the current recipe state after adding
     setCurrentRecipe({
-      item_id: "",
+      inventory_id: "",
       quantity: "",
       unit_id: "",
     });
@@ -289,17 +289,17 @@ const NewMenuModal = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {/* Item Dropdown */}
               <select
-                value={currentRecipe.item_id}
+                value={currentRecipe.inventory_id}
                 onChange={(e) =>
                   setCurrentRecipe({
                     ...currentRecipe,
-                    item_id: e.target.value,
+                    inventory_id: e.target.value,
                   })
                 }
                 className="p-1.5 text-sm border rounded-lg"
               >
                 <option value="">Select Item</option>
-                {items.map((item) => (
+                {inventory.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.name}
                   </option>
@@ -371,7 +371,7 @@ const NewMenuModal = ({
                       className="grid grid-cols-4 border-t border-gray-200 hover:bg-gray-100 text-xs"
                     >
                       <div className="px-2 py-1 border-r border-gray-200 truncate">
-                        {recipe.item_name}
+                        {recipe.inventory_name}
                       </div>
                       <div className="px-2 py-1 border-r border-gray-200">
                         {recipe.quantity}
