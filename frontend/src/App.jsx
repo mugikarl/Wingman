@@ -34,6 +34,7 @@ import EditItem from "./components/popups/EditItem";
 import NewCategory from "./components/popups/NewCategory";
 import FPMenu from "./pages/Inventory/FPMenu";
 import GrabMenu from "./pages/Inventory/GrabMenu";
+import NewMenuForm from "./components/popups/NewMenuForm";
 import NewMenuModal from "./components/popups/NewMenuModal";
 import EditMenuModal from "./components/popups/EditMenuModal";
 
@@ -77,6 +78,14 @@ const App = () => {
               element={
                 <AdminRoute>
                   <Inventory />
+                </AdminRoute>
+              }
+            />
+             <Route
+              path="/dashboard-admin/newmenuform"
+              element={
+                <AdminRoute>
+                  <NewMenuForm />
                 </AdminRoute>
               }
             />

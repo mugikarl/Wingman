@@ -1,105 +1,190 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const Sidebar = ({ isAdmin, setIsAdmin }) => {
   const navigate = useNavigate();
+  const [isInventoryDropdownOpen, setIsInventoryDropdownOpen] = useState(false);
+  const role = localStorage.getItem("role");
 
-  // Handler for logging out
   const handleLogout = () => {
-    // Remove tokens from storage and clear default headers
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("role");
     delete axios.defaults.headers.common["Authorization"];
 
-    // Update admin state and redirect to the non-admin dashboard (or login page)
     setIsAdmin(false);
     navigate("/dashboard");
   };
 
+  const toggleInventoryDropdown = () => {
+    setIsInventoryDropdownOpen((prev) => !prev); // Toggle the state
+  };
+
   return (
-    <div className="w-1/8 bg-[#FFCF03] flex flex-col justify-between items-center py-4">
-      {/* Top Section: Logo */}
+    <div className="w-44 bg-[#FFCF03] flex flex-col justify-between items-center py-4 gap-5">
+      {/* Logo */}
       <Link to={isAdmin ? "/dashboard-admin" : "/dashboard"}>
         <button className="flex items-center justify-center bg-[#FFCF03] p-2 rounded-lg w-full">
-          <img src="/images/logo.png" alt="Logo" className="w-20 h-20" />
+          <img src="/images/logo.png" alt="Logo" className="w-16 h-16" />
         </button>
       </Link>
 
-      {/* Middle Section: Navigation Buttons */}
-      <div className="flex-grow flex flex-col justify-around w-full px-4 gap-4">
+      {/* Navigation Buttons */}
+      <div className="flex-grow flex flex-col w-full px-4 gap-4">
         {isAdmin ? (
-          // Admin navigation buttons
           <>
             <Link to="/dashboard-admin/ordertable">
-              <button className="flex flex-col items-center justify-center text-[#FFCF03] p-4 rounded-lg shadow hover:shadow-lg w-full h-28">
-                <img src="/images/order.png" alt="Order" className="mb-2" />
-                <span className="text-center text-white">Order</span>
+              <button className="flex items-center bg-[#FFCF03] text-white rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden">
+                <div className="flex items-center justify-center bg-[#E6B800] p-2">
+                  <img src="/images/order.png" alt="Order" className="w-5 h-5" />
+                </div>
+                <span className="flex-1 text-left pl-3">Order</span>
               </button>
             </Link>
-            <Link to="/dashboard-admin/inventory">
-              <button className="flex flex-col items-center justify-center text-[#FFCF03] p-4 rounded-lg shadow hover:shadow-lg w-full h-28">
-                <img
-                  src="/images/inventory.png"
-                  alt="Inventory"
-                  className="mb-2"
-                />
-                <span className="text-center text-white">Inventory</span>
+
+            {/* Inventory Button with Dropdown */}
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={toggleInventoryDropdown}
+                className="flex items-center bg-[#FFCF03] text-white rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden"
+              >
+                <div className="flex items-center justify-center bg-[#E6B800] p-2">
+                  <img
+                    src="/images/inventory.png"
+                    alt="Inventory"
+                    className="w-5 h-5"
+                  />
+                </div>
+                <span className="flex-1 text-left pl-3">Inventory</span>
               </button>
-            </Link>
+
+              {/* Dropdown Menu */}
+              {isInventoryDropdownOpen && (
+                <div className="flex flex-col gap-2 pl-6">
+                  <Link to="/inventory">
+                    <button className="text-white">
+                      <span className="flex-1 text-left pl-3">Inventory</span>
+                    </button>
+                  </Link>
+                  {role === "Admin" && (
+                    <>
+                      <Link to="/dashboard-admin/items">
+                        <button className="text-white">
+                          
+                          <span className="flex-1 text-left pl-3">Items</span>
+                        </button>
+                      </Link>
+                      <Link to="/dashboard-admin/menu">
+                        <button className="text-white">
+                          <span className="flex-1 text-left pl-3">Menu</span>
+                        </button>
+                      </Link>
+                    </>
+                  )}
+                  <Link to="/stockin">
+                    <button className="text-white">
+                      
+                      <span className="flex-1 text-left pl-3">Stock In</span>
+                    </button>
+                  </Link>
+                  <Link to="/stockout">
+                    <button className="text-white">
+                      
+                      <span className="flex-1 text-left pl-3">Disposed</span>
+                    </button>
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Staff Profiling and Sales Buttons */}
             <Link to="/dashboard-admin/staffprofile">
-              <button className="flex flex-col items-center justify-center text-[#FFCF03] p-4 rounded-lg shadow hover:shadow-lg w-full h-28">
-                <img
-                  src="/images/staff.png"
-                  alt="Staff Profile"
-                  className="mb-2"
-                />
-                <span className="text-center text-white">Staff Profiling</span>
+              <button className="flex items-center bg-[#FFCF03] text-white rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden">
+                <div className="flex items-center justify-center bg-[#E6B800] p-2">
+                  <img src="/images/staff.png" alt="Staff" className="w-5 h-5" />
+                </div>
+                <span className="flex-1 text-left pl-3">Staff Profile</span>
               </button>
             </Link>
             <Link to="/dashboard-admin/sales">
-              <button className="flex flex-col items-center justify-center text-[#FFCF03] p-4 rounded-lg shadow hover:shadow-lg w-full h-28">
-                <img src="/images/sales.png" alt="Sales" className="mb-2" />
-                <span className="text-center text-white">Sales</span>
+              <button className="flex items-center bg-[#FFCF03] text-white rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden">
+                <div className="flex items-center justify-center bg-[#E6B800] p-2">
+                  <img src="/images/sales.png" alt="Sales" className="w-5 h-5" />
+                </div>
+                <span className="flex-1 text-left pl-3">Sales</span>
               </button>
             </Link>
           </>
         ) : (
-          // Employee (non-admin) navigation buttons
           <>
             <Link to="/ordertable">
-              <button className="flex flex-col items-center justify-center text-[#FFCF03] p-4 rounded-lg shadow hover:shadow-lg w-full h-28">
-                <img src="/images/order.png" alt="Order" className="mb-2" />
-                <span className="text-center text-white">Order</span>
+              <button className="flex items-center bg-[#FFCF03] text-white rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden">
+                <div className="flex items-center justify-center bg-[#E6B800] p-2">
+                  <img src="/images/order.png" alt="Order" className="w-5 h-5" />
+                </div>
+                <span className="flex-1 text-left pl-3">Order</span>
               </button>
             </Link>
-            <Link to="/inventory">
-              <button className="flex flex-col items-center justify-center text-[#FFCF03] p-4 rounded-lg shadow hover:shadow-lg w-full h-28">
-                <img
-                  src="/images/inventory.png"
-                  alt="Inventory"
-                  className="mb-2"
-                />
-                <span className="text-center text-white">Inventory</span>
+
+            {/* Inventory Button with Dropdown */}
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={toggleInventoryDropdown}
+                className="flex items-center bg-[#FFCF03] text-white rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden"
+              >
+                <div className="flex items-center justify-center bg-[#E6B800] p-2">
+                  <img
+                    src="/images/inventory.png"
+                    alt="Inventory"
+                    className="w-5 h-5"
+                  />
+                </div>
+                <span className="flex-1 text-left pl-3">Inventory</span>
               </button>
-            </Link>
+
+              {/* Dropdown Menu */}
+              {isInventoryDropdownOpen && (
+                <div className="flex flex-col gap-2 pl-6">
+                  <Link to="/inventory">
+                    <button className="text-white">
+                      <span className="flex-1 text-left pl-3">Inventory</span>
+                    </button>
+                  </Link>
+                  <Link to="/stockin">
+                    <button className="text-white">
+                      <span className="flex-1 text-left pl-3">Stock In</span>
+                    </button>
+                  </Link>
+                  <Link to="/stockout">
+                    <button className="text-white">
+                      
+                      <span className="flex-1 text-left pl-3">Disposed</span>
+                    </button>
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Attendance Button */}
             <Link to="/attendance">
-              <button className="flex flex-col items-center justify-center text-[#FFCF03] p-4 rounded-lg shadow hover:shadow-lg w-full h-28">
-                <img
-                  src="/images/attendance.png"
-                  alt="Attendance"
-                  className="mb-2"
-                />
-                <span className="text-center text-white">Attendance</span>
+              <button className="flex items-center bg-[#FFCF03] text-white rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden">
+                <div className="flex items-center justify-center bg-[#E6B800] p-2">
+                  <img
+                    src="/images/attendance.png"
+                    alt="Attendance"
+                    className="w-5 h-5"
+                  />
+                </div>
+                <span className="flex-1 text-left pl-3">Attendance</span>
               </button>
             </Link>
           </>
         )}
       </div>
 
-      {/* Bottom Section: Login/Logout Button */}
-      <div className="w-full px-4">
+       {/* Bottom Section: Login/Logout Button */}
+       <div className="w-full px-4">
         {isAdmin ? (
           // When logged in as admin, show Logout
           <button

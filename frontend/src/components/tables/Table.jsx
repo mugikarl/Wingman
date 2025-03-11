@@ -4,7 +4,7 @@ const Table = ({ columns, data, rowOnClick }) => {
   return (
     <div className="table-container border rounded-lg shadow overflow-x-auto">
       <table className="table-auto w-full text-left">
-        <thead className="bg-[#FFCF03] font-bold">
+        <thead className="bg-white font-bold">
           <tr>
             {columns.map((column, index) => (
               <th key={index} className="p-2">
@@ -18,7 +18,9 @@ const Table = ({ columns, data, rowOnClick }) => {
             data.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className="bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
+                className={`${
+                  rowIndex % 2 === 0 ? "bg-[#FFEEA6]" : "bg-white"
+                } border-b cursor-pointer hover:bg-yellow-200`}
                 onClick={() => rowOnClick && rowOnClick(rowIndex)}
               >
                 {row.map((cell, cellIndex) => (
