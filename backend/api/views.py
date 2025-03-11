@@ -2153,6 +2153,131 @@ def delete_menu_item(request, menu_id):
 
     except Exception as e:
         return Response({"error": f"Unexpected error: {e}"}, status=500)
+
+@api_view(['GET'])
+@authentication_classes([])  # You can add authentication classes if needed
+@permission_classes([AllowAny])   
+def fetch_order_data(request):
+    try:
+
+        # Discounts
+        discounts_response = supabase_anon.table("discounts") \
+            .select("id","type","percentage") \
+            .execute()
+        discounts = discounts_response.data if discounts_response.data else []
+        
+        # Payment Methods
+        payment_methods_response = supabase_anon.table("payment_methods") \
+            .select("id","name") \
+            .execute()
+        payment_methods = payment_methods_response.data if payment_methods_response.data else []
+
+
+        return Response({
+            "discounts": discounts,
+            "payment_methods": payment_methods,
+        })
+    
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['POST'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def add_payment_method(request):
+    """
+    Handles adding a new payment method to the databae
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        data = json.loads(request.body)
+        name = data.get("name")
+
+        if not name:
+            return Response({"error": "All fields are required"}, status=400)
+
+        # Insert new item category
+        insert_response = supabase_client.table("payment_methods").insert({
+            "name": name
+        }).execute()
+
+        if insert_response.data:
+            return Response({
+                "message": "Payment Method added successfully"
+            }, status=201)
+        else:
+            return Response({"error": "Failed to add Payment Method"}, status=500)
+        
+    except Exception as e:
+        return Response({"error" : str(e)}, status=500)
+
+@api_view(['PUT'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def edit_payment_method(request, payment_method_id):
+    """
+    Handles updating an existing payment_method name
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        data = json.loads(request.body)
+        new_name = data.get("name")
+
+        if not new_name:
+            return Response({"error": "Name is required."}, status=400)
+
+        # Check if payment method exists
+        payment_method_response = supabase_client.table("payment_methods").select("*").eq("id", payment_method_id).execute()
+        if not payment_method_response.data:
+            return Response({"error": "Payment Method not found."}, status=404)
+
+        # Update payment method name
+        update_response = supabase_client.table("payment_methods").update({
+            "name": new_name
+        }).eq("id", payment_method_id).execute()
+
+        if update_response.data:
+            return Response({"message": "Payment Method updated successfully."}, status=200)
+        else:
+            return Response({"error": "Failed to update Payment Method."}, status=500)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+@api_view(['DELETE'])
+@authentication_classes([SupabaseAuthentication])  # Use appropriate authentication
+@permission_classes([SupabaseIsAdmin])  # Ensure only admins can delete categories
+def delete_payment_method(request, payment_method_id):
+    """
+    This view handles the deletion of an existing payment method
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        # Verify payment method exists
+        payment_method_response = supabase_client.table("payment_methods").select("*").eq("id", payment_method_id).execute()
+        if not payment_method_response.data:
+            return Response({"error": "Payment method not found."}, status=404)
+
+        # Delete category
+        delete_response = supabase_client.table("payment_methods").delete().eq("id", payment_method_id).execute()
+
+        if delete_response.data:
+            return Response({"message": "Payment Method deleted successfully."}, status=200)
+        else:
+            return Response({"error": "Failed to delete Payment Method."}, status=500)
+    
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
     
 
 @api_view(['POST'])
