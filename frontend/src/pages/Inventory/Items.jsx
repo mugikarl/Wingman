@@ -9,14 +9,14 @@ import NewCategory from "../../components/popups/NewCategory";
 
 const Items = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // State for edit modal
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [units, setUnits] = useState([]);
   const [categories, setCategories] = useState([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
-  const [selectedItem, setSelectedItem] = useState(null); // State to track selected item
+  const [selectedItem, setSelectedItem] = useState(null);
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);

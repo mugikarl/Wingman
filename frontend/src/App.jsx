@@ -9,7 +9,7 @@ import {
 // Import your components and pages
 import Sidebar from "./components/navigations/Sidebar"; // Combined Sidebar component
 import Dashboard from "./pages/Dashboard";
-import Ordertable from "./pages/Ordertable";
+import OrderTable from "./pages/Order/Ordertable";
 import Inventory from "./pages/Inventory";
 import StaffProfile from "./pages/Staff Profile/StaffProfile";
 import Sales from "./pages/Sales";
@@ -68,7 +68,7 @@ const App = () => {
               path="/dashboard-admin/ordertable"
               element={
                 <AdminRoute>
-                  <Ordertable />
+                  <OrderTable />
                 </AdminRoute>
               }
             />
@@ -81,7 +81,7 @@ const App = () => {
                 </AdminRoute>
               }
             />
-             <Route
+            <Route
               path="/dashboard-admin/newmenuform"
               element={
                 <AdminRoute>
@@ -169,7 +169,7 @@ const App = () => {
                 </AdminRoute>
               }
             />
-            
+
             <Route
               path="/dashboard-admin"
               element={
@@ -209,37 +209,37 @@ const App = () => {
                 )
               }
             />
-            <Route 
-              path="/stockin" 
+            <Route
+              path="/stockin"
               element={
                 localStorage.getItem("role") === "Admin" ? (
                   <Navigate to="/dashboard-admin/stockin" replace />
                 ) : (
                   <StockIn />
-                ) 
-              } 
+                )
+              }
             />
-            <Route 
-              path="/menu" 
+            <Route
+              path="/menu"
               element={
                 localStorage.getItem("role") === "Admin" ? (
                   <Navigate to="/dashboard-admin/menu" replace />
                 ) : (
                   <Menu />
-                ) 
-              } 
+                )
+              }
             />
-            <Route 
-              path="/stockout" 
+            <Route
+              path="/stockout"
               element={
                 localStorage.getItem("role") === "Admin" ? (
                   <Navigate to="/dashboard-admin/stockout" replace />
                 ) : (
-                  <StockOut/>
-                ) 
-              } 
+                  <StockOut />
+                )
+              }
             />
-            <Route path="/ordertable" element={<Ordertable />} />
+            <Route path="/ordertable" element={<OrderTable />} />
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/schedule" element={<Schedule />} />
             <Route path="/legendmodal" element={<LegendModal />} />
@@ -247,7 +247,7 @@ const App = () => {
             <Route path="/holidays" element={<Holidays />} />
 
             <Route path="/salescalendar" element={<SalesCalendar />} />
-      
+
             <Route path="/order" element={<Order />} />
             <Route path="/chooseorder" element={<ChooseOrder />} />
             <Route path="/testconnection" element={<TestConnection />} />
@@ -256,7 +256,7 @@ const App = () => {
             <Route path="/edititem" element={<EditItem />} /> */}
             {/* <Route path="/editinventory" element={<EditInventory />} /> */}
             {/* <Route path="/newcategory" element={<NewCategory />} /> */}
-    
+
             {/* Fallback Route */}
             <Route
               path="*"
