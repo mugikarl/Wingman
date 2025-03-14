@@ -36,6 +36,7 @@ urlpatterns = [
     path('add-payment-method/', views.add_payment_method, name='add_payment_method'),
     path('edit-payment-method/<int:payment_method_id>/', views.edit_payment_method, name='edit_payment_method'),
     path('delete-payment-method/<int:payment_method_id>/', views.delete_payment_method, name='delete_payment_method'),
+    path('edit-delivery-deduction/<int:delivery_id>/', views.edit_delivery_deduction, name='edit_delivery_deduction'),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/login/', views.login_view, name='login'),

@@ -1,3 +1,4 @@
+from operator import ne
 from django.shortcuts import render
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate, login
@@ -2161,7 +2162,7 @@ def fetch_order_data(request):
     try:
         # Fetch menu types
         menu_types_response = supabase_anon.table("menu_type") \
-            .select("id, name") \
+            .select("id, name, deduction_percentage") \
             .execute()
         menu_types = menu_types_response.data if menu_types_response.data else []
 
@@ -2352,16 +2353,16 @@ def delete_payment_method(request, payment_method_id):
     
 
 @api_view(['POST'])
-@authentication_classes([])
-@permission_classes([AllowAny])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
 def add_discount(request):
     """
     Handles adding a new discount to the database
     """
     try:
         # Authenticate the user and get the authenticated Supabase client
-        # auth_data = authenticate_user(request)
-        # supabase_client = auth_data["client"]
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
 
         data = json.loads(request.body)
         type = data.get("type")
@@ -2371,7 +2372,7 @@ def add_discount(request):
             return Response({"error": "All fields are required"}, status=400)
 
         # Insert new item category
-        insert_response = supabase_service.table("discounts").insert({
+        insert_response = supabase_client.table("discounts").insert({
             "type": type,
             "percentage": percentage,
         }).execute()
@@ -2388,16 +2389,16 @@ def add_discount(request):
 
 
 @api_view(['PUT'])
-@authentication_classes([])
-@permission_classes([AllowAny])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
 def edit_discount(request, discount_id):
     """
     Handles updating an existing discount
     """
     try:
         # Authenticate the user and get the authenticated Supabase client
-        # auth_data = authenticate_user(request)
-        # supabase_client = auth_data["client"]
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
 
         data = json.loads(request.body)
         new_type = data.get("type")
@@ -2407,12 +2408,12 @@ def edit_discount(request, discount_id):
             return Response({"error": "All fields are required."}, status=400)
 
         # Check if exists
-        response = supabase_service.table("discounts").select("*").eq("id", discount_id).execute()
+        response = supabase_client.table("discounts").select("*").eq("id", discount_id).execute()
         if not response.data:
             return Response({"error": "Discount not found."}, status=404)
 
         # Update discounts
-        update_response = supabase_service.table("discounts").update({
+        update_response = supabase_client.table("discounts").update({
             "type": new_type,
             "percentage": new_percentage
         }).eq("id", discount_id).execute()
@@ -2426,29 +2427,66 @@ def edit_discount(request, discount_id):
         return Response({"error": str(e)}, status=500)
     
 @api_view(['DELETE'])
-@authentication_classes([])  # Use appropriate authentication
-@permission_classes([AllowAny])  # Ensure only admins can delete categories
+@authentication_classes([SupabaseAuthentication])  # Use appropriate authentication
+@permission_classes([SupabaseIsAdmin])  # Ensure only admins can delete categories
 def delete_discount(request, discount_id):
     """
     Handles deleting of discount
     """
     try:
         # Authenticate the user and get the authenticated Supabase client
-        # auth_data = authenticate_user(request)
-        # supabase_client = auth_data["client"]
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
 
         # Verify category exists
-        response = supabase_service.table("discounts").select("*").eq("id", discount_id).execute()
+        response = supabase_client.table("discounts").select("*").eq("id", discount_id).execute()
         if not response.data:
             return Response({"error": "Discount not found."}, status=404)
 
         # Delete category
-        delete_response = supabase_service.table("discounts").delete().eq("id", discount_id).execute()
+        delete_response = supabase_client.table("discounts").delete().eq("id", discount_id).execute()
 
         if delete_response.data:
             return Response({"message": "Discount deleted successfully."}, status=200)
         else:
             return Response({"error": "Failed to delete Discount."}, status=500)
     
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+@api_view(['PUT'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def edit_delivery_deduction(request, delivery_id):
+    """
+    Handles updating an existing delivery deduction
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        data = json.loads(request.body)
+        new_deduction = data.get("deduction_percentage")
+
+        if new_deduction is None:
+            return Response({"error": "All fields are required."}, status=400)
+
+        # Check if exists
+        response = supabase_client.table("menu_type").select("*").eq("id", delivery_id).execute()
+        if not response.data:
+            return Response({"error": "Delivery detail not found."}, status=404)
+
+        # Update discounts
+        update_response = supabase_client.table("menu_type").update({
+            "deduction_percentage": new_deduction
+        }).eq("id", delivery_id).execute()
+
+        if update_response.data:
+            return Response({"message": "Delivery deduction percentage updated successfully."}, status=200)
+        else:
+            return Response({"error": "Failed to update delivery deduction percentage."}, status=500)
+
     except Exception as e:
         return Response({"error": str(e)}, status=500)
