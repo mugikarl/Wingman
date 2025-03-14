@@ -6,9 +6,10 @@ const ItemBox = ({
   name,
   price,
   currency = "₱",
-  inStock,
+  status,
   onClick,
 }) => {
+  const isAvailable = status === 1;
   return (
     <div
       className="w-48 h-full rounded-lg pb-3 overflow-hidden shadow-md bg-white hover:shadow-lg transition-shadow duration-300 cursor-pointer"
@@ -29,9 +30,11 @@ const ItemBox = ({
             <p className="text-gray-900 font-bold ml-1">{price}</p>
           </div>
           <span
-            className={`text-sm ${inStock ? "text-green-500" : "text-red-500"}`}
+            className={`text-sm ${
+              isAvailable ? "text-green-500" : "text-red-500"
+            }`}
           >
-            {inStock ? "In Stock" : "Out of Stock"}
+            {isAvailable ? "Available" : "Unavailable"}
           </span>
         </div>
       </div>

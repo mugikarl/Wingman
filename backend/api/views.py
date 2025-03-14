@@ -2452,3 +2452,101 @@ def delete_discount(request, discount_id):
     
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+    
+@api_view(['POST'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def add_menu_category(request):
+    """
+    Handles adding a new menu category to the database
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        data = json.loads(request.body)
+        name = data.get("name")
+
+        if not name:
+            return Response({"error": "All fields are required"}, status=400)
+
+        # Insert new menu category
+        insert_response = supabase_client.table("menu_category").insert({
+            "name": name
+        }).execute()
+
+        if insert_response.data:
+            return Response({
+                "message": "Menu Category added successfully"
+            }, status=201)
+        else:
+            return Response({"error": "Failed to add Menu Category"}, status=500)
+        
+    except Exception as e:
+        return Response({"error" : str(e)}, status=500)
+
+@api_view(['PUT'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def edit_menu_category(request, category_id):
+    """
+    Handles updating an existing category name
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        data = json.loads(request.body)
+        new_name = data.get("name")
+
+        if not new_name:
+            return Response({"error": "Name is required."}, status=400)
+
+        # Check if category exists
+        category_response = supabase_client.table("menu_category").select("*").eq("id", category_id).execute()
+        if not category_response.data:
+            return Response({"error": "Menu Category not found."}, status=404)
+
+        # Update category name
+        update_response = supabase_client.table("menu_category").update({
+            "name": new_name
+        }).eq("id", category_id).execute()
+
+        if update_response.data:
+            return Response({"message": "Menu Category updated successfully."}, status=200)
+        else:
+            return Response({"error": "Failed to update Menu Category."}, status=500)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+@api_view(['DELETE'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def delete_menu_category(request, category_id):
+    """
+    This view handles the deletion of an existing category
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        # Verify category exists
+        category_response = supabase_client.table("menu_category").select("*").eq("id", category_id).execute()
+        if not category_response.data:
+            return Response({"error": "Item Category not found."}, status=404)
+
+        # Delete category
+        delete_response = supabase_client.table("menu_category").delete().eq("id", category_id).execute()
+
+        if delete_response.data:
+            return Response({"message": "Menu Category deleted successfully."}, status=200)
+        else:
+            return Response({"error": "Failed to delete Menu Category."}, status=500)
+    
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)

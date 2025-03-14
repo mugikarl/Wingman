@@ -4,28 +4,35 @@ import axios from "axios";
 import NewMenuModal from "../../components/popups/NewMenuModal";
 import EditMenuModal from "../../components/popups/EditMenuModal"; // Import the EditMenuModal
 import ItemBox from "../../components/tables/ItemBox"; // Import the updated ItemBox
+import NewMenuCategory from "../../components/popups/NewMenuCategory";
 
 const Menu = () => {
   const role = localStorage.getItem("role");
 
-  // State to control modal visibility
+  // Modal and dropdown states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [isMenuCategoryModalOpen, setIsMenuCategoryModalOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedMenuType, setSelectedMenuType] = useState(null);
 
-  // State to store menu items, categories, and types
+  // Data states
   const [menuItems, setMenuItems] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [statuses, setStatuses] = useState([]);
   const [menuTypes, setMenuTypes] = useState([]);
   const [units, setUnits] = useState([]);
+
+  const closeMenuCategoryModal = () => setIsMenuCategoryModalOpen(false);
 
   // Fetch menus when the component mounts
   const fetchMenus = async () => {
     try {
       const token = localStorage.getItem("access_token");
       const response = await axios.get(
-        "http://127.0.0.1:8000/fetch-item-data/", // Use the correct endpoint here
+        "http://127.0.0.1:8000/fetch-item-data/",
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -33,6 +40,7 @@ const Menu = () => {
         }
       );
       setCategories(response.data.menu_categories || []);
+      setStatuses(response.data.menu_statuses || []);
       setMenuTypes(response.data.menu_types || []);
       setUnits(response.data.units || []);
       setInventory(response.data.inventory || []);
@@ -47,6 +55,16 @@ const Menu = () => {
     fetchMenus();
   }, []);
 
+  // Set default filter to "In Store" once menuTypes are loaded
+  useEffect(() => {
+    if (menuTypes.length > 0 && !selectedMenuType) {
+      const defaultType = menuTypes.find(
+        (type) => type.name.toLowerCase() === "in store"
+      );
+      setSelectedMenuType(defaultType || menuTypes[0]);
+    }
+  }, [menuTypes, selectedMenuType]);
+
   // Function to add a new menu item
   const addMenuItem = (newItem) => {
     setMenuItems([...menuItems, newItem]);
@@ -60,11 +78,47 @@ const Menu = () => {
     setMenuItems(updatedItems);
   };
 
+  // Filter the menu items based on the selected menu type
+  const filteredMenuItems = selectedMenuType
+    ? menuItems.filter((item) => item.type_id === selectedMenuType.id)
+    : menuItems;
+
+  // Handle filter selection
+  const handleFilter = (type) => {
+    setSelectedMenuType(type);
+    setIsDropdownOpen(false);
+  };
+
+  // Helper to return unique button styles based on type id for the main filter button
+  const getTypeButtonStyles = (type) => {
+    switch (type.id) {
+      case 1:
+        return "bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white";
+      case 2:
+        return "bg-gradient-to-r from-green-500 to-green-600 text-white";
+      case 3:
+        return "bg-gradient-to-r from-pink-500 to-pink-600 text-white";
+      default:
+        return "bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white";
+    }
+  };
+
+  const getLeftContainerBg = (type) => {
+    switch (type.id) {
+      case 1:
+        return "bg-gradient-to-r from-[#D87A03] to-[#E88504]";
+      case 2:
+        return "bg-gradient-to-r from-green-500 to-green-600";
+      case 3:
+        return "bg-gradient-to-r from-pink-500 to-pink-600";
+      default:
+        return "bg-gradient-to-r from-[#D87A03] to-[#E88504]";
+    }
+  };
+
   return (
     <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
-      {/* Side Buttons with Image and Text (Moved Above Search Bar) */}
-      
-
+      {/* Top section with search and action buttons */}
       <div className="flex justify-between items-start mb-2">
         <div className="w-[400px]">
           <input
@@ -73,26 +127,86 @@ const Menu = () => {
             className="w-full p-2 border rounded-lg shadow"
           />
         </div>
+        <div className="flex gap-4">
+          {/* New Menu Button */}
+          <button
+            className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden"
+            onClick={() => setIsModalOpen(true)}
+          >
+            <div className="flex items-center justify-center bg-[#D87A03] p-3">
+              <img
+                src="/images/menu (2).png"
+                alt="New Menu"
+                className="w-6 h-6"
+              />
+            </div>
+            <span className="text-left pl-3">New Menu</span>
+          </button>
+          {/* New Category Button */}
+          <button
+            onClick={() => setIsMenuCategoryModalOpen(true)}
+            className="flex items-center bg-gradient-to-r from-[#5930b2] to-[#6b3dcc] text-white rounded-md shadow-md hover:from-[#4a2699] hover:to-[#5930b2] transition-colors duration-200 w-48 overflow-hidden"
+          >
+            <div className="flex items-center justify-center bg-[#5930b2] p-3">
+              <img
+                src="/images/category.png"
+                alt="New Category"
+                className="w-6 h-6"
+              />
+            </div>
+            <span className="flex-1 text-left pl-3">New Category</span>
+          </button>
+        </div>
+      </div>
 
-        {/* New Menu Button */}
+      {/* Filter Dropdown Button */}
+      <div className="relative inline-block text-left mb-4">
         <button
-          className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden"
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+          className={`flex items-center ${
+            selectedMenuType
+              ? getTypeButtonStyles(selectedMenuType)
+              : "bg-gradient-to-r from-[#D87A03] to-[#E88504]"
+          } rounded-md shadow-md hover:opacity-90 transition-colors duration-200 w-48 overflow-hidden`}
         >
-          <div className="flex items-center justify-center bg-[#D87A03] p-3">
+          {/* Left Icon Container with dynamic background */}
+          <div
+            className={`flex items-center justify-center ${
+              selectedMenuType
+                ? getLeftContainerBg(selectedMenuType)
+                : "bg-[#D87A03]"
+            } p-3`}
+          >
             <img
-              src="/images/menu (2).png"
-              alt="New Menu"
+              src="/images/stockout/menu.png"
+              alt="Menu"
               className="w-6 h-6"
             />
           </div>
-          <span className="text-left pl-3">New Menu</span>
+          <span className="flex-1 text-left pl-3 text-white">
+            {selectedMenuType ? selectedMenuType.name : "Filter Items"}
+          </span>
         </button>
+        {isDropdownOpen && (
+          <div className="absolute left-0 mt-2 w-48 rounded-md shadow-lg z-10">
+            <div className="bg-white rounded-md py-2">
+              {menuTypes.map((type) => (
+                <button
+                  key={type.id}
+                  onClick={() => handleFilter(type)}
+                  className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                >
+                  {type.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Grid Layout for Menu Items */}
+      {/* Grid Layout for Filtered Menu Items */}
       <div className="grid grid-cols-6 gap-y-5 pt-1">
-        {menuItems.map((item) => (
+        {filteredMenuItems.map((item) => (
           <ItemBox
             key={item.id}
             item={item}
@@ -100,7 +214,7 @@ const Menu = () => {
             name={item.name}
             price={item.price}
             currency="₱"
-            inStock={item.status_id}
+            status={item.status_id}
             onClick={() => {
               setSelectedItem(item);
               setIsEditModalOpen(true);
@@ -135,6 +249,13 @@ const Menu = () => {
           fetchMenus={fetchMenus}
         />
       )}
+
+      <NewMenuCategory
+        isOpen={isMenuCategoryModalOpen}
+        onClose={closeMenuCategoryModal}
+        fetchItemData={fetchMenus}
+        menuCategories={categories}
+      />
     </div>
   );
 };
