@@ -3,7 +3,6 @@ import axios from "axios";
 import ChooseOrder from "../../components/popups/ChooseOrder";
 import Table from "../../components/tables/Table";
 import OrderEssentials from "../../components/popups/OrderEssentials";
-
 import TransactionModal from "../../components/popups/TransactionModal";
 
 const OrderTable = () => {
@@ -97,14 +96,12 @@ const OrderTable = () => {
   }, []);
 
   if (loading) {
-    return <LoadingScreen />; // Use the LoadingScreen component here
+    return <div className="p-4">Loading...</div>;
   }
 
   if (error) {
     return <div className="p-4 text-red-500">Error: {error}</div>;
   }
-
-
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -186,7 +183,6 @@ const OrderTable = () => {
         </div>
       </div>
       {showPopup && <ChooseOrder onClose={() => setShowPopup(false)} />}
-
       <OrderEssentials
         isOpen={isOrderEssentialsOpen}
         onClose={closeOrderEssentialsModal}
@@ -212,9 +208,6 @@ const OrderTable = () => {
                     (order_details) =>
                       `${order_details.quantity}x - ${order_details.menu_item?.name}`
                   ) || [];
-
-
-      <Table columns={columns} data={data} />
 
                 let formattedOrderSummary;
                 if (orderSummary.length === 1) {
@@ -267,7 +260,6 @@ const OrderTable = () => {
         transaction={selectedTransaction}
         menuTypes={orderData.menu_types}
       />
-
     </div>
   );
 };
