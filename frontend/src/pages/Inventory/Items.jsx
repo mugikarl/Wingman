@@ -6,6 +6,8 @@ import Table from "../../components/tables/Table";
 import axios from "axios";
 import EditItem from "../../components/popups/EditItem";
 import NewCategory from "../../components/popups/NewCategory";
+import LoadingScreen from "../../components/popups/LoadingScreen"; // Import the LoadingScreen component
+import { FaBasketShopping, FaRegRectangleList  } from "react-icons/fa6";
 
 const Items = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,7 +17,6 @@ const Items = () => {
   const [units, setUnits] = useState([]);
   const [categories, setCategories] = useState([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-
   const [selectedItem, setSelectedItem] = useState(null);
 
   const openModal = () => setIsModalOpen(true);
@@ -24,13 +25,6 @@ const Items = () => {
 
   const navigate = useNavigate();
   const role = localStorage.getItem("role");
-
-  // Redirect admin to the dashboard-admin route
-  // useEffect(() => {
-  //   if (role === "Admin") {
-  //     navigate("/dashboard-admin/items", { replace: true });
-  //   }
-  // }, [role, navigate]);
 
   const openEditModal = (item) => {
     setSelectedItem(item); // Set the selected item
@@ -41,6 +35,7 @@ const Items = () => {
     setSelectedItem(null); // Clear the selected item
     setIsEditModalOpen(false); // Close the edit modal
   };
+
   // Fetch item data from the backend API
   const fetchItemData = async () => {
     try {
@@ -56,6 +51,7 @@ const Items = () => {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     fetchItemData();
   }, []);
@@ -64,86 +60,7 @@ const Items = () => {
     <div className="min-h-screen w-full bg-[#E2D6D5] flex">
       <div className="flex-grow p-6">
         <div className="flex flex-col space-y-4 mb-4">
-          <div className="grid grid-cols-6">
-            {/* Inventory Button */}
-            <Link to="/inventory">
-              <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
-                {/* Darker Left Section for Icon */}
-                <div className="flex items-center justify-center bg-[#D87A03] p-3">
-                  <img
-                    src="/images/stockout/trolley.png"
-                    alt="New Product"
-                    className="w-6 h-6"
-                  />
-                </div>
-                {/* Text Aligned Left in Normal Color Section */}
-                <span className="flex-1 text-left pl-3">Inventory</span>
-              </button>
-            </Link>
-
-            {/* Items Button (Admin Only) */}
-            {role === "Admin" && (
-              <Link to="/dashboard-admin/items">
-                <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
-                  {/* Darker Left Section for Icon */}
-                  <div className="flex items-center justify-center bg-[#D87A03] p-3">
-                    <img
-                      src="/images/stockout/menu.png"
-                      alt="Menu"
-                      className="w-6 h-6"
-                    />
-                  </div>
-                  {/* Text Aligned Left in Normal Color Section */}
-                  <span className="flex-1 text-left pl-3">Items</span>
-                </button>
-              </Link>
-            )}
-            {role === "Admin" && (
-              <Link to="/dashboard-admin/menu">
-                <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
-                  <div className="flex items-center justify-center bg-[#D87A03] p-3">
-                    <img
-                      src="/images/restaurant.png"
-                      alt="Stock In"
-                      className="w-6 h-6"
-                    />
-                  </div>
-                  <span className="flex-1 text-left pl-3">Menu</span>
-                </button>
-              </Link>
-            )}
-            {/* Stock In Button */}
-            <Link to="/stockin">
-              <button className="flex items-center bg-gradient-to-r from-[#009E2A] to-[#00BA34] text-white rounded-md shadow-md hover:from-[#008C25] hover:to-[#009E2A] transition-colors duration-200 w-48 overflow-hidden">
-                {/* Darker Left Section for Icon */}
-                <div className="flex items-center justify-center bg-[#009E2A] p-3">
-                  <img
-                    src="/images/stockout/stock.png"
-                    alt="Stock In"
-                    className="w-6 h-6"
-                  />
-                </div>
-                {/* Text Aligned Left in Normal Color Section */}
-                <span className="flex-1 text-left pl-3">Stock In</span>
-              </button>
-            </Link>
-
-            {/* Disposed Button */}
-            <Link to="/stockout">
-              <button className="flex items-center bg-gradient-to-r from-[#E60000] to-[#FF0000] text-white rounded-md shadow-md hover:from-[#CC0000] hover:to-[#E60000] transition-colors duration-200 w-48 overflow-hidden">
-                {/* Darker Left Section for Icon */}
-                <div className="flex items-center justify-center bg-[#E60000] p-3">
-                  <img
-                    src="/images/stockout/trash-can.png"
-                    alt="Disposed"
-                    className="w-6 h-6"
-                  />
-                </div>
-                {/* Text Aligned Left in Normal Color Section */}
-                <span className="flex-1 text-left pl-3">Disposed</span>
-              </button>
-            </Link>
-          </div>
+          
           <div className="w-full">
             <div className="flex justify-between items-center w-full space-x-4">
               <div className="flex w-[400px]">
@@ -153,20 +70,15 @@ const Items = () => {
                   className="flex-grow p-2 border rounded-lg shadow"
                 />
               </div>
-              <div className="">
+              <div className="flex space-x-2">
                 <button
                   onClick={openModal}
-                  className="flex items-center bg-gradient-to-r from-[#1c4686] to-[#2a5ca7] text-white rounded-md shadow-md hover:from-[#163a6f] hover:to-[#1c4686] transition-colors duration-200 w-48 overflow-hidden"
-                >
-                  {/* Darker Left Section for Icon */}
-                  <div className="flex items-center justify-center bg-[#1c4686] p-3">
-                    <img
-                      src="/images/groceries.png"
-                      alt="New Item"
-                      className="w-6 h-6"
-                    />
-                  </div>
-                  {/* Text Aligned Left in Normal Color Section */}
+                  className="flex items-center bg-gradient-to-r from-[#864926] to-[#a95a00] text-white rounded-md shadow-md hover:from-[#864926] hover:to-[#864926] transition-colors duration-200 w-48 overflow-hidden"
+            >
+              {/* Image Side */}
+              <div className="flex items-center justify-center bg-[#864926] p-3">
+                    <FaBasketShopping className="w-5 h-5 text-white" />
+              </div>
                   <span className="flex-1 text-left pl-3">New Item</span>
                 </button>
               </div>
@@ -191,46 +103,40 @@ const Items = () => {
               {/* New Category button */}
               <button
                 onClick={() => setIsCategoryModalOpen(true)}
-                className="flex items-center bg-gradient-to-r from-[#5930b2] to-[#6b3dcc] text-white rounded-md shadow-md hover:from-[#4a2699] hover:to-[#5930b2] transition-colors duration-200 w-48 overflow-hidden"
-              >
-                {/* Darker Left Section for Icon */}
-                <div className="flex items-center justify-center bg-[#5930b2] p-3">
-                  <img
-                    src="/images/category.png"
-                    alt="New Category"
-                    className="w-6 h-6"
-                  />
-                </div>
-                {/* Text Aligned Left in Normal Color Section */}
+                className="flex items-center bg-gradient-to-r from-[#864926] to-[#a95a00] text-white rounded-md shadow-md hover:from-[#864926] hover:to-[#864926] transition-colors duration-200 w-48 overflow-hidden"
+            >
+              {/* Image Side */}
+              <div className="flex items-center justify-center bg-[#864926] p-3">
+                 <FaRegRectangleList className="w-5 h-5 text-white" />
+              </div>
                 <span className="flex-1 text-left pl-3">New Category</span>
               </button>
             </div>
           </div>
         </div>
         {/* Table */}
-        <Table
-          columns={["ID", "ITEM NAME", "UNIT", "CATEGORY", "STOCK TRIGGER"]}
-          data={
-            loading
-              ? [["", "", "Loading...", "", ""]]
-              : items.map((item) => {
-                  // Find the corresponding unit (measurement) and category for each item
-                  const unit = units.find((u) => u.id === item.measurement);
-                  const category = categories.find(
-                    (c) => c.id === item.category
-                  );
+        {loading ? (
+          <div className="w-full flex justify-center items-center">
+            <LoadingScreen /> {/* Display the LoadingScreen component */}
+          </div>
+        ) : (
+          <Table
+            columns={["ID", "ITEM NAME", "UNIT", "CATEGORY", "STOCK TRIGGER"]}
+            data={items.map((item) => {
+              const unit = units.find((u) => u.id === item.measurement);
+              const category = categories.find((c) => c.id === item.category);
 
-                  return [
-                    item.id,
-                    item.name,
-                    unit ? unit.symbol : "", // Display the unit symbol
-                    category ? category.name : "", // Display the category name
-                    item.stock_trigger,
-                  ];
-                })
-          }
-          rowOnClick={(rowIndex) => openEditModal(items[rowIndex])} // Pass row click handler
-        />
+              return [
+                item.id,
+                item.name,
+                unit ? unit.symbol : "",
+                category ? category.name : "",
+                item.stock_trigger,
+              ];
+            })}
+            rowOnClick={(rowIndex) => openEditModal(items[rowIndex])}
+          />
+        )}
 
         {/* New Item Modal */}
         <NewItem
@@ -243,7 +149,7 @@ const Items = () => {
         <EditItem
           isOpen={isEditModalOpen}
           closeModal={closeEditModal}
-          item={selectedItem} // Pass the selected item
+          item={selectedItem}
           fetchItemData={fetchItemData}
           units={units}
           categories={categories}

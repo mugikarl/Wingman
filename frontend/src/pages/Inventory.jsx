@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Table from "../components/tables/Table";
 import axios from "axios";
 import DisposedInventory from "../components/popups/DisposedInventory";
+import LoadingScreen from "../components/popups/LoadingScreen"; // Import the LoadingScreen component
 
 const Inventory = () => {
   const [inventoryData, setInventoryData] = useState([]);
@@ -68,29 +69,25 @@ const Inventory = () => {
       </div>
 
       {/* Table */}
-      <Table
-        columns={["NAME", "CATEGORY", "QUANTITY"]}
-        data={
-          loading
-            ? [["", "Loading...", ""]]
-            : filteredInventoryData.map((item) => {
-                const unit = units.find((u) => u.id === item.measurement);
-                const category = categories.find((c) => c.id === item.category);
-                const quantityWithUnit = `${item.quantity} ${
-                  unit ? unit.symbol : ""
-                }`;
+      {loading ? (
+        <div className="w-full flex justify-center items-center">
+          <LoadingScreen /> {/* Display the LoadingScreen component */}
+        </div>
+      ) : (
+        <Table
+          columns={["NAME", "CATEGORY", "QUANTITY"]}
+          data={filteredInventoryData.map((item) => {
+            const unit = units.find((u) => u.id === item.measurement);
+            const category = categories.find((c) => c.id === item.category);
+            const quantityWithUnit = `${item.quantity} ${unit ? unit.symbol : ""}`;
 
-                return [
-                  item.name,
-                  category ? category.name : "",
-                  quantityWithUnit,
-                ];
-              })
-        }
-        rowOnClick={(rowIndex) =>
-          openDisposedModal(filteredInventoryData[rowIndex])
-        }
-      />
+            return [item.name, category ? category.name : "", quantityWithUnit];
+          })}
+          rowOnClick={(rowIndex) =>
+            openDisposedModal(filteredInventoryData[rowIndex])
+          }
+        />
+      )}
 
       {/* Disposed Inventory Modal */}
       <DisposedInventory

@@ -3,10 +3,12 @@ import axios from "axios";
 import ChooseOrder from "../../components/popups/ChooseOrder";
 import Table from "../../components/tables/Table";
 import OrderEssentials from "../../components/popups/OrderEssentials";
+import LoadingScreen from "../../components/popups/LoadingScreen"; // Import the LoadingScreen component
+import { FaFileCircleMinus, FaBowlRice } from "react-icons/fa6";
 
 const OrderTable = () => {
   const [isOrderEssentialsOpen, setIsOrderEssentialsOpen] = useState(false);
-  const [showPopup, setShowPopup] = useState(false); // For ChooseOrder popup if needed
+  const [showPopup, setShowPopup] = useState(false);
   const [orderData, setOrderData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,7 +30,7 @@ const OrderTable = () => {
     } catch (err) {
       setError(err.message || "Error fetching data");
     } finally {
-      setLoading(false); // ✅ Ensure loading is set to false
+      setLoading(false);
     }
   };
 
@@ -37,17 +39,15 @@ const OrderTable = () => {
   }, []);
 
   if (loading) {
-    return <div className="p-4">Loading...</div>;
+    return <LoadingScreen />; // Use the LoadingScreen component here
   }
 
   if (error) {
     return <div className="p-4 text-red-500">Error: {error}</div>;
   }
 
-  // Update the table columns as needed.
   const columns = ["ORDER ID", "Name", "Price", "Actions"];
 
-  // Map the fetched menu items to table data rows.
   const data =
     orderData && orderData.menu_items
       ? orderData.menu_items.map((item) => [
@@ -63,31 +63,33 @@ const OrderTable = () => {
 
   return (
     <div className="p-4">
-      {/* Add New Order Button */}
-      <button
-        onClick={() => setShowPopup(true)}
-        className="bg-orange-500 text-white px-4 py-2 rounded-md shadow hover:bg-orange-600 mb-4"
-      >
-        Add New Order
-      </button>
-      <button
-        onClick={openOrderEssentialsModal}
-        className="flex items-center bg-gradient-to-r from-[#1c4686] to-[#2a5ca7] text-white rounded-md shadow-md hover:from-[#163a6f] hover:to-[#1c4686] transition-colors duration-200 w-48 overflow-hidden mb-4"
-      >
-        <div className="flex items-center justify-center bg-[#1c4686] p-3">
-          <img
-            src="/images/stockout/trash.png"
-            alt="New Receipt"
-            className="w-6 h-6"
-          />
-        </div>
-        <span className="flex-1 text-left pl-3">Order Essentials</span>
-      </button>
+      {/* Buttons Container */}
+      <div className="flex gap-4 mb-4">
+        <button
+          onClick={() => setShowPopup(true)}
+          className="flex items-center bg-gradient-to-r from-[#864926] to-[#a95a00] text-white rounded-md shadow-md hover:from-[#864926] hover:to-[#864926] transition-colors duration-200 w-48 overflow-hidden"
+        >
+          {/* Image Side */}
+          <div className="flex items-center justify-center bg-[#864926] p-3">
+            <FaBowlRice className="w-5 h-5 text-white" />
+          </div>
+          <span className="flex-1 text-left pl-3">Add Order</span>
+        </button>
 
-      {/* Optionally, show the ChooseOrder popup */}
+        <button
+          onClick={openOrderEssentialsModal}
+          className="flex items-center bg-gradient-to-r from-[#864926] to-[#a95a00] text-white rounded-md shadow-md hover:from-[#864926] hover:to-[#864926] transition-colors duration-200 w-48 overflow-hidden"
+        >
+          {/* Image Side */}
+          <div className="flex items-center justify-center bg-[#864926] p-3">
+            <FaFileCircleMinus className="w-5 h-5 text-white" />
+          </div>
+          <span className="flex-1 text-left pl-3">Order Essentials</span>
+        </button>
+      </div>
+
       {showPopup && <ChooseOrder onClose={() => setShowPopup(false)} />}
 
-      {/* Pass menu_types from API as a prop to the modal */}
       <OrderEssentials
         isOpen={isOrderEssentialsOpen}
         onClose={closeOrderEssentialsModal}
@@ -97,7 +99,6 @@ const OrderTable = () => {
         fetchOrderData={fetchOrderData}
       />
 
-      {/* Table Component */}
       <Table columns={columns} data={data} />
     </div>
   );

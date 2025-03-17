@@ -3,6 +3,8 @@ import axios from "axios";
 import { Link } from "react-router-dom";
 import AddProfile from "../../components/popups/AddProfile";
 import EditProfile from "../../components/popups/EditProfile";
+import LoadingScreen from "../../components/popups/LoadingScreen";
+import { FaCalendarDays, FaPersonCirclePlus, FaRegNewspaper } from "react-icons/fa6";
 
 const StaffProfile = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -64,7 +66,7 @@ const StaffProfile = () => {
   const sortedEmployees = [...filteredEmployees].sort((a, b) => a.id - b.id);
 
   return (
-    <div className="flex-grow p-6 bg-[#E2D6D5] min-h-full">
+    <div className="flex-grow p-6 bg-[#] min-h-full">
       {/* Top Section */}
       <div className="flex items-start mb-4 space-x-4">
         {/* Attendance Sheet Button */}
@@ -72,11 +74,7 @@ const StaffProfile = () => {
           <button className="flex items-center bg-gradient-to-r from-[#1c4686] to-[#2a5ca7] text-white rounded-md shadow-md hover:from-[#163a6f] hover:to-[#1c4686] transition-colors duration-200 w-48 overflow-hidden">
             {/* Darker Left Section for Icon */}
             <div className="flex items-center justify-center bg-[#1c4686] p-3">
-              <img
-                src="/images/google-sheets.png" // Replace with your icon path
-                alt="Attendance Sheet"
-                className="w-6 h-6"
-              />
+              <FaRegNewspaper className="w-5 h-5 text-white" />
             </div>
             {/* Text Aligned Left in Normal Color Section */}
             <span className="flex-1 text-left pl-3">Attendance Sheet</span>
@@ -90,11 +88,7 @@ const StaffProfile = () => {
         >
           {/* Darker Left Section for Icon */}
           <div className="flex items-center justify-center bg-[#E88504] p-3">
-            <img
-              src="/images/user.png" // Replace with your icon path
-              alt="Add New Profile"
-              className="w-6 h-6"
-            />
+            <FaPersonCirclePlus className="w-5 h-5 text-white" />
           </div>
           {/* Text Aligned Left in Normal Color Section */}
           <span className="flex-1 text-left pl-3">Add New Profile</span>
@@ -105,11 +99,7 @@ const StaffProfile = () => {
           <button className="flex items-center bg-gradient-to-r from-[#009E2A] to-[#00BA34] text-white rounded-md shadow-md hover:from-[#008C25] hover:to-[#009E2A] transition-colors duration-200 w-48 overflow-hidden">
             {/* Darker Left Section for Icon */}
             <div className="flex items-center justify-center bg-[#009E2A] p-3">
-              <img
-                src="/images/schedule.png" // Replace with your icon path
-                alt="Schedule"
-                className="w-6 h-6"
-              />
+              <FaCalendarDays className="w-5 h-5 text-white" />
             </div>
             {/* Text Aligned Left in Normal Color Section */}
             <span className="flex-1 text-left pl-3">Schedule</span>
@@ -155,7 +145,7 @@ const StaffProfile = () => {
             {loading ? (
               <tr>
                 <td className="p-2 text-center" colSpan="5">
-                  Loading...
+                  return <LoadingScreen />; 
                 </td>
               </tr>
             ) : sortedEmployees.length > 0 ? (

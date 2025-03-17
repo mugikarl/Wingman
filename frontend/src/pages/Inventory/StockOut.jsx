@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Datepicker } from "flowbite-react";
 import axios from "axios";
 import Table from "../../components/tables/Table";
+import LoadingScreen from "../../components/popups/LoadingScreen"; // Import the LoadingScreen component
 
 // Helper: Converts a Date object to a "YYYY-MM-DD" string in local time.
 const getLocalDateString = (date) => {
@@ -143,91 +144,9 @@ const StockOut = () => {
     setSelectedDate(getLocalDateString(dateObj));
   };
 
-  const columns = ["ITEM NAME", "DISPOSER", "DISPOSED", "REASON", "DATE"];
-  const data = loading
-    ? [["", "", "Loading...", "", ""]]
-    : filteredDisposedData.map((item) => [
-        item.item_name,
-        item.disposer,
-        `${item.disposed_quantity} ${item.disposed_unit}`,
-        item.reason === "Other" ? `Other - ${item.other_reason}` : item.reason,
-        new Date(item.disposal_datetime).toLocaleDateString(),
-      ]);
-
   return (
     <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
-      <div className="flex flex-col space-y-4 mb-4">
-        <div className="grid grid-cols-6">
-          {/* Inventory Button */}
-          <Link to="/inventory">
-            <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
-              <div className="flex items-center justify-center bg-[#D87A03] p-3">
-                <img
-                  src="/images/stockout/trolley.png"
-                  alt="Inventory"
-                  className="w-6 h-6"
-                />
-              </div>
-              <span className="flex-1 text-left pl-3">Inventory</span>
-            </button>
-          </Link>
-          {/* Items Button (Admin Only) */}
-          {role === "Admin" && (
-            <Link to="/dashboard-admin/items">
-              <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
-                <div className="flex items-center justify-center bg-[#D87A03] p-3">
-                  <img
-                    src="/images/stockout/menu.png"
-                    alt="Items"
-                    className="w-6 h-6"
-                  />
-                </div>
-                <span className="flex-1 text-left pl-3">Items</span>
-              </button>
-            </Link>
-          )}
-          {role === "Admin" && (
-            <Link to="/dashboard-admin/menu">
-              <button className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden">
-                <div className="flex items-center justify-center bg-[#D87A03] p-3">
-                  <img
-                    src="/images/restaurant.png"
-                    alt="Menu"
-                    className="w-6 h-6"
-                  />
-                </div>
-                <span className="flex-1 text-left pl-3">Menu</span>
-              </button>
-            </Link>
-          )}
-          {/* Stock In Button */}
-          <Link to="/stockin">
-            <button className="flex items-center bg-gradient-to-r from-[#009E2A] to-[#00BA34] text-white rounded-md shadow-md hover:from-[#008C25] hover:to-[#009E2A] transition-colors duration-200 w-48 overflow-hidden">
-              <div className="flex items-center justify-center bg-[#009E2A] p-3">
-                <img
-                  src="/images/stockout/stock.png"
-                  alt="Stock In"
-                  className="w-6 h-6"
-                />
-              </div>
-              <span className="flex-1 text-left pl-3">Stock In</span>
-            </button>
-          </Link>
-          {/* Disposed Button */}
-          <Link to="/stockout">
-            <button className="flex items-center bg-gradient-to-r from-[#E60000] to-[#FF0000] text-white rounded-md shadow-md hover:from-[#CC0000] hover:to-[#E60000] transition-colors duration-200 w-48 overflow-hidden">
-              <div className="flex items-center justify-center bg-[#E60000] p-3">
-                <img
-                  src="/images/stockout/trash-can.png"
-                  alt="Disposed"
-                  className="w-6 h-6"
-                />
-              </div>
-              <span className="flex-1 text-left pl-3">Disposed</span>
-            </button>
-          </Link>
-        </div>
-      </div>
+      
       {/* Top navigation: arrows and current date */}
       <div className="relative bg-[#c27100] text-lg font-semibold w-full rounded flex justify-between items-center">
         <button
@@ -270,21 +189,23 @@ const StockOut = () => {
         )}
       </div>
       {/* Table */}
-      <Table
-        columns={["ITEM NAME", "DISPOSER", "DISPOSED", "REASON"]}
-        data={
-          loading
-            ? [["", "Loading...", "", ""]]
-            : filteredDisposedData.map((item) => [
-                item.item_name,
-                item.disposer,
-                `${item.disposed_quantity} ${item.disposed_unit}`,
-                item.reason === "Other"
-                  ? `Other - ${item.other_reason}`
-                  : item.reason,
-              ])
-        }
-      />
+      {loading ? (
+        <div className="w-full flex justify-center items-center">
+          <LoadingScreen /> {/* Display the LoadingScreen component */}
+        </div>
+      ) : (
+        <Table
+          columns={["ITEM NAME", "DISPOSER", "DISPOSED", "REASON"]}
+          data={filteredDisposedData.map((item) => [
+            item.item_name,
+            item.disposer,
+            `${item.disposed_quantity} ${item.disposed_unit}`,
+            item.reason === "Other"
+              ? `Other - ${item.other_reason}`
+              : item.reason,
+          ])}
+        />
+      )}
     </div>
   );
 };
