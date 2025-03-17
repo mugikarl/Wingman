@@ -2161,97 +2161,103 @@ def delete_menu_item(request, menu_id):
 def fetch_order_data(request):
     try:
         # Fetch menu types
-        menu_types_response = supabase_anon.table("menu_type") \
-            .select("id, name, deduction_percentage") \
-            .execute()
-        menu_types = menu_types_response.data if menu_types_response.data else []
-
+        menu_types = supabase_anon.table("menu_type").select("id, name, deduction_percentage").execute().data or []
+        
         # Fetch menu statuses
-        menu_statuses_response = supabase_anon.table("menu_status") \
-            .select("id, name") \
-            .execute()
-        menu_statuses = menu_statuses_response.data if menu_statuses_response.data else []
-
+        menu_statuses = supabase_anon.table("menu_status").select("id, name").execute().data or []
+        
         # Fetch menu categories
-        menu_categories_response = supabase_anon.table("menu_category") \
-            .select("id, name") \
-            .execute()
-        menu_categories = menu_categories_response.data if menu_categories_response.data else []
-
+        menu_categories = supabase_anon.table("menu_category").select("id, name").execute().data or []
+        
         # Fetch menus
-        menus_response = supabase_anon.table("menu_items") \
-            .select("id, name, type_id, price, image, status_id, category_id") \
-            .execute()
-        menus = menus_response.data if menus_response.data else []
-
-        formatted_menus = []
-        for menu in menus:
-            # Generate a public URL for the image
-            image_url = None
-            if menu["image"]:
-                try:
-                    image_url = supabase_anon.storage.from_("menu-images").get_public_url(menu["image"])
-
-                except Exception as e:
-                    print(f"Error generating URL for image {menu['image']}: {e}")
-
-            formatted_menus.append({
+        menus = supabase_anon.table("menu_items").select("id, name, type_id, price, image, status_id, category_id").execute().data or []
+        
+        formatted_menus = [
+            {
                 "id": menu["id"],
                 "name": menu["name"],
                 "type_id": menu["type_id"],
                 "category_id": menu["category_id"],
                 "price": menu["price"],
-                "image": image_url,
+                "image": supabase_anon.storage.from_("menu-images").get_public_url(menu["image"]) if menu["image"] else None,
                 "status_id": menu["status_id"]
-            })
-
-        # Fetch menu ingredients
-        menu_items_response = supabase_anon.table("menu_ingredients") \
-            .select("id, menu_id, inventory_id, quantity, unit_id") \
-            .execute()
-        menu_ingredients = menu_items_response.data if menu_items_response.data else []
-
-        formatted_menu_ingredients = []
-        for menu_ingredient in menu_ingredients:
-            formatted_menu_ingredients.append({
-                "id": menu_ingredient["id"],
-                "menu_id": menu_ingredient["menu_id"],
-                "inventory_id": menu_ingredient["inventory_id"],
-                "quantity": menu_ingredient["quantity"],
-                "unit_id": menu_ingredient["unit_id"]
-            })
-
-        # Combine menu items with their respective menu.
-        for menu in formatted_menus:
-            menu["menu_ingredients"] = [
-                mi for mi in formatted_menu_ingredients if mi["menu_id"] == menu["id"]
-            ]
-
-        # Discounts
-        discounts_response = supabase_anon.table("discounts") \
-            .select("id","type","percentage") \
-            .execute()
-        discounts = discounts_response.data if discounts_response.data else []
+            }
+            for menu in menus
+        ]
         
-        # Payment Methods
-        payment_methods_response = supabase_anon.table("payment_methods") \
-            .select("id","name") \
+        # Fetch menu ingredients
+        menu_ingredients = supabase_anon.table("menu_ingredients").select("id, menu_id, inventory_id, quantity, unit_id").execute().data or []
+        
+        # Attach ingredients to menus
+        for menu in formatted_menus:
+            menu["menu_ingredients"] = [mi for mi in menu_ingredients if mi["menu_id"] == menu["id"]]
+        
+        # Fetch discounts
+        discounts = supabase_anon.table("discounts").select("id", "type", "percentage").execute().data or []
+        
+        # Fetch payment methods
+        payment_methods = supabase_anon.table("payment_methods").select("id", "name").execute().data or []
+        
+        # Fetch in-store categories
+        instore_categories = supabase_anon.table("instore_category").select("id", "name", "base_amount").execute().data or []
+        
+        # Fetch employees
+        active_status_id = 1  # Adjust based on your actual "Active" status ID
+
+        employees_response = supabase_anon.table("employee") \
+            .select("id, first_name, last_name, status_id") \
+            .eq("status_id", active_status_id) \
             .execute()
-        payment_methods = payment_methods_response.data if payment_methods_response.data else []
 
-
+        employees = employees_response.data if employees_response.data else []
+        
+        # Fetch order details
+        order_details = supabase_anon.table("order_details").select("id", "quantity", "menu_id", "discount_id", "instore_category", "transaction_id").execute().data or []
+        
+        # Fetch transactions
+        transactions = supabase_anon.table("transaction").select("id", "date", "payment_amount", "reference_id", "receipt_image", "order_status(id, name)", "payment_method", "employee_id").execute().data or []
+        
+        # Combine transactions with order details
+        formatted_transactions = []
+        for transaction in transactions:
+            related_orders = [
+                {
+                    "id": order["id"],
+                    "quantity": order["quantity"],
+                    "menu_item": next((menu for menu in formatted_menus if menu["id"] == order["menu_id"]), None),
+                    "discount": next((discount for discount in discounts if discount["id"] == order["discount_id"]), None),
+                    "instore_category": next((category for category in instore_categories if category["id"] == order["instore_category"]), None)
+                }
+                for order in order_details if order["transaction_id"] == transaction["id"]
+            ]
+            formatted_transactions.append({
+                "id": transaction["id"],
+                "date": transaction["date"],
+                "payment_amount": transaction["payment_amount"],
+                "reference_id": transaction["reference_id"],
+                "receipt_image": transaction["receipt_image"],
+                "order_status": transaction["order_status"],
+                "payment_method": next((method for method in payment_methods if method["id"] == transaction["payment_method"]), None),
+                "employee": next((emp for emp in employees if emp["id"] == transaction["employee_id"]), None),
+                "order_details": related_orders
+            })
+        
         return Response({
             "menu_types": menu_types,
             "menu_statuses": menu_statuses,
-            "menu_categories":menu_categories,
+            "menu_categories": menu_categories,
             "menu_items": formatted_menus,
-            "menu_ingredients": formatted_menu_ingredients,
+            "menu_ingredients": menu_ingredients,
             "discounts": discounts,
             "payment_methods": payment_methods,
+            "instore_categories": instore_categories,
+            "employees": employees,
+            "transactions": formatted_transactions
         })
     
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
 
 @api_view(['POST'])
 @authentication_classes([SupabaseAuthentication])
