@@ -5,6 +5,7 @@ import NewMenuModal from "../../components/popups/NewMenuModal";
 import EditMenuModal from "../../components/popups/EditMenuModal"; // Import the EditMenuModal
 import ItemBox from "../../components/tables/ItemBox"; // Import the updated ItemBox
 import NewMenuCategory from "../../components/popups/NewMenuCategory";
+import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
 
 const Menu = () => {
   const role = localStorage.getItem("role");
@@ -45,7 +46,6 @@ const Menu = () => {
       setUnits(response.data.units || []);
       setInventory(response.data.inventory || []);
       setMenuItems(response.data.menu_items || []);
-      console.log("Fetched menu items:", response.data.menu_items);
     } catch (error) {
       console.error("Error fetching menus:", error);
     }
@@ -93,26 +93,26 @@ const Menu = () => {
   const getTypeButtonStyles = (type) => {
     switch (type.id) {
       case 1:
-        return "bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white";
+        return "bg-[#E88504] text-white";
       case 2:
-        return "bg-gradient-to-r from-green-500 to-green-600 text-white";
+        return "bg-green-500 text-white";
       case 3:
-        return "bg-gradient-to-r from-pink-500 to-pink-600 text-white";
+        return "bg-pink-500 text-white";
       default:
-        return "bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white";
+        return "bg-[#E88504] text-white";
     }
   };
 
   const getLeftContainerBg = (type) => {
     switch (type.id) {
       case 1:
-        return "bg-gradient-to-r from-[#D87A03] to-[#E88504]";
+        return "bg-[#D87A03]";
       case 2:
-        return "bg-gradient-to-r from-green-500 to-green-600";
+        return "bg-green-600";
       case 3:
-        return "bg-gradient-to-r from-pink-500 to-pink-600";
+        return "bg-pink-600";
       default:
-        return "bg-gradient-to-r from-[#D87A03] to-[#E88504]";
+        return "bg-[#D87A03]";
     }
   };
 
@@ -169,7 +169,7 @@ const Menu = () => {
               : "bg-gradient-to-r from-[#D87A03] to-[#E88504]"
           } rounded-md shadow-md hover:opacity-90 transition-colors duration-200 w-48 overflow-hidden`}
         >
-          {/* Left Icon Container with dynamic background */}
+          {/* Left Icon Container*/}
           <div
             className={`flex items-center justify-center ${
               selectedMenuType
@@ -183,9 +183,19 @@ const Menu = () => {
               className="w-6 h-6"
             />
           </div>
-          <span className="flex-1 text-left pl-3 text-white">
+          {/* Text */}
+          <span className="flex-1 text-left px-3 text-white">
             {selectedMenuType ? selectedMenuType.name : "Filter Items"}
           </span>
+
+          {/* Arrow Icon */}
+          <div className="flex items-center justify-center p-3">
+            {isDropdownOpen ? (
+              <FaChevronUp className="h-6 text-white" />
+            ) : (
+              <FaChevronDown className="h-6 text-white" />
+            )}
+          </div>
         </button>
         {isDropdownOpen && (
           <div className="absolute left-0 mt-2 w-48 rounded-md shadow-lg z-10">
@@ -205,7 +215,7 @@ const Menu = () => {
       </div>
 
       {/* Grid Layout for Filtered Menu Items */}
-      <div className="grid grid-cols-6 gap-y-5 pt-1">
+      <div className="grid grid-cols-5 gap-x-2 gap-y-4 pt-1">
         {filteredMenuItems.map((item) => (
           <ItemBox
             key={item.id}

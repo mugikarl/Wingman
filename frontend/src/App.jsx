@@ -64,11 +64,20 @@ const App = () => {
             {/* Login Page */}
             <Route path="/login" element={<Login setIsAdmin={setIsAdmin} />} />
             {/* Admin Dashboard Routes (protected by AdminRoute) */}
+            {/** ORDER */}
             <Route
               path="/dashboard-admin/ordertable"
               element={
                 <AdminRoute>
                   <OrderTable />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/dashboard-admin/order"
+              element={
+                <AdminRoute>
+                  <Order />
                 </AdminRoute>
               }
             />
@@ -113,22 +122,7 @@ const App = () => {
                 </AdminRoute>
               }
             />
-            <Route
-              path="/dashboard-admin/grabmenu"
-              element={
-                <AdminRoute>
-                  <GrabMenu />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="/dashboard-admin/fpmenu"
-              element={
-                <AdminRoute>
-                  <FPMenu />
-                </AdminRoute>
-              }
-            />
+
             <Route
               path="/dashboard-admin/stockout"
               element={
@@ -137,22 +131,6 @@ const App = () => {
                 </AdminRoute>
               }
             />
-            {/* <Route
-              path="/dashboard-admin/newmenumodal"
-              element={
-                <AdminRoute>
-                  <NewMenuModal />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="/dashboard-admin/editmenumodal"
-              element={
-                <AdminRoute>
-                  <EditMenuModal />
-                </AdminRoute>
-              }
-            /> */}
             <Route
               path="/dashboard-admin/staffprofile"
               element={
@@ -239,7 +217,26 @@ const App = () => {
                 )
               }
             />
-            <Route path="/ordertable" element={<OrderTable />} />
+            <Route
+              path="/ordertable"
+              element={
+                localStorage.getItem("role") === "Admin" ? (
+                  <Navigate to="/dashboard-admin/ordertable" replace />
+                ) : (
+                  <OrderTable />
+                )
+              }
+            />
+            <Route
+              path="/order"
+              element={
+                localStorage.getItem("role") === "Admin" ? (
+                  <Navigate to="/dashboard-admin/order" replace />
+                ) : (
+                  <Order />
+                )
+              }
+            />
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/schedule" element={<Schedule />} />
             <Route path="/legendmodal" element={<LegendModal />} />

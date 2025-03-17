@@ -17,8 +17,6 @@ const Inventory = () => {
   const [selectedInventory, setSelectedInventory] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const navigate = useNavigate();
-
   const openDisposedModal = (item) => {
     console.log("Row clicked:", item);
     setSelectedInventory(item);
@@ -27,7 +25,9 @@ const Inventory = () => {
 
   const fetchInventoryData = async () => {
     try {
-      const response = await axios.get("http://127.0.0.1:8000/fetch-item-data/");
+      const response = await axios.get(
+        "http://127.0.0.1:8000/fetch-item-data/"
+      );
       setInventoryData(response.data.inventory);
       setUnits(response.data.units || []);
       setCategories(response.data.categories || []);

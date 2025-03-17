@@ -12,7 +12,7 @@ const ItemBox = ({
   const isAvailable = status === 1;
   return (
     <div
-      className="w-48 h-full rounded-lg pb-3 overflow-hidden shadow-md bg-white hover:shadow-lg transition-shadow duration-300 cursor-pointer"
+      className="w-54 h-full rounded-lg pb-3 overflow-hidden shadow-md bg-white hover:shadow-lg transition-shadow duration-300 cursor-pointer"
       onClick={onClick}
     >
       <div className="px-3 pt-3">
