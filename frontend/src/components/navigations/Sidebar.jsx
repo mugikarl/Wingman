@@ -4,12 +4,12 @@ import axios from "axios";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa"; // Import icons
 import {
   FaClipboard,
-  FaBoxOpen, // Correct icon for Inventory
+  FaBoxOpen,
   FaUser,
   FaChartLine,
   FaClipboardList,
   FaCheck,
-} from "react-icons/fa6"; // Import icons from react-icons/fa6
+} from "react-icons/fa6";
 
 const Sidebar = ({ isAdmin, setIsAdmin }) => {
   const navigate = useNavigate();
@@ -70,7 +70,8 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
                 } text-[#E88504] rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden`}
               >
                 <div className="flex items-center justify-center bg-[#eaeaea] p-2">
-                  <FaClipboard className="w-5 h-5 text-[#E88504]" /> {/* Replaced with icon */}
+                  <FaClipboard className="w-5 h-5 text-[#E88504]" />{" "}
+                  {/* Replaced with icon */}
                 </div>
                 <span className="flex-1 text-left pl-3">Order</span>
               </button>
@@ -85,7 +86,8 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
                 } text-[#E88504] rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden`}
               >
                 <div className="flex items-center justify-center bg-[#eaeaea] p-2">
-                  <FaBoxOpen className="w-5 h-5 text-[#E88504]" /> {/* Replaced with icon */}
+                  <FaBoxOpen className="w-5 h-5 text-[#E88504]" />{" "}
+                  {/* Replaced with icon */}
                 </div>
                 <span className="flex-1 text-left pl-3">Inventory</span>
                 {/* Dropdown Arrow */}
@@ -168,7 +170,8 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
                 } text-[#E88504] rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden`}
               >
                 <div className="flex items-center justify-center bg-[#eaeaea] p-2">
-                  <FaUser className="w-5 h-5 text-[#E88504]" /> {/* Replaced with icon */}
+                  <FaUser className="w-5 h-5 text-[#E88504]" />{" "}
+                  {/* Replaced with icon */}
                 </div>
                 <span className="flex-1 text-left pl-3">Staff Profile</span>
               </button>
@@ -183,7 +186,8 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
                 } text-[#E88504] rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden`}
               >
                 <div className="flex items-center justify-center bg-[#eaeaea] p-2">
-                  <FaChartLine className="w-5 h-5 text-[#E88504]" /> {/* Replaced with icon */}
+                  <FaChartLine className="w-5 h-5 text-[#E88504]" />{" "}
+                  {/* Replaced with icon */}
                 </div>
                 <span className="flex-1 text-left pl-3">Sales</span>
               </button>
@@ -200,7 +204,8 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
                 } text-[#E88504] rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden`}
               >
                 <div className="flex items-center justify-center bg-[#eaeaea] p-2">
-                  <FaClipboardList className="w-5 h-5 text-[#E88504]" /> {/* Replaced with icon */}
+                  <FaClipboardList className="w-5 h-5 text-[#E88504]" />{" "}
+                  {/* Replaced with icon */}
                 </div>
                 <span className="flex-1 text-left pl-3">Order</span>
               </button>
@@ -215,7 +220,8 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
                 } text-[#E88504] rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden`}
               >
                 <div className="flex items-center justify-center bg-[#eaeaea] p-2">
-                  <FaBoxOpen className="w-5 h-5 text-[#E88504]" /> {/* Replaced with icon */}
+                  <FaBoxOpen className="w-5 h-5 text-[#E88504]" />{" "}
+                  {/* Replaced with icon */}
                 </div>
                 <span className="flex-1 text-left pl-3">Inventory</span>
                 {/* Dropdown Arrow */}
@@ -274,7 +280,8 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
                 } text-[#E88504] rounded-md shadow-md hover:shadow-lg transition-shadow duration-200 w-full overflow-hidden`}
               >
                 <div className="flex items-center justify-center bg-[#eaeaea] p-2">
-                  <FaCheck className="w-5 h-5 text-[#E88504]" /> {/* Replaced with icon */}
+                  <FaCheck className="w-5 h-5 text-[#E88504]" />{" "}
+                  {/* Replaced with icon */}
                 </div>
                 <span className="flex-1 text-left pl-3">Attendance</span>
               </button>
@@ -294,10 +301,9 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
             <span>Logout</span>
           </button>
         ) : (
-          // When not logged in, show a Login button that redirects to the Login page
           <Link to="/login">
             <button className="flex items-center justify-center bg-white text-[#E88504] p-2 rounded-lg shadow hover:shadow-lg w-full">
-              <span>Login</span>
+              <span>Admin Mode</span>
             </button>
           </Link>
         )}

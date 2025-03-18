@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import ChooseOrder from "../../components/popups/ChooseOrder";
 import Table from "../../components/tables/Table";
@@ -161,12 +162,11 @@ const OrderTable = () => {
         </div>
 
         <div className="flex flex-col space-y-2">
-          <button
-            onClick={() => setShowPopup(true)}
-            className="bg-orange-500 text-white px-4 py-2 rounded-md shadow hover:bg-orange-600"
-          >
-            Add New Order
-          </button>
+          <Link to="/order">
+            <button className="bg-orange-500 text-white px-4 py-2 rounded-md shadow hover:bg-orange-600">
+              Add New Order
+            </button>
+          </Link>
           <button
             onClick={openOrderEssentialsModal}
             className="flex items-center bg-gradient-to-r from-[#1c4686] to-[#2a5ca7] text-white rounded-md shadow-md hover:from-[#163a6f] hover:to-[#1c4686] transition-colors duration-200 w-48 overflow-hidden"

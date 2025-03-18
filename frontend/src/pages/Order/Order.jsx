@@ -2,11 +2,11 @@ import React, { useState, useEffect } from "react";
 import ItemBox from "../../components/tables/ItemBox";
 import axios from "axios";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
+import OrderSummary from "../../components/panels/OrderSummary";
 
 const Order = () => {
   // Modal and dropdown states
-  const [selectedItems, setSelectedItems] = useState(null);
-  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [selectedItems, setSelectedItems] = useState([]);
   const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
   const [selectedMenuType, setSelectedMenuType] = useState(null);
   const [selectedMenuCategory, setSelectedMenuCategory] = useState(null);
@@ -35,10 +35,18 @@ const Order = () => {
     fetchMenuOrders();
   }, []);
 
+  // Set default selected menu type to "In-Store" immediately
+  useEffect(() => {
+    if (menuTypes.length > 0 && !selectedMenuType) {
+      // Assuming the "In-Store" type has id 1
+      const inStoreType = menuTypes.find((type) => type.id === 1);
+      setSelectedMenuType(inStoreType);
+    }
+  }, [menuTypes, selectedMenuType]);
+
   // Handle filter selection
   const handleTypeFilter = (type) => {
     setSelectedMenuType(type);
-    setIsTypeDropdownOpen(false);
   };
 
   const handleCategoryFilter = (cat) => {
@@ -46,6 +54,7 @@ const Order = () => {
     setIsCatDropdownOpen(false);
   };
 
+  // Filter items based on selected type and category
   const filteredMenuItems = menuItems.filter((item) => {
     const matchesType = selectedMenuType
       ? item.type_id === selectedMenuType.id
@@ -57,7 +66,14 @@ const Order = () => {
     return matchesType && matchesCategory;
   });
 
-  // Helper to return unique button styles based on type id for the main filter button
+  // Sort items so that available (status_id === 1) come first
+  const sortedFilteredMenuItems = filteredMenuItems.slice().sort((a, b) => {
+    if (a.status_id === 1 && b.status_id !== 1) return -1;
+    if (a.status_id !== 1 && b.status_id === 1) return 1;
+    return 0;
+  });
+
+  // Helper functions for button styles
   const getMenuTypeButtonStyles = (type) => {
     switch (type.id) {
       case 1:
@@ -115,7 +131,7 @@ const Order = () => {
       <div className="flex-grow p-6 flex flex-col">
         {/* Fixed Header: Search Bar and Filters */}
         <div>
-          <div className="flex flex-col space-y-4">
+          <div className="flex flex-col space-y-4 mb-4">
             {/* Search Bar */}
             <div className="w-full">
               <div className="flex justify-between items-center w-full space-x-4">
@@ -128,69 +144,45 @@ const Order = () => {
                 </div>
               </div>
             </div>
-            {/* Filters */}
-            <div className="flex gap-x-4">
-              {/* Filter Type Dropdown Button */}
-              <div className="relative inline-block text-left mb-4">
-                <button
-                  onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                  className={`flex items-center ${
-                    selectedMenuType
-                      ? getMenuTypeButtonStyles(selectedMenuType)
-                      : "bg-[#E88504]"
-                  } rounded-md shadow-md hover:opacity-90 transition-colors duration-200 w-56 overflow-hidden`}
-                >
-                  {/* Left Icon Container */}
-                  <div
-                    className={`flex items-center justify-center ${
-                      selectedMenuType
-                        ? getMenuLeftContainerBg(selectedMenuType)
-                        : "bg-[#D87A03]"
-                    } p-3`}
+            {/* Filters Section */}
+            <div className="flex flex-col space-y-4">
+              {/* Menu Type Buttons */}
+              <div className="flex gap-4">
+                {menuTypes.map((type) => (
+                  <button
+                    key={type.id}
+                    onClick={() => handleTypeFilter(type)}
+                    className={`flex items-center ${getMenuTypeButtonStyles(
+                      type
+                    )} ${
+                      selectedMenuType && selectedMenuType.id === type.id
+                        ? "filter brightness-90"
+                        : ""
+                    } rounded-md shadow-md hover:opacity-90 active:scale-95 transition-transform duration-150 w-56 overflow-hidden`}
                   >
-                    <img
-                      src="/images/stockout/menu.png"
-                      alt="Menu"
-                      className="w-6 h-6"
-                    />
-                  </div>
-                  {/* Text */}
-                  <span className="flex-1 text-left px-3 text-white">
-                    {selectedMenuType ? selectedMenuType.name : "Select Type"}
-                  </span>
-                  {/* Arrow Icon */}
-                  <div className="flex items-center justify-center p-3">
-                    {isTypeDropdownOpen ? (
-                      <FaChevronUp className="h-6 text-white" />
-                    ) : (
-                      <FaChevronDown className="h-6 text-white" />
-                    )}
-                  </div>
-                </button>
-                {/* Dropdown Menu */}
-                {isTypeDropdownOpen && (
-                  <div className="absolute left-0 mt-2 w-48 rounded-md shadow-lg z-10">
-                    <div className="bg-white rounded-md py-2">
-                      {menuTypes.map((type) => (
-                        <button
-                          key={type.id}
-                          onClick={() => handleTypeFilter(type)}
-                          className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
-                        >
-                          {type.name}
-                        </button>
-                      ))}
+                    <div
+                      className={`flex items-center justify-center ${getMenuLeftContainerBg(
+                        type
+                      )} p-3`}
+                    >
+                      <img
+                        src="/images/stockout/menu.png"
+                        alt="Menu"
+                        className="w-6 h-6"
+                      />
                     </div>
-                  </div>
-                )}
+                    <span className="flex-1 text-left px-3 text-white">
+                      {type.name}
+                    </span>
+                  </button>
+                ))}
               </div>
-              {/* Filter Category Dropdown Button */}
-              <div className="relative inline-block text-left mb-4">
+              {/* Select Category Dropdown placed underneath */}
+              <div className="relative inline-block text-left">
                 <button
                   onClick={() => setIsCatDropdownOpen(!isCatDropdownOpen)}
-                  className="flex items-center bg-[#E88504] rounded-md shadow-md hover:opacity-90 transition-colors duration-200 w-56 overflow-hidden"
+                  className="flex items-center bg-[#E88504] rounded-md shadow-md hover:opacity-90 active:scale-95 transition-transform duration-150 w-56 overflow-hidden"
                 >
-                  {/* Left Icon Container */}
                   <div className="flex items-center justify-center bg-[#D87A03] p-3">
                     <img
                       src="/images/groceries.png"
@@ -198,13 +190,11 @@ const Order = () => {
                       className="w-6 h-6"
                     />
                   </div>
-                  {/* Text */}
                   <span className="flex-1 text-left px-3 text-white">
                     {selectedMenuCategory
                       ? selectedMenuCategory.name
                       : "Select Category"}
                   </span>
-                  {/* Arrow Icon */}
                   <div className="flex items-center justify-center p-3">
                     {isCatDropdownOpen ? (
                       <FaChevronUp className="h-6 text-white" />
@@ -213,11 +203,9 @@ const Order = () => {
                     )}
                   </div>
                 </button>
-                {/* Dropdown Menu */}
                 {isCatDropdownOpen && (
                   <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg z-10">
                     <div className="bg-white rounded-md py-2">
-                      {/* Overall Option */}
                       <button
                         onClick={() =>
                           handleCategoryFilter({ id: 0, name: "Overall" })
@@ -242,10 +230,10 @@ const Order = () => {
             </div>
           </div>
         </div>
-        {/* Scrollable Grid Layout for Filtered Menu Items */}
+        {/* Scrollable Grid Layout for Sorted Menu Items */}
         <div className="flex-grow overflow-y-auto pb-2">
           <div className="grid grid-cols-4 gap-x-4 gap-y-4">
-            {filteredMenuItems.map((item) => (
+            {sortedFilteredMenuItems.map((item) => (
               <ItemBox
                 key={item.id}
                 item={item}
@@ -261,28 +249,7 @@ const Order = () => {
         </div>
       </div>
       {/* Summary Panel (Fixed) */}
-      <div className="w-1/4 bg-white p-4 flex flex-col justify-between">
-        <div className="text-center font-bold text-lg border-b pb-2">
-          Order Summary
-        </div>
-        <div className="bg-gray-100 p-4 rounded-t-lg">
-          <div className="flex justify-between mb-2">
-            <span>Subtotal:</span>
-            <span>$ {/* Calculation here */}</span>
-          </div>
-          <div className="flex justify-between mb-2">
-            <span>Discount:</span>
-            <span>$0.00</span>
-          </div>
-          <div className="flex justify-between font-bold">
-            <span>Total:</span>
-            <span>$ {/* Calculation here */}</span>
-          </div>
-          <button className="w-full bg-green-500 text-white py-2 mt-4 rounded">
-            Proceed to Payment
-          </button>
-        </div>
-      </div>
+      <OrderSummary />
     </div>
   );
 };

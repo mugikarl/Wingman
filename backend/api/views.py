@@ -1847,13 +1847,15 @@ def dispose_item(request):
         disposed_unit = disposed_unit_response.data[0]  
 
         # 4. Convert the disposed quantity to the item's unit.
-        category_str = "Weight" if item_unit["unit_category"] == 1 else "Volume"
-
-        converted_disposed_qty = convert_value(
-            disposed_quantity,
-            from_unit=disposed_unit["symbol"],
-            to_unit=item_unit["symbol"],
-            category=category_str
+        if item_unit["unit_category"] == 3:  # Assuming 3 represents 'Count'
+            converted_disposed_qty = disposed_quantity
+        else:
+            category_str = "Weight" if item_unit["unit_category"] == 1 else "Volume"
+            converted_disposed_qty = convert_value(
+                disposed_quantity,
+                from_unit=disposed_unit["symbol"],
+                to_unit=item_unit["symbol"],
+                category=category_str
         )
 
         # 5. Validate: disposed quantity should not exceed current inventory.
