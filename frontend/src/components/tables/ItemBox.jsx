@@ -12,14 +12,16 @@ const ItemBox = ({
   const isAvailable = status === 1;
   return (
     <div
-      className="w-54 h-full rounded-lg pb-3 overflow-hidden shadow-md bg-white hover:shadow-lg transition-shadow duration-300 cursor-pointer"
       onClick={onClick}
+      className={`relative w-54 h-full rounded-lg pb-3 overflow-hidden shadow-md transition-shadow duration-300 bg-white ${
+        isAvailable ? "cursor-pointer hover:shadow-lg" : "cursor-not-allowed"
+      }`}
     >
       <div className="px-3 pt-3">
         <img
           src={image || "/placeholder.svg"}
           alt={name}
-          className="w-full h-32 shadow-md object-cover rounded-lg"
+          className="w-full h-32 object-cover rounded-lg shadow-md"
         />
       </div>
       <div className="px-3 pt-2">
@@ -27,7 +29,7 @@ const ItemBox = ({
         <div className="flex justify-between items-center">
           <div className="flex items-center">
             <span className="text-gray-700">{currency}</span>
-            <p className="text-gray-900 font-bold ml-1">{price}</p>
+            <p className="ml-1 font-bold text-gray-900">{price}</p>
           </div>
           <span
             className={`text-sm ${
@@ -38,6 +40,10 @@ const ItemBox = ({
           </span>
         </div>
       </div>
+      {/* Grey overlay for unavailable items */}
+      {!isAvailable && (
+        <div className="absolute inset-0 bg-gray-400 opacity-50 pointer-events-none"></div>
+      )}
     </div>
   );
 };
