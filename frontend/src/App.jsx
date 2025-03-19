@@ -56,7 +56,7 @@ const App = () => {
 
   return (
     <Router>
-      <div className="flex">
+      <div className="flex h-screen">
         {/* Overall Sidebar is always rendered */}
         <Sidebar isAdmin={isAdmin} setIsAdmin={setIsAdmin} />
         <div className="flex-grow">

@@ -50,9 +50,9 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
   };
 
   return (
-    <div className="w-52 bg-[#E88504] flex flex-col justify-between py-4 gap-5 h-screen overflow-hidden">
+    <div className="w-52 bg-[#E88504] flex flex-col h-screen overflow-hidden">
       {/* Logo */}
-      <div className="flex items-center justify-center">
+      <div className="flex items-center justify-center py-4">
         <Link to={isAdmin ? "/dashboard-admin" : "/dashboard"}>
           <button className="flex p-2 rounded-lg w-full justify-center">
             <img src="/images/bawkbawk.png" alt="Logo" className="w-24" />
@@ -60,264 +60,294 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
         </Link>
       </div>
 
-      {/* Navigation Buttons (no sidebar scrolling) */}
-      <div className="flex-grow flex flex-col w-full px-4 gap-4">
-        {isAdmin ? (
-          <>
-            {/* Order Button */}
-            <Link to="/dashboard-admin/ordertable">
-              <button
-                onClick={() => handleMainButtonClick("order")}
-                className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                  activeButton === "order" ? "bg-white/10" : "bg-transparent"
-                } hover:bg-white/10`}
-              >
-                <div className="flex items-center justify-center p-2">
-                  <FaClipboard className="w-5 h-5 text-white" />
-                </div>
-                <span className="flex-1 text-left pl-3">Order</span>
-              </button>
-            </Link>
+      {/* Navigation Buttons */}
+      <div className="flex-grow overflow-y-auto">
+        <div className="flex flex-col w-full px-4">
+          {isAdmin ? (
+            <>
+              {/* Order Button */}
+              <Link to="/dashboard-admin/ordertable">
+                <button
+                  onClick={() => handleMainButtonClick("order")}
+                  className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                    activeButton === "order" ? "bg-white/10" : "bg-transparent"
+                  } hover:bg-white/10`}
+                >
+                  <div className="flex items-center justify-center p-2">
+                    <FaClipboard className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="flex-1 text-left pl-3">Order</span>
+                </button>
+              </Link>
 
-            {/* Inventory Button with Dropdown */}
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={toggleInventoryDropdown}
-                className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                  activeButton === "inventory"
-                    ? "bg-white/10"
-                    : "bg-transparent"
-                } hover:bg-white/10`}
-              >
-                <div className="flex items-center justify-center p-2">
-                  <FaBoxOpen className="w-5 h-5 text-white" />
-                </div>
-                <span className="flex-1 text-left pl-3">Inventory</span>
-                <span className="pr-2">
-                  {isInventoryDropdownOpen ? (
-                    <FaChevronUp className="w-3 h-4" />
-                  ) : (
-                    <FaChevronDown className="w-3 h-4" />
-                  )}
-                </span>
-              </button>
+              {/* Inventory Button with Dropdown */}
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={toggleInventoryDropdown}
+                  className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                    activeButton === "inventory"
+                      ? "bg-white/10"
+                      : "bg-transparent"
+                  } hover:bg-white/10`}
+                >
+                  <div className="flex items-center justify-center p-2">
+                    <FaBoxOpen className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="flex-1 text-left pl-3">Inventory</span>
+                  <span className="pr-2">
+                    {isInventoryDropdownOpen ? (
+                      <FaChevronUp className="w-3 h-4" />
+                    ) : (
+                      <FaChevronDown className="w-3 h-4" />
+                    )}
+                  </span>
+                </button>
 
-              {/* Dropdown Menu with Sliding Animation and Scrollable Area */}
-              <div
-                className={`overflow-y-auto custom-scrollbar transition-[max-height] duration-300 ${
-                  isInventoryDropdownOpen ? "max-h-96" : "max-h-0"
-                }`}
-              >
-                <div className="flex flex-col gap-2 pl-6 p-2 bg-transparent rounded-md">
-                  <Link to="/inventory">
-                    <button
-                      onClick={() => handleDropdownButtonClick("inventory")}
-                      className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                        activeDropdownButton === "inventory"
-                          ? "bg-white/10 font-bold"
-                          : "bg-transparent"
-                      } hover:bg-white/10`}
-                    >
-                      <span className="flex-1 text-left pl-3">Inventory</span>
-                    </button>
-                  </Link>
-                  {role === "Admin" && (
-                    <>
-                      <Link to="/dashboard-admin/items">
-                        <button
-                          onClick={() => handleDropdownButtonClick("items")}
-                          className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                            activeDropdownButton === "items"
-                              ? "bg-white/10 font-bold"
-                              : "bg-transparent"
-                          } hover:bg-white/10`}
-                        >
-                          <span className="flex-1 text-left pl-3">Items</span>
-                        </button>
-                      </Link>
-                      <Link to="/dashboard-admin/menu">
-                        <button
-                          onClick={() => handleDropdownButtonClick("menu")}
-                          className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                            activeDropdownButton === "menu"
-                              ? "bg-white/10 font-bold"
-                              : "bg-transparent"
-                          } hover:bg-white/10`}
-                        >
-                          <span className="flex-1 text-left pl-3">Menu</span>
-                        </button>
-                      </Link>
-                    </>
-                  )}
-                  <Link to="/stockin">
-                    <button
-                      onClick={() => handleDropdownButtonClick("stockin")}
-                      className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                        activeDropdownButton === "stockin"
-                          ? "bg-white/10 font-bold"
-                          : "bg-transparent"
-                      } hover:bg-white/10`}
-                    >
-                      <span className="flex-1 text-left pl-3">Stock In</span>
-                    </button>
-                  </Link>
-                  <Link to="/stockout">
-                    <button
-                      onClick={() => handleDropdownButtonClick("stockout")}
-                      className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                        activeDropdownButton === "stockout"
-                          ? "bg-white/10 font-bold"
-                          : "bg-transparent"
-                      } hover:bg-white/10`}
-                    >
-                      <span className="flex-1 text-left pl-3">Disposed</span>
-                    </button>
-                  </Link>
+                {/* Dropdown Menu with Sliding Animation and Scrollable Area */}
+                <div
+                  className={`overflow-y-auto custom-scrollbar transition-[max-height] duration-300 ${
+                    isInventoryDropdownOpen ? "max-h-96" : "max-h-0"
+                  }`}
+                >
+                  <div className="flex flex-col gap-2 pl-6 p-2 bg-transparent rounded-md">
+                    <Link to="/inventory">
+                      <button
+                        onClick={() => handleDropdownButtonClick("inventory")}
+                        className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                          activeDropdownButton === "inventory"
+                            ? "bg-white/10 font-bold"
+                            : "bg-transparent"
+                        } hover:bg-white/10`}
+                      >
+                        <span className="flex-1 text-left pl-3">Inventory</span>
+                      </button>
+                    </Link>
+                    {role === "Admin" && (
+                      <>
+                        <Link to="/dashboard-admin/items">
+                          <button
+                            onClick={() => handleDropdownButtonClick("items")}
+                            className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                              activeDropdownButton === "items"
+                                ? "bg-white/10 font-bold"
+                                : "bg-transparent"
+                            } hover:bg-white/10`}
+                          >
+                            <span className="flex-1 text-left pl-3">Items</span>
+                          </button>
+                        </Link>
+                        <Link to="/dashboard-admin/menu">
+                          <button
+                            onClick={() => handleDropdownButtonClick("menu")}
+                            className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                              activeDropdownButton === "menu"
+                                ? "bg-white/10 font-bold"
+                                : "bg-transparent"
+                            } hover:bg-white/10`}
+                          >
+                            <span className="flex-1 text-left pl-3">Menu</span>
+                          </button>
+                        </Link>
+                      </>
+                    )}
+                    <Link to="/stockin">
+                      <button
+                        onClick={() => handleDropdownButtonClick("stockin")}
+                        className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                          activeDropdownButton === "stockin"
+                            ? "bg-white/10 font-bold"
+                            : "bg-transparent"
+                        } hover:bg-white/10`}
+                      >
+                        <span className="flex-1 text-left pl-3">Stock In</span>
+                      </button>
+                    </Link>
+                    <Link to="/stockout">
+                      <button
+                        onClick={() => handleDropdownButtonClick("stockout")}
+                        className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                          activeDropdownButton === "stockout"
+                            ? "bg-white/10 font-bold"
+                            : "bg-transparent"
+                        } hover:bg-white/10`}
+                      >
+                        <span className="flex-1 text-left pl-3">Disposed</span>
+                      </button>
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Staff Profile Button */}
-            <Link to="/dashboard-admin/staffprofile">
-              <button
-                onClick={() => handleMainButtonClick("staffprofile")}
-                className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                  activeButton === "staffprofile"
-                    ? "bg-white/10"
-                    : "bg-transparent"
-                } hover:bg-white/10`}
-              >
-                <div className="flex items-center justify-center p-2">
-                  <FaUser className="w-5 h-5 text-white" />
-                </div>
-                <span className="flex-1 text-left pl-3">Staff Profile</span>
-              </button>
-            </Link>
+              {/* Staff Profile Button */}
+              <Link to="/dashboard-admin/staffprofile">
+                <button
+                  onClick={() => handleMainButtonClick("staffprofile")}
+                  className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                    activeButton === "staffprofile"
+                      ? "bg-white/10"
+                      : "bg-transparent"
+                  } hover:bg-white/10`}
+                >
+                  <div className="flex items-center justify-center p-2">
+                    <FaUser className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="flex-1 text-left pl-3">Staff Profile</span>
+                </button>
+              </Link>
 
-            {/* Sales Button */}
-            <Link to="/dashboard-admin/sales">
-              <button
-                onClick={() => handleMainButtonClick("sales")}
-                className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                  activeButton === "sales" ? "bg-white/10" : "bg-transparent"
-                } hover:bg-white/10`}
-              >
-                <div className="flex items-center justify-center p-2">
-                  <FaChartLine className="w-5 h-5 text-white" />
-                </div>
-                <span className="flex-1 text-left pl-3">Sales</span>
-              </button>
-            </Link>
-          </>
-        ) : (
-          <>
-            {/* Order Button */}
-            <Link to="/ordertable">
-              <button
-                onClick={() => handleMainButtonClick("order")}
-                className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                  activeButton === "order" ? "bg-white/10" : "bg-transparent"
-                } hover:bg-white/10`}
-              >
-                <div className="flex items-center justify-center p-2">
-                  <FaClipboardList className="w-5 h-5 text-white" />
-                </div>
-                <span className="flex-1 text-left pl-3">Order</span>
-              </button>
-            </Link>
+              {/* Sales Button */}
+              <Link to="/dashboard-admin/sales">
+                <button
+                  onClick={() => handleMainButtonClick("sales")}
+                  className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                    activeButton === "sales" ? "bg-white/10" : "bg-transparent"
+                  } hover:bg-white/10`}
+                >
+                  <div className="flex items-center justify-center p-2">
+                    <FaChartLine className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="flex-1 text-left pl-3">Sales</span>
+                </button>
+              </Link>
+            </>
+          ) : (
+            <>
+              {/* Order Button */}
+              <Link to="/ordertable">
+                <button
+                  onClick={() => handleMainButtonClick("order")}
+                  className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                    activeButton === "order" ? "bg-white/10" : "bg-transparent"
+                  } hover:bg-white/10`}
+                >
+                  <div className="flex items-center justify-center p-2">
+                    <FaClipboardList className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="flex-1 text-left pl-3">Order</span>
+                </button>
+              </Link>
 
-            {/* Inventory Button with Dropdown */}
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={toggleInventoryDropdown}
-                className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                  activeButton === "inventory"
-                    ? "bg-white/10"
-                    : "bg-transparent"
-                } hover:bg-white/10`}
-              >
-                <div className="flex items-center justify-center p-2">
-                  <FaBoxOpen className="w-5 h-5 text-white" />
-                </div>
-                <span className="flex-1 text-left pl-3">Inventory</span>
-                <span className="pr-2">
-                  {isInventoryDropdownOpen ? (
-                    <FaChevronUp className="w-3 h-4" />
-                  ) : (
-                    <FaChevronDown className="w-3 h-4" />
-                  )}
-                </span>
-              </button>
+              {/* Inventory Button with Dropdown */}
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={toggleInventoryDropdown}
+                  className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                    activeButton === "inventory"
+                      ? "bg-white/10"
+                      : "bg-transparent"
+                  } hover:bg-white/10`}
+                >
+                  <div className="flex items-center justify-center p-2">
+                    <FaBoxOpen className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="flex-1 text-left pl-3">Inventory</span>
+                  <span className="pr-2">
+                    {isInventoryDropdownOpen ? (
+                      <FaChevronUp className="w-3 h-4" />
+                    ) : (
+                      <FaChevronDown className="w-3 h-4" />
+                    )}
+                  </span>
+                </button>
 
-              {/* Dropdown Menu with Sliding Animation and Scrollable Area */}
-              <div
-                className={`overflow-y-auto custom-scrollbar transition-[max-height] duration-300 ${
-                  isInventoryDropdownOpen ? "max-h-96" : "max-h-0"
-                }`}
-              >
-                <div className="flex flex-col gap-2 bg-transparent p-2 rounded-md w-full">
-                  <Link to="/inventory">
-                    <button
-                      onClick={() => handleDropdownButtonClick("inventory")}
-                      className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                        activeDropdownButton === "inventory"
-                          ? "bg-white/10 font-bold"
-                          : "bg-transparent"
-                      } hover:bg-white/10`}
-                    >
-                      <span className="flex-1 text-left pl-3">Inventory</span>
-                    </button>
-                  </Link>
-                  <Link to="/stockin">
-                    <button
-                      onClick={() => handleDropdownButtonClick("stockin")}
-                      className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                        activeDropdownButton === "stockin"
-                          ? "bg-white/10 font-bold"
-                          : "bg-transparent"
-                      } hover:bg-white/10`}
-                    >
-                      <span className="flex-1 text-left pl-3">Stock In</span>
-                    </button>
-                  </Link>
-                  <Link to="/stockout">
-                    <button
-                      onClick={() => handleDropdownButtonClick("stockout")}
-                      className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                        activeDropdownButton === "stockout"
-                          ? "bg-white/10 font-bold"
-                          : "bg-transparent"
-                      } hover:bg-white/10`}
-                    >
-                      <span className="flex-1 text-left pl-3">Disposed</span>
-                    </button>
-                  </Link>
+                {/* Dropdown Menu with Sliding Animation and Scrollable Area */}
+                <div
+                  className={`overflow-y-auto custom-scrollbar transition-[max-height] duration-300 ${
+                    isInventoryDropdownOpen ? "max-h-96" : "max-h-0"
+                  }`}
+                >
+                  <div className="flex flex-col gap-2 bg-transparent p-2 rounded-md w-full">
+                    <Link to="/inventory">
+                      <button
+                        onClick={() => handleDropdownButtonClick("inventory")}
+                        className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                          activeDropdownButton === "inventory"
+                            ? "bg-white/10 font-bold"
+                            : "bg-transparent"
+                        } hover:bg-white/10`}
+                      >
+                        <span className="flex-1 text-left pl-3">Inventory</span>
+                      </button>
+                    </Link>
+                    {role === "Admin" && (
+                      <>
+                        <Link to="/dashboard-admin/items">
+                          <button
+                            onClick={() => handleDropdownButtonClick("items")}
+                            className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                              activeDropdownButton === "items"
+                                ? "bg-white/10 font-bold"
+                                : "bg-transparent"
+                            } hover:bg-white/10`}
+                          >
+                            <span className="flex-1 text-left pl-3">Items</span>
+                          </button>
+                        </Link>
+                        <Link to="/dashboard-admin/menu">
+                          <button
+                            onClick={() => handleDropdownButtonClick("menu")}
+                            className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                              activeDropdownButton === "menu"
+                                ? "bg-white/10 font-bold"
+                                : "bg-transparent"
+                            } hover:bg-white/10`}
+                          >
+                            <span className="flex-1 text-left pl-3">Menu</span>
+                          </button>
+                        </Link>
+                      </>
+                    )}
+                    <Link to="/stockin">
+                      <button
+                        onClick={() => handleDropdownButtonClick("stockin")}
+                        className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                          activeDropdownButton === "stockin"
+                            ? "bg-white/10 font-bold"
+                            : "bg-transparent"
+                        } hover:bg-white/10`}
+                      >
+                        <span className="flex-1 text-left pl-3">Stock In</span>
+                      </button>
+                    </Link>
+                    <Link to="/stockout">
+                      <button
+                        onClick={() => handleDropdownButtonClick("stockout")}
+                        className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                          activeDropdownButton === "stockout"
+                            ? "bg-white/10 font-bold"
+                            : "bg-transparent"
+                        } hover:bg-white/10`}
+                      >
+                        <span className="flex-1 text-left pl-3">Disposed</span>
+                      </button>
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Attendance Button */}
-            <Link to="/attendance">
-              <button
-                onClick={() => handleMainButtonClick("attendance")}
-                className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                  activeButton === "attendance"
-                    ? "bg-white/10"
-                    : "bg-transparent"
-                } hover:bg-white/10`}
-              >
-                <div className="flex items-center justify-center p-2">
-                  <FaCheck className="w-5 h-5 text-white" />
-                </div>
-                <span className="flex-1 text-left pl-3">Attendance</span>
-              </button>
-            </Link>
-          </>
-        )}
+              {/* Attendance Button */}
+              <Link to="/attendance">
+                <button
+                  onClick={() => handleMainButtonClick("attendance")}
+                  className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
+                    activeButton === "attendance"
+                      ? "bg-white/10"
+                      : "bg-transparent"
+                  } hover:bg-white/10`}
+                >
+                  <div className="flex items-center justify-center p-2">
+                    <FaCheck className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="flex-1 text-left pl-3">Attendance</span>
+                </button>
+              </Link>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Bottom Section: Login/Logout Button */}
-      <div className="w-full px-4">
+      <div className="w-full px-4 py-4">
         {isAdmin ? (
           <button
             onClick={handleLogout}
