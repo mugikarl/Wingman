@@ -62,7 +62,7 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
 
       {/* Navigation Buttons */}
       <div className="flex-grow overflow-y-auto">
-        <div className="flex flex-col w-full px-4">
+        <div className="flex flex-col w-full px-2 gap-y-2">
           {isAdmin ? (
             <>
               {/* Order Button */}
