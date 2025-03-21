@@ -10,12 +10,17 @@ const Order = () => {
   const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
   const [selectedMenuType, setSelectedMenuType] = useState(null);
   const [selectedMenuCategory, setSelectedMenuCategory] = useState(null);
+  // Active section: "alaCarte" or "unli"
+  const [activeSection, setActiveSection] = useState("alaCarte");
+  // For Unli orders, track the current order number (starts at 1)
+  const [currentUnliOrderNumber, setCurrentUnliOrderNumber] = useState(1);
 
   // Data states
   const [menuItems, setMenuItems] = useState([]);
   const [menuTypes, setMenuTypes] = useState([]);
   const [menuCategories, setMenuCategories] = useState([]);
   const [menuStatuses, setMenuStatuses] = useState([]);
+  const [discounts, setDiscounts] = useState([]);
 
   const fetchMenuOrders = async () => {
     try {
@@ -26,8 +31,9 @@ const Order = () => {
       setMenuTypes(response.data.menu_types || []);
       setMenuCategories(response.data.menu_categories || []);
       setMenuStatuses(response.data.menu_statuses || []);
+      setDiscounts(response.data.discounts || []);
     } catch (error) {
-      console.log("Error fetching data menu data: ", error);
+      console.log("Error fetching menu data: ", error);
     }
   };
 
@@ -48,15 +54,38 @@ const Order = () => {
   useEffect(() => {
     if (selectedMenuType && selectedMenuType.id !== 1) {
       setSelectedItems([]);
+      setActiveSection("alaCarte");
     }
   }, [selectedMenuType]);
 
-  // Handle filter selection
+  // Handle filter selection for type
   const handleTypeFilter = (type) => {
+    if (
+      selectedMenuType &&
+      selectedMenuType.id !== type.id &&
+      selectedItems.length > 0
+    ) {
+      const ok = window.confirm(
+        "Changing types will remove the current items in the order summary. Proceed?"
+      );
+      if (!ok) return;
+      setSelectedItems([]);
+    }
     setSelectedMenuType(type);
+    if (type.id !== 1) {
+      setActiveSection("alaCarte");
+    }
   };
 
+  // Category filter remains unchanged
   const handleCategoryFilter = (cat) => {
+    if (selectedItems.length > 0) {
+      const ok = window.confirm(
+        "Changing categories will remove the current items in the order summary. Proceed?"
+      );
+      if (!ok) return;
+      setSelectedItems([]);
+    }
     setSelectedMenuCategory(cat);
     setIsCatDropdownOpen(false);
   };
@@ -107,39 +136,99 @@ const Order = () => {
     }
   };
 
-  // Add item or increment quantity
+  // Add item or increment quantity.
+  // For Unli orders, assign a default category "Unli Order" and include the currentUnliOrderNumber.
   const handleAddItem = (item) => {
+    if (item.status_id === 2) {
+      return alert("This item is unavailable!");
+    }
+
     if (selectedMenuType?.id === 1) {
-      // For In‑Store, default instoreCategory is "Ala Carte" and discount is 0 (None)
-      const defaultCategory = "Ala Carte";
-      const defaultDiscount = 0;
-      // Only merge if same product, same instoreCategory, and same discount
-      const existingItem = selectedItems.find(
-        (i) =>
+      let defaultCategory, defaultDiscount;
+      if (activeSection === "unli") {
+        // For Unli mode, only allow items in allowed category IDs: 1 (Wings), 4 (Sides), 5 (Drinks)
+        if (
+          item.category_id === 1 ||
+          item.category_id === 5 ||
+          item.category_id === 4
+        ) {
+          // For category 4 (Sides), only allow items with "rice" in their name
+          if (
+            item.category_id === 4 &&
+            !item.name.toLowerCase().includes("rice")
+          ) {
+            return alert(
+              "Only Rice items can be added for Sides in the Unli section."
+            );
+          }
+          // For all Unli orders, we'll use a single default label
+          defaultCategory = "Unli Order";
+          defaultDiscount = 0;
+        } else {
+          return alert(
+            "Only Wings, Drinks, or Sides items can be added to the Unli section."
+          );
+        }
+      } else {
+        // For Ala Carte mode.
+        defaultCategory = "Ala Carte";
+        defaultDiscount = 0;
+      }
+
+      // Merge if same product, same instoreCategory, same discount, and for unli orders, same orderNumber.
+      const existingItem = selectedItems.find((i) => {
+        // For unli orders, also match orderNumber.
+        if (activeSection === "unli") {
+          return (
+            i.id === item.id &&
+            i.instoreCategory === defaultCategory &&
+            i.discount === defaultDiscount &&
+            i.orderNumber === currentUnliOrderNumber
+          );
+        }
+        return (
           i.id === item.id &&
           i.instoreCategory === defaultCategory &&
           i.discount === defaultDiscount
-      );
+        );
+      });
+
       if (existingItem) {
         setSelectedItems(
-          selectedItems.map((i) =>
-            i.id === item.id &&
-            i.instoreCategory === defaultCategory &&
-            i.discount === defaultDiscount
+          selectedItems.map((i) => {
+            if (activeSection === "unli") {
+              return i.id === item.id &&
+                i.instoreCategory === defaultCategory &&
+                i.discount === defaultDiscount &&
+                i.orderNumber === currentUnliOrderNumber
+                ? { ...i, quantity: i.quantity + 1 }
+                : i;
+            }
+            return i.id === item.id &&
+              i.instoreCategory === defaultCategory &&
+              i.discount === defaultDiscount
               ? { ...i, quantity: i.quantity + 1 }
-              : i
-          )
+              : i;
+          })
         );
       } else {
-        setSelectedItems([
-          ...selectedItems,
-          {
-            ...item,
-            quantity: 1,
-            instoreCategory: defaultCategory,
-            discount: defaultDiscount,
-          },
-        ]);
+        // For unli, attach the current unli order number.
+        const newItem =
+          activeSection === "unli"
+            ? {
+                ...item,
+                quantity: 1,
+                instoreCategory: defaultCategory,
+                discount: defaultDiscount,
+                orderNumber: currentUnliOrderNumber,
+              }
+            : {
+                ...item,
+                quantity: 1,
+                instoreCategory: defaultCategory,
+                discount: defaultDiscount,
+              };
+        setSelectedItems([...selectedItems, newItem]);
       }
     } else {
       // For non‑In‑Store types, use the existing behavior.
@@ -159,8 +248,13 @@ const Order = () => {
     }
   };
 
+  // Handler to add a new Unli order.
+  // This increments the currentUnliOrderNumber so that subsequent unli items go to a new order group.
+  const handleAddNewUnliOrder = () => {
+    setCurrentUnliOrderNumber(currentUnliOrderNumber + 1);
+  };
+
   // Update discount only for the targeted card.
-  // It does not merge with others if the new discount differs.
   const handleDiscountChange = (id, category, newDiscount, targetKey) => {
     setSelectedItems((prevItems) =>
       prevItems.map((item) => {
@@ -173,7 +267,6 @@ const Order = () => {
         return item;
       })
     );
-    setOpenDropdownId(null);
   };
 
   // Update quantity with discount considered.
@@ -353,6 +446,11 @@ const Order = () => {
         menuType={selectedMenuType} // pass current menu type
         handleInstoreCategoryChange={handleInstoreCategoryChange}
         handleDiscountChange={handleDiscountChange}
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        // Pass the new handler to add a new unli order.
+        handleAddNewUnliOrder={handleAddNewUnliOrder}
+        discounts={discounts}
       />
     </div>
   );
