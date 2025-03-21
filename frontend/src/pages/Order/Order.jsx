@@ -35,14 +35,21 @@ const Order = () => {
     fetchMenuOrders();
   }, []);
 
-  // Set default selected menu type to "In-Store" immediately
+  // Set default selected menu type to "In‑Store" immediately
   useEffect(() => {
     if (menuTypes.length > 0 && !selectedMenuType) {
-      // Assuming the "In-Store" type has id 1
+      // Assuming the "In‑Store" type has id 1
       const inStoreType = menuTypes.find((type) => type.id === 1);
       setSelectedMenuType(inStoreType);
     }
   }, [menuTypes, selectedMenuType]);
+
+  // When menu type changes to a non‑In‑Store type, clear order details.
+  useEffect(() => {
+    if (selectedMenuType && selectedMenuType.id !== 1) {
+      setSelectedItems([]);
+    }
+  }, [selectedMenuType]);
 
   // Handle filter selection
   const handleTypeFilter = (type) => {
@@ -100,29 +107,119 @@ const Order = () => {
     }
   };
 
+  // Add item or increment quantity
   const handleAddItem = (item) => {
-    const existingItem = selectedItems.find((i) => i.id === item.id);
-    if (existingItem) {
-      setSelectedItems(
-        selectedItems.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-        )
+    if (selectedMenuType?.id === 1) {
+      // For In‑Store, default instoreCategory is "Ala Carte" and discount is 0 (None)
+      const defaultCategory = "Ala Carte";
+      const defaultDiscount = 0;
+      // Only merge if same product, same instoreCategory, and same discount
+      const existingItem = selectedItems.find(
+        (i) =>
+          i.id === item.id &&
+          i.instoreCategory === defaultCategory &&
+          i.discount === defaultDiscount
       );
+      if (existingItem) {
+        setSelectedItems(
+          selectedItems.map((i) =>
+            i.id === item.id &&
+            i.instoreCategory === defaultCategory &&
+            i.discount === defaultDiscount
+              ? { ...i, quantity: i.quantity + 1 }
+              : i
+          )
+        );
+      } else {
+        setSelectedItems([
+          ...selectedItems,
+          {
+            ...item,
+            quantity: 1,
+            instoreCategory: defaultCategory,
+            discount: defaultDiscount,
+          },
+        ]);
+      }
     } else {
-      setSelectedItems([...selectedItems, { ...item, quantity: 1 }]);
+      // For non‑In‑Store types, use the existing behavior.
+      const existingItem = selectedItems.find((i) => i.id === item.id);
+      if (existingItem) {
+        setSelectedItems(
+          selectedItems.map((i) =>
+            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+          )
+        );
+      } else {
+        setSelectedItems([
+          ...selectedItems,
+          { ...item, quantity: 1, instoreCategory: "default", discount: 0 },
+        ]);
+      }
     }
   };
 
-  const handleQuantityChange = (id, newQuantity) => {
-    setSelectedItems(
-      selectedItems.map((i) =>
-        i.id === id ? { ...i, quantity: newQuantity } : i
-      )
+  // Update discount only for the targeted card.
+  // It does not merge with others if the new discount differs.
+  const handleDiscountChange = (id, category, newDiscount, targetKey) => {
+    setSelectedItems((prevItems) =>
+      prevItems.map((item) => {
+        const key = `${item.id}-${item.instoreCategory || "default"}-${
+          item.discount || 0
+        }`;
+        if (item.id.toString() === id.toString() && key === targetKey) {
+          return { ...item, discount: Number(newDiscount) };
+        }
+        return item;
+      })
     );
+    setOpenDropdownId(null);
   };
 
+  // Update quantity with discount considered.
+  const handleQuantityChange = (id, category, discount, newQuantity) => {
+    if (newQuantity === 0) {
+      setSelectedItems(
+        selectedItems.filter(
+          (i) =>
+            !(
+              i.id === id &&
+              (selectedMenuType?.id === 1
+                ? i.instoreCategory === category &&
+                  Number(i.discount) === Number(discount)
+                : true)
+            )
+        )
+      );
+    } else if (newQuantity < 0) {
+      return;
+    } else {
+      setSelectedItems(
+        selectedItems.map((i) =>
+          i.id === id &&
+          (selectedMenuType?.id === 1
+            ? i.instoreCategory === category &&
+              Number(i.discount) === Number(discount)
+            : true)
+            ? { ...i, quantity: newQuantity }
+            : i
+        )
+      );
+    }
+  };
+
+  // Remove item from the order
   const handleRemoveItem = (id) => {
     setSelectedItems(selectedItems.filter((i) => i.id !== id));
+  };
+
+  // Update instore category for a product
+  const handleInstoreCategoryChange = (id, category) => {
+    setSelectedItems(
+      selectedItems.map((item) =>
+        item.id === id ? { ...item, instoreCategory: category } : item
+      )
+    );
   };
 
   return (
@@ -177,7 +274,7 @@ const Order = () => {
                   </button>
                 ))}
               </div>
-              {/* Select Category Dropdown placed underneath */}
+              {/* Select Category Dropdown */}
               <div className="relative inline-block text-left">
                 <button
                   onClick={() => setIsCatDropdownOpen(!isCatDropdownOpen)}
@@ -249,7 +346,14 @@ const Order = () => {
         </div>
       </div>
       {/* Summary Panel (Fixed) */}
-      <OrderSummary />
+      <OrderSummary
+        selectedItems={selectedItems}
+        handleQuantityChange={handleQuantityChange}
+        handleRemoveItem={handleRemoveItem}
+        menuType={selectedMenuType} // pass current menu type
+        handleInstoreCategoryChange={handleInstoreCategoryChange}
+        handleDiscountChange={handleDiscountChange}
+      />
     </div>
   );
 };
