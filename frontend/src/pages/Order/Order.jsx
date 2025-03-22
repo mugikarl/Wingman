@@ -22,6 +22,8 @@ const Order = () => {
   const [menuStatuses, setMenuStatuses] = useState([]);
   const [discounts, setDiscounts] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
+  const [inStoreCategories, setInStoreCategories] = useState([]);
+  const [employees, setEmployees] = useState([]); // New state for employees
 
   const fetchMenuOrders = async () => {
     try {
@@ -34,6 +36,8 @@ const Order = () => {
       setMenuStatuses(response.data.menu_statuses || []);
       setDiscounts(response.data.discounts || []);
       setPaymentMethods(response.data.paymentMethods || []);
+      setInStoreCategories(response.data.instore_categories || []);
+      setEmployees(response.data.employees || []); // Fetch employees from backend
     } catch (error) {
       console.log("Error fetching menu data: ", error);
     }
@@ -139,7 +143,7 @@ const Order = () => {
   };
 
   // Add item or increment quantity.
-  // For Unli orders, assign a default category "Unli Order" and include the currentUnliOrderNumber.
+  // For Unli orders, assign a default category "Unli Wings" and include the currentUnliOrderNumber.
   const handleAddItem = (item) => {
     if (item.status_id === 2) {
       return alert("This item is unavailable!");
@@ -246,7 +250,7 @@ const Order = () => {
     }
   };
 
-  // CHANGED: Prevent adding a new Unli order if the current Unli order is empty.
+  // Prevent adding a new Unli order if the current Unli order is empty.
   const handleAddNewUnliOrder = () => {
     const hasItemsInCurrentOrder = selectedItems.some(
       (i) =>
@@ -320,6 +324,61 @@ const Order = () => {
         item.id === id ? { ...item, instoreCategory: category } : item
       )
     );
+  };
+
+  // NEW: Function to post the transaction to the backend.
+  // This function builds a payload from the current order state and calls the add_order API.
+  const handlePlaceOrder = async (
+    employeeId,
+    paymentMethod,
+    cashReceived,
+    gcashReferenceNo,
+    gcashReferenceImage
+  ) => {
+    // Construct order_details from selectedItems:
+    const orderDetails = selectedItems.map((item) => {
+      let instore_category = null;
+      let unli_wings_group = null;
+      if (selectedMenuType && selectedMenuType.id === 1) {
+        instore_category = item.instoreCategory === "Unli Wings" ? 2 : 1;
+        unli_wings_group =
+          item.instoreCategory === "Unli Wings" ? item.orderNumber : null;
+      }
+      return {
+        menu_id: item.id,
+        quantity: item.quantity,
+        discount_id: item.discount || null,
+        instore_category: instore_category,
+        unli_wings_group: unli_wings_group,
+      };
+    });
+
+    const payload = {
+      employee_id: employeeId,
+      payment_method: paymentMethod,
+      payment_amount: Number(cashReceived) || 0,
+      reference_id: null,
+      receipt_image: gcashReferenceImage,
+      order_details: orderDetails,
+    };
+
+    try {
+      const response = await axios.post(
+        "http://127.0.0.1:8000/add-order/",
+        payload,
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      console.log("Order placed successfully:", response.data);
+      // Optionally clear order state or show confirmation
+      setSelectedItems([]);
+    } catch (error) {
+      console.error(
+        "Error placing order:",
+        error.response ? error.response.data : error.message
+      );
+    }
   };
 
   return (
@@ -457,9 +516,12 @@ const Order = () => {
         activeSection={activeSection}
         setActiveSection={setActiveSection}
         handleAddNewUnliOrder={handleAddNewUnliOrder}
-        currentUnliOrderNumber={currentUnliOrderNumber} // <-- Pass current order number
+        currentUnliOrderNumber={currentUnliOrderNumber} // Pass current order number
         discounts={discounts}
-        paymentMethods={paymentMethods} // pass paymentMethods to OrderSummary
+        paymentMethods={paymentMethods}
+        inStoreCategories={inStoreCategories}
+        employees={employees} // Pass employees to OrderSummary
+        onPlaceOrder={handlePlaceOrder} // Pass our new onPlaceOrder function
       />
     </div>
   );

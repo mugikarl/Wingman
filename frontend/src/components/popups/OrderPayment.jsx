@@ -7,30 +7,36 @@ const OrderPayment = ({
   totalAmount,
   onPlaceOrder,
   paymentMethods,
+  employees, // Array of employee objects
 }) => {
-  const [paymentMethod, setPaymentMethod] = useState("");
+  // Instead of a string, store the selected payment method object
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
   const [cashReceived, setCashReceived] = useState("");
   const [change, setChange] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-
-  // New state for GCash fields
+  // GCash fields
   const [gcashReferenceNo, setGcashReferenceNo] = useState("");
   const [gcashReferenceImage, setGcashReferenceImage] = useState(null);
+  // Selected employee
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
 
-  // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
-      setPaymentMethod(
-        paymentMethods && paymentMethods.length > 0
-          ? paymentMethods[0].name
-          : "Cash"
-      );
+      // Set default payment method to first payment method object if available
+      if (paymentMethods && paymentMethods.length > 0) {
+        setSelectedPaymentMethod(paymentMethods[0]);
+      } else {
+        setSelectedPaymentMethod(null);
+      }
       setCashReceived("");
       setChange(0);
       setGcashReferenceNo("");
       setGcashReferenceImage(null);
+      if (employees && employees.length > 0) {
+        setSelectedEmployee(employees[0]);
+      }
     }
-  }, [isOpen, paymentMethods]);
+  }, [isOpen, paymentMethods, employees]);
 
   useEffect(() => {
     const cashAmount = Number.parseFloat(cashReceived) || 0;
@@ -41,7 +47,6 @@ const OrderPayment = ({
     }
   }, [cashReceived, totalAmount]);
 
-  // Handle image upload for GCash Reference Image
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -50,7 +55,12 @@ const OrderPayment = ({
   };
 
   const handleSubmit = () => {
-    if (paymentMethod.toLowerCase() === "cash") {
+    if (!selectedPaymentMethod) {
+      alert("Please select a payment method.");
+      return;
+    }
+
+    if (selectedPaymentMethod.name.toLowerCase() === "cash") {
       if ((Number.parseFloat(cashReceived) || 0) < totalAmount) {
         alert(
           "Cash received must be greater than or equal to the total amount"
@@ -58,22 +68,30 @@ const OrderPayment = ({
         return;
       }
       setIsProcessing(true);
-      // Simulate processing delay for Cash
       setTimeout(() => {
-        onPlaceOrder(paymentMethod, Number.parseFloat(cashReceived) || 0);
+        // Use selectedPaymentMethod.id instead of the name
+        onPlaceOrder(
+          selectedEmployee.id,
+          selectedPaymentMethod.id,
+          Number.parseFloat(cashReceived) || 0
+        );
         setIsProcessing(false);
         onClose();
       }, 1000);
-    } else if (paymentMethod.toLowerCase() === "gcash") {
+    } else if (selectedPaymentMethod.name.toLowerCase() === "gcash") {
       if (!gcashReferenceNo) {
         alert("Please provide GCash Reference No.");
         return;
       }
       setIsProcessing(true);
-      // Simulate processing delay for GCash
       setTimeout(() => {
-        // Pass the GCash-specific fields along with payment method
-        onPlaceOrder(paymentMethod, 0, gcashReferenceNo, gcashReferenceImage);
+        onPlaceOrder(
+          selectedEmployee.id,
+          selectedPaymentMethod.id,
+          0,
+          gcashReferenceNo,
+          gcashReferenceImage
+        );
         setIsProcessing(false);
         onClose();
       }, 1000);
@@ -95,9 +113,31 @@ const OrderPayment = ({
             &times;
           </button>
         </div>
-
         {/* Content */}
         <div className="p-4 space-y-6">
+          {/* Employee Selection */}
+          {employees && employees.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Employee</label>
+              <select
+                value={selectedEmployee ? selectedEmployee.id : ""}
+                onChange={(e) => {
+                  const emp = employees.find(
+                    (employee) => employee.id.toString() === e.target.value
+                  );
+                  setSelectedEmployee(emp);
+                }}
+                className="w-full p-2 border rounded-md focus:outline-none"
+              >
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.first_name} {emp.last_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Total Amount */}
           <div className="flex items-center justify-between border-b pb-4">
             <span className="text-lg font-medium text-gray-700">
@@ -116,11 +156,12 @@ const OrderPayment = ({
                     key={method.id}
                     type="button"
                     className={`h-16 flex flex-col items-center justify-center gap-1 rounded-lg border ${
-                      paymentMethod === method.name
+                      selectedPaymentMethod &&
+                      selectedPaymentMethod.id === method.id
                         ? "bg-green-500 text-white border-green-600"
                         : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                     }`}
-                    onClick={() => setPaymentMethod(method.name)}
+                    onClick={() => setSelectedPaymentMethod(method)}
                   >
                     {method.name.toLowerCase() === "cash" ? (
                       <FaMoneyBill />
@@ -137,11 +178,14 @@ const OrderPayment = ({
                   <button
                     type="button"
                     className={`h-16 flex flex-col items-center justify-center gap-1 rounded-lg border ${
-                      paymentMethod.toLowerCase() === "cash"
+                      selectedPaymentMethod &&
+                      selectedPaymentMethod.name.toLowerCase() === "cash"
                         ? "bg-green-500 text-white border-green-600"
                         : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                     }`}
-                    onClick={() => setPaymentMethod("Cash")}
+                    onClick={() =>
+                      setSelectedPaymentMethod({ id: 1, name: "Cash" })
+                    }
                   >
                     <FaMoneyBill />
                     <span>Cash</span>
@@ -149,11 +193,14 @@ const OrderPayment = ({
                   <button
                     type="button"
                     className={`h-16 flex flex-col items-center justify-center gap-1 rounded-lg border ${
-                      paymentMethod.toLowerCase() === "gcash"
+                      selectedPaymentMethod &&
+                      selectedPaymentMethod.name.toLowerCase() === "gcash"
                         ? "bg-blue-500 text-white border-blue-600"
                         : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                     }`}
-                    onClick={() => setPaymentMethod("GCash")}
+                    onClick={() =>
+                      setSelectedPaymentMethod({ id: 2, name: "GCash" })
+                    }
                   >
                     <FaCreditCard />
                     <span>GCash</span>
@@ -164,82 +211,86 @@ const OrderPayment = ({
           </div>
 
           {/* Fields for Cash Payment */}
-          {paymentMethod.toLowerCase() === "cash" && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="cash-received" className="text-sm font-medium">
-                  Cash Received
-                </label>
+          {selectedPaymentMethod &&
+            selectedPaymentMethod.name.toLowerCase() === "cash" && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="cash-received"
+                    className="text-sm font-medium"
+                  >
+                    Cash Received
+                  </label>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                    ₱
+                  </span>
+                  <input
+                    id="cash-received"
+                    type="number"
+                    value={cashReceived}
+                    onChange={(e) => setCashReceived(e.target.value)}
+                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-md text-right text-lg font-medium focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="0.00"
+                    min={totalAmount}
+                    step="0.01"
+                  />
+                </div>
+                <div className="flex items-center justify-between border-t pt-4">
+                  <span className="text-lg font-medium text-gray-700">
+                    Change
+                  </span>
+                  <span className="text-xl font-bold text-green-600">
+                    ₱{change.toFixed(2)}
+                  </span>
+                </div>
               </div>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                  ₱
-                </span>
-                <input
-                  id="cash-received"
-                  type="number"
-                  value={cashReceived}
-                  onChange={(e) => setCashReceived(e.target.value)}
-                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-md text-right text-lg font-medium focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="0.00"
-                  min={totalAmount}
-                  step="0.01"
-                />
-              </div>
-              {/* Always show change for Cash */}
-              <div className="flex items-center justify-between border-t pt-4">
-                <span className="text-lg font-medium text-gray-700">
-                  Change
-                </span>
-                <span className="text-xl font-bold text-green-600">
-                  ₱{change.toFixed(2)}
-                </span>
-              </div>
-            </div>
-          )}
+            )}
 
           {/* Fields for GCash Payment */}
-          {paymentMethod.toLowerCase() === "gcash" && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Reference No.
-                </label>
-                <input
-                  type="text"
-                  value={gcashReferenceNo}
-                  onChange={(e) => setGcashReferenceNo(e.target.value)}
-                  className="w-full pl-3 pr-4 py-2 border border-gray-300 rounded-md text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter reference number"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Reference Image (optional)
-                </label>
-                <div
-                  onClick={() =>
-                    document.getElementById("gcash-image-upload").click()
-                  }
-                  className="flex-1 py-2 rounded bg-blue-500 text-white cursor-pointer text-center"
-                >
-                  Choose File
+          {selectedPaymentMethod &&
+            selectedPaymentMethod.name.toLowerCase() === "gcash" && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Reference No.
+                  </label>
+                  <input
+                    type="text"
+                    value={gcashReferenceNo}
+                    onChange={(e) => setGcashReferenceNo(e.target.value)}
+                    className="w-full pl-3 pr-4 py-2 border border-gray-300 rounded-md text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter reference number"
+                  />
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="gcash-image-upload"
-                />
-                {gcashReferenceImage && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    {gcashReferenceImage.name}
-                  </p>
-                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Reference Image (optional)
+                  </label>
+                  <div
+                    onClick={() =>
+                      document.getElementById("gcash-image-upload").click()
+                    }
+                    className="flex-1 py-2 rounded bg-blue-500 text-white cursor-pointer text-center"
+                  >
+                    Choose File
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="gcash-image-upload"
+                  />
+                  {gcashReferenceImage && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      {gcashReferenceImage.name}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </div>
 
         {/* Footer */}
@@ -248,17 +299,23 @@ const OrderPayment = ({
             onClick={handleSubmit}
             className={`w-full py-3 rounded-lg text-white text-lg font-medium transition-colors ${
               isProcessing ||
-              (paymentMethod.toLowerCase() === "cash" &&
+              (selectedPaymentMethod &&
+                selectedPaymentMethod.name.toLowerCase() === "cash" &&
                 (Number.parseFloat(cashReceived) || 0) < totalAmount) ||
-              (paymentMethod.toLowerCase() === "gcash" && !gcashReferenceNo)
+              (selectedPaymentMethod &&
+                selectedPaymentMethod.name.toLowerCase() === "gcash" &&
+                !gcashReferenceNo)
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-green-500 hover:bg-green-600"
             }`}
             disabled={
               isProcessing ||
-              (paymentMethod.toLowerCase() === "cash" &&
+              (selectedPaymentMethod &&
+                selectedPaymentMethod.name.toLowerCase() === "cash" &&
                 (Number.parseFloat(cashReceived) || 0) < totalAmount) ||
-              (paymentMethod.toLowerCase() === "gcash" && !gcashReferenceNo)
+              (selectedPaymentMethod &&
+                selectedPaymentMethod.name.toLowerCase() === "gcash" &&
+                !gcashReferenceNo)
             }
           >
             {isProcessing ? "Processing..." : "Place Order"}

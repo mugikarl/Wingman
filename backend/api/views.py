@@ -2608,6 +2608,7 @@ def add_order(request):
         payment_method = data.get("payment_method")
         payment_amount = data.get("payment_amount")  # Amount paid by customer
         reference_id = data.get("reference_id")  # Optional, can be null
+        receipt_image = data.get("receipt_image")  # New: receipt image from the frontend (if any)
         order_details = data.get("order_details", [])
         
         if not order_details:
@@ -2652,7 +2653,6 @@ def add_order(request):
             return Response({"error": f"Discounts with IDs {missing_discounts} not found."}, status=status.HTTP_400_BAD_REQUEST)
         
         # For Grab and FoodPanda orders (no instore_category), fetch their menu type details.
-        # We only care about menu items with menu_type_id 2 or 3.
         menu_type_ids_needed = [menu["type_id"] for menu in menus_data if menu["type_id"] in [2, 3]]
         if menu_type_ids_needed:
             menu_type_ids = list(set(menu_type_ids_needed))
@@ -2664,13 +2664,14 @@ def add_order(request):
         else:
             menu_types = {}
         
-        # Create transaction record
+        # Create transaction record (including receipt_image if provided)
         transaction_data = {
             "reference_id": reference_id,  
             "payment_amount": payment_amount,  
             "payment_method": payment_method,
             "employee_id": employee_id,
             "order_status": 1,  # e.g., Pending
+            "receipt_image": receipt_image  # New field; ensure your table has this column
         }
         transaction_response = supabase_anon.table("transaction").insert(transaction_data).execute()
         if not transaction_response.data:
@@ -2692,7 +2693,7 @@ def add_order(request):
             discount_id = order.get("discount_id")
             menu_item = menus[menu_id]
             
-            # Check if instore_category is provided.
+            # If instore_category is provided, process as In-Store order.
             if "instore_category" in order:
                 instore_category_id = order["instore_category"]
                 instore_category = instore_categories.get(instore_category_id)
@@ -2737,6 +2738,7 @@ def add_order(request):
                             "discount_id": discount_id
                         }
                     else:
+                        # If discount_id not yet set in the group and this order has one, update it.
                         if not unli_wings_groups[unli_wings_group]["discount_id"] and discount_id:
                             unli_wings_groups[unli_wings_group]["discount_id"] = discount_id
                     unli_wings_groups[unli_wings_group]["total_quantity"] += quantity
@@ -2746,21 +2748,18 @@ def add_order(request):
                         "quantity": quantity,
                         "discount_id": discount_id,
                         "instore_category": instore_category_id,
-                        "unli_wings_group": unli_wings_group
+                        "unli_wings_group": unli_wings_group  # Make sure your order_details table has this column
                     })
                 else:
                     return Response({"error": "Invalid In-Store Category."}, status=status.HTTP_400_BAD_REQUEST)
             else:
                 # No instore_category provided: treat as Grab/FoodPanda order.
-                # Check the menu type of the menu item.
                 menu_type_id = menu_item.get("type_id")
                 if menu_type_id not in [2, 3]:
                     return Response({"error": f"Order detail for menu_id {menu_id} is missing instore_category and is not a Grab/FoodPanda type."}, status=status.HTTP_400_BAD_REQUEST)
                 base_price = menu_item["price"] * quantity
-                # Get deduction percentage from menu type details.
                 deduction_percentage = menu_types.get(menu_type_id, {}).get("deduction_percentage", 0)
                 price = base_price - (base_price * deduction_percentage)
-                # Optionally, apply an additional discount if provided.
                 discount_percentage = 0
                 if discount_id:
                     discount_percentage = discounts.get(discount_id, 0)
@@ -2786,7 +2785,7 @@ def add_order(request):
                     "unli_wings_group": None
                 })
         
-        # Process Unli Wings groups for pricing
+        # Process Unli Wings groups for pricing (if any)
         for group_key, group in unli_wings_groups.items():
             base_price = instore_categories[group["instore_category_id"]]["base_amount"]
             price = base_price
@@ -2809,6 +2808,7 @@ def add_order(request):
         total_price = round(total_price, 2)
         change = round(payment_amount - total_price, 2)
         
+        # Insert order details
         order_details_response = supabase_anon.table("order_details").insert(order_items).execute()
         if not order_details_response.data:
             return Response({"error": "Failed to save order details."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
