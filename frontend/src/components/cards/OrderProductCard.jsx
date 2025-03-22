@@ -1,6 +1,27 @@
 import React from "react";
 import { FaEllipsisVertical } from "react-icons/fa6";
 
+// Helper to create a composite key for an item.
+// We add a guard to ensure item is defined.
+export const getItemKey = (item, menuType) => {
+  if (!item) return "";
+  if (
+    menuType?.id === 1 &&
+    item.instoreCategory === "Unli Wings" &&
+    item.orderNumber !== undefined
+  ) {
+    return `${item.id}-unli-${item.orderNumber}-${String(item.discount || 0)}`;
+  }
+  return `${item.id}-${item.instoreCategory || "Ala Carte"}-${String(
+    item.discount || 0
+  )}`;
+};
+
+export const getKeyFromParams = (id, groupIdentifier, discount, isUnli) => {
+  if (isUnli) return `${id}-unli-${groupIdentifier}-${String(discount)}`;
+  return `${id}-${groupIdentifier}-${String(discount)}`;
+};
+
 const OrderProductCard = ({
   item,
   menuType,
@@ -12,24 +33,24 @@ const OrderProductCard = ({
   handleDiscountChange,
   openDropdownId,
   setOpenDropdownId,
-  discounts, // new prop: array of discount objects from the backend
+  discounts,
 }) => {
-  // For In‑Store orders, use the provided instoreCategory; otherwise, default to "default"
+  // If item is undefined, return null to avoid further errors.
+  if (!item) return null;
+
+  // For In‑Store orders, default to "Ala Carte" if instoreCategory is not set.
   const instoreCat =
     menuType?.id === 1 ? item.instoreCategory || "Ala Carte" : "default";
-  const currentDiscount = menuType?.id === 1 ? item.discount || 0 : 0;
-  // If this is an Unli order, include the orderNumber in the key; otherwise, use instoreCat.
-  const compositeKey =
-    menuType?.id === 1 && item.instoreCategory === "Unli Order"
-      ? `${item.id}-${item.orderNumber}-${currentDiscount}`
-      : `${item.id}-${instoreCat}-${currentDiscount}`;
-  const discountFactor = 1 - currentDiscount / 100;
-
-  // Determine if this is an Unli order product
+  // For Unli orders, use the orderNumber as the unique group identifier.
   const isUnliOrder =
-    menuType?.id === 1 && item.instoreCategory === "Unli Order";
-
-  // Use discounts prop if provided, otherwise fallback to an empty array.
+    menuType?.id === 1 && item.instoreCategory === "Unli Wings";
+  const groupIdentifier =
+    isUnliOrder && item.orderNumber !== undefined
+      ? item.orderNumber
+      : instoreCat;
+  const currentDiscount = menuType?.id === 1 ? item.discount || 0 : 0;
+  const compositeKey = getItemKey(item, menuType);
+  const discountFactor = 1 - currentDiscount / 100;
   const discountOptions = discounts || [];
 
   return (
@@ -89,7 +110,7 @@ const OrderProductCard = ({
             onClick={() =>
               handleQuantityChange(
                 item.id,
-                instoreCat,
+                groupIdentifier,
                 currentDiscount,
                 item.quantity - 1
               )
@@ -105,14 +126,14 @@ const OrderProductCard = ({
             onChange={(e) =>
               onLocalQuantityChange(compositeKey, e.target.value)
             }
-            onBlur={() => handleBlur(item.id, instoreCat, currentDiscount)}
+            onBlur={() => handleBlur(item.id, groupIdentifier, currentDiscount)}
             className="w-10 text-center border-t border-b border-gray-300 text-sm h-8"
           />
           <button
             onClick={() =>
               handleQuantityChange(
                 item.id,
-                instoreCat,
+                groupIdentifier,
                 currentDiscount,
                 item.quantity + 1
               )
@@ -127,7 +148,7 @@ const OrderProductCard = ({
               onChange={(e) =>
                 handleDiscountChange(
                   item.id,
-                  instoreCat,
+                  groupIdentifier,
                   parseFloat(e.target.value),
                   compositeKey
                 )
@@ -143,7 +164,7 @@ const OrderProductCard = ({
             </select>
           )}
         </div>
-        {/* Bottom Row: Price Information (only shown for non-Unli orders) */}
+        {/* Bottom Row: Price Information (only for non-Unli orders) */}
         {!isUnliOrder && (
           <div className="flex justify-between items-center mt-1">
             <span className="text-sm text-gray-600 whitespace-nowrap">

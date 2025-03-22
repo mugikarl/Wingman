@@ -280,36 +280,23 @@ const Order = () => {
     );
   };
 
-  // Update quantity with discount considered.
-  const handleQuantityChange = (id, category, discount, newQuantity) => {
-    if (newQuantity === 0) {
-      setSelectedItems(
-        selectedItems.filter(
-          (i) =>
-            !(
-              i.id === id &&
-              (selectedMenuType?.id === 1
-                ? i.instoreCategory === category &&
-                  Number(i.discount) === Number(discount)
-                : true)
-            )
-        )
-      );
-    } else if (newQuantity < 0) {
-      return;
-    } else {
-      setSelectedItems(
-        selectedItems.map((i) =>
-          i.id === id &&
-          (selectedMenuType?.id === 1
-            ? i.instoreCategory === category &&
-              Number(i.discount) === Number(discount)
-            : true)
-            ? { ...i, quantity: newQuantity }
-            : i
-        )
-      );
-    }
+  const handleQuantityChange = (id, groupIdentifier, discount, newQuantity) => {
+    setSelectedItems((prevItems) =>
+      prevItems.map((item) => {
+        if (item.id === id && Number(item.discount || 0) === Number(discount)) {
+          if (item.instoreCategory === "Unli Wings") {
+            // For Unli orders, check the orderNumber as well.
+            if (item.orderNumber === groupIdentifier) {
+              return { ...item, quantity: newQuantity };
+            }
+          } else if (item.instoreCategory === groupIdentifier) {
+            // For Ala Carte orders, match on category.
+            return { ...item, quantity: newQuantity };
+          }
+        }
+        return item;
+      })
+    );
   };
 
   // Remove item from the order

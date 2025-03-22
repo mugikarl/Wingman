@@ -2214,7 +2214,7 @@ def fetch_order_data(request):
         employees = employees_response.data if employees_response.data else []
         
         # Fetch order details
-        order_details = supabase_anon.table("order_details").select("id", "quantity", "menu_id", "discount_id", "instore_category", "transaction_id").execute().data or []
+        order_details = supabase_anon.table("order_details").select("id", "quantity", "menu_id", "discount_id", "instore_category", "transaction_id","unli_wings_group").execute().data or []
         
         # Fetch transactions
         transactions = supabase_anon.table("transaction").select("id", "date", "payment_amount", "reference_id", "receipt_image", "order_status(id, name)", "payment_method", "employee_id").execute().data or []
@@ -2228,7 +2228,8 @@ def fetch_order_data(request):
                     "quantity": order["quantity"],
                     "menu_item": next((menu for menu in formatted_menus if menu["id"] == order["menu_id"]), None),
                     "discount": next((discount for discount in discounts if discount["id"] == order["discount_id"]), None),
-                    "instore_category": next((category for category in instore_categories if category["id"] == order["instore_category"]), None)
+                    "instore_category": next((category for category in instore_categories if category["id"] == order["instore_category"]), None),
+                    "unli_wings_group": order["unli_wings_group"]
                 }
                 for order in order_details if order["transaction_id"] == transaction["id"]
             ]
@@ -2671,7 +2672,7 @@ def add_order(request):
             "payment_method": payment_method,
             "employee_id": employee_id,
             "order_status": 1,  # e.g., Pending
-            "receipt_image": receipt_image  # New field; ensure your table has this column
+            "receipt_image": receipt_image  # Ensure your table has this column
         }
         transaction_response = supabase_anon.table("transaction").insert(transaction_data).execute()
         if not transaction_response.data:
@@ -2693,12 +2694,12 @@ def add_order(request):
             discount_id = order.get("discount_id")
             menu_item = menus[menu_id]
             
-            # If instore_category is provided, process as In-Store order.
             if "instore_category" in order:
                 instore_category_id = order["instore_category"]
                 instore_category = instore_categories.get(instore_category_id)
                 if not instore_category:
                     return Response({"error": f"In-Store Category with ID {instore_category_id} not found."}, status=status.HTTP_400_BAD_REQUEST)
+                
                 if instore_category["name"] == "Ala Carte":
                     base_price = menu_item["price"] * quantity
                     price = base_price
@@ -2738,7 +2739,6 @@ def add_order(request):
                             "discount_id": discount_id
                         }
                     else:
-                        # If discount_id not yet set in the group and this order has one, update it.
                         if not unli_wings_groups[unli_wings_group]["discount_id"] and discount_id:
                             unli_wings_groups[unli_wings_group]["discount_id"] = discount_id
                     unli_wings_groups[unli_wings_group]["total_quantity"] += quantity
@@ -2748,12 +2748,12 @@ def add_order(request):
                         "quantity": quantity,
                         "discount_id": discount_id,
                         "instore_category": instore_category_id,
-                        "unli_wings_group": unli_wings_group  # Make sure your order_details table has this column
+                        "unli_wings_group": unli_wings_group
                     })
                 else:
                     return Response({"error": "Invalid In-Store Category."}, status=status.HTTP_400_BAD_REQUEST)
             else:
-                # No instore_category provided: treat as Grab/FoodPanda order.
+                # Grab/FoodPanda orders
                 menu_type_id = menu_item.get("type_id")
                 if menu_type_id not in [2, 3]:
                     return Response({"error": f"Order detail for menu_id {menu_id} is missing instore_category and is not a Grab/FoodPanda type."}, status=status.HTTP_400_BAD_REQUEST)
@@ -2785,7 +2785,7 @@ def add_order(request):
                     "unli_wings_group": None
                 })
         
-        # Process Unli Wings groups for pricing (if any)
+        # Process Unli Wings groups pricing (if any)
         for group_key, group in unli_wings_groups.items():
             base_price = instore_categories[group["instore_category_id"]]["base_amount"]
             price = base_price
@@ -2823,5 +2823,3 @@ def add_order(request):
     
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
