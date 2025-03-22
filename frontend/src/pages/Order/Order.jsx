@@ -281,16 +281,33 @@ const Order = () => {
   };
 
   const handleQuantityChange = (id, groupIdentifier, discount, newQuantity) => {
+    if (newQuantity <= 0) {
+      // Remove item from the order when quantity reaches 0 or negative.
+      setSelectedItems((prevItems) =>
+        prevItems.filter((item) => {
+          if (item.id !== id) return true;
+          if (item.instoreCategory === "Unli Wings") {
+            return !(
+              item.orderNumber === groupIdentifier &&
+              Number(item.discount || 0) === Number(discount)
+            );
+          }
+          return !(
+            item.instoreCategory === groupIdentifier &&
+            Number(item.discount || 0) === Number(discount)
+          );
+        })
+      );
+      return;
+    }
     setSelectedItems((prevItems) =>
       prevItems.map((item) => {
         if (item.id === id && Number(item.discount || 0) === Number(discount)) {
           if (item.instoreCategory === "Unli Wings") {
-            // For Unli orders, check the orderNumber as well.
             if (item.orderNumber === groupIdentifier) {
               return { ...item, quantity: newQuantity };
             }
           } else if (item.instoreCategory === groupIdentifier) {
-            // For Ala Carte orders, match on category.
             return { ...item, quantity: newQuantity };
           }
         }
@@ -324,20 +341,24 @@ const Order = () => {
   ) => {
     // Construct order_details from selectedItems:
     const orderDetails = selectedItems.map((item) => {
-      let instore_category = null;
-      let unli_wings_group = null;
       if (selectedMenuType && selectedMenuType.id === 1) {
-        instore_category = item.instoreCategory === "Unli Wings" ? 2 : 1;
-        unli_wings_group =
-          item.instoreCategory === "Unli Wings" ? item.orderNumber : null;
+        // For In‑Store orders, include instore_category and unli_wings_group.
+        return {
+          menu_id: item.id,
+          quantity: item.quantity,
+          discount_id: item.discount || null,
+          instore_category: item.instoreCategory === "Unli Wings" ? 2 : 1,
+          unli_wings_group:
+            item.instoreCategory === "Unli Wings" ? item.orderNumber : null,
+        };
+      } else {
+        // For non‑In‑Store orders (FoodPanda/Grab), do not include instore_category.
+        return {
+          menu_id: item.id,
+          quantity: item.quantity,
+          discount_id: item.discount || null,
+        };
       }
-      return {
-        menu_id: item.id,
-        quantity: item.quantity,
-        discount_id: item.discount || null,
-        instore_category: instore_category,
-        unli_wings_group: unli_wings_group,
-      };
     });
 
     const payload = {

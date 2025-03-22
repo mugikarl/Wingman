@@ -47,14 +47,27 @@ const OrderSummary = ({
   );
   const UNLI_BASE_AMOUNT = unliCategory && unliCategory.base_amount;
 
+  // Update localQuantities from selectedItems:
+  // If a key already exists and its value is an empty string (user cleared it),
+  // we preserve the empty string. Otherwise, we update it to match the parent's quantity.
   useEffect(() => {
-    const newQuantities = {};
-    selectedItems.forEach((item) => {
-      const key = getItemKey(item, menuType);
-      newQuantities[key] = item.quantity ? item.quantity.toString() : "1";
+    setLocalQuantities((prevQuantities) => {
+      const newQuantities = {};
+      selectedItems.forEach((item) => {
+        const key = getItemKey(item, menuType);
+        // If the previous value is "", preserve it; otherwise update.
+        newQuantities[key] =
+          prevQuantities[key] === "" ? "" : item.quantity.toString();
+      });
+      return newQuantities;
     });
-    setLocalQuantities(newQuantities);
   }, [selectedItems, menuType]);
+
+  useEffect(() => {
+    if (menuType) {
+      setIsAlaCarteOpen(true);
+    }
+  }, [menuType]);
 
   // Group Unli Wings items
   const unliItems = selectedItems.filter(
@@ -71,9 +84,10 @@ const OrderSummary = ({
   }, {});
 
   // Group Ala Carte items
-  const alaCarteItems = selectedItems.filter(
-    (item) => item.instoreCategory === "Ala Carte"
-  );
+  const alaCarteItems =
+    menuType?.id === 1
+      ? selectedItems.filter((item) => item.instoreCategory === "Ala Carte")
+      : selectedItems;
 
   const calculateSubtotal = () => {
     if (!menuType || menuType.id !== 1) {
@@ -94,21 +108,13 @@ const OrderSummary = ({
     }
   };
 
+  // When the text field is cleared, allow it to remain empty.
   const handleBlur = (id, groupIdentifier, discount) => {
     const isUnli = menuType?.id === 1 && activeSection === "unliWings";
     const key = getKeyFromParams(id, groupIdentifier, discount, isUnli);
     const inputVal = localQuantities[key];
     if (inputVal === "") {
-      const currentItem = selectedItems.find((i) => {
-        if (menuType?.id === 1 && i.instoreCategory === "Unli Wings") {
-          return i.id === id && i.orderNumber === groupIdentifier;
-        }
-        return i.id === id && i.instoreCategory === groupIdentifier;
-      });
-      setLocalQuantities((prev) => ({
-        ...prev,
-        [key]: currentItem ? currentItem.quantity.toString() : "1",
-      }));
+      // Do nothing so that the textbox remains empty.
       return;
     }
     const newQuantity = parseInt(inputVal, 10);
@@ -143,7 +149,35 @@ const OrderSummary = ({
     new Set([...Object.keys(groupedUnliOrders), currentOrderKey])
   ).sort((a, b) => Number(a) - Number(b));
 
-  // Default onPlaceOrder in case none is provided
+  // Wrapped quantity change: if new quantity is ≤ 0, remove the item.
+  const wrappedHandleQuantityChange = (
+    id,
+    groupIdentifier,
+    discount,
+    newQuantity
+  ) => {
+    if (newQuantity <= 0) {
+      setSelectedItems((prevItems) =>
+        prevItems.filter((item) => {
+          if (item.id !== id) return true;
+          if (item.instoreCategory === "Unli Wings") {
+            return !(
+              item.orderNumber === groupIdentifier &&
+              Number(item.discount || 0) === Number(discount)
+            );
+          }
+          return !(
+            item.instoreCategory === groupIdentifier &&
+            Number(item.discount || 0) === Number(discount)
+          );
+        })
+      );
+      return;
+    }
+    handleQuantityChange(id, groupIdentifier, discount, newQuantity);
+  };
+
+  // Default onPlaceOrder if not provided
   const defaultOnPlaceOrder = (paymentMethod, cashReceived) => {
     console.log("Placing order with:", paymentMethod, cashReceived);
   };
@@ -157,24 +191,16 @@ const OrderSummary = ({
 
       {/* Scrollable content container */}
       <div className="flex-grow overflow-y-auto">
-        {/* Ala Carte Accordion */}
-        <div className="mt-4">
-          <button
-            onClick={() => {
-              setIsAlaCarteOpen(!isAlaCarteOpen);
-              setActiveSection("alaCarte");
-            }}
-            className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200"
-          >
-            <span className="font-semibold">Ala Carte</span>
-            {isAlaCarteOpen ? <FaMinus /> : <FaPlus />}
-          </button>
-          {isAlaCarteOpen && (
+        {menuType?.id !== 1 ? (
+          // For non-In-Store orders (Grab/FoodPanda), render product cards immediately.
+          <div className="mt-4">
             <div className="p-3 border border-t-0 border-gray-300 space-y-4">
-              {alaCarteItems.length === 0 ? (
-                <p className="text-gray-500 text-center">No items added.</p>
+              {selectedItems.length === 0 ? (
+                <p className="text-gray-500 text-center">
+                  No Order Details Added
+                </p>
               ) : (
-                alaCarteItems.map((item) => (
+                selectedItems.map((item) => (
                   <OrderProductCard
                     key={getItemKey(item, menuType)}
                     item={item}
@@ -184,7 +210,7 @@ const OrderSummary = ({
                     }
                     onLocalQuantityChange={onLocalQuantityChange}
                     handleBlur={handleBlur}
-                    handleQuantityChange={handleQuantityChange}
+                    handleQuantityChange={wrappedHandleQuantityChange}
                     handleInstoreCategoryChange={handleInstoreCategoryChange}
                     handleDiscountChange={handleDiscountChange}
                     discounts={discounts}
@@ -192,72 +218,118 @@ const OrderSummary = ({
                 ))
               )}
             </div>
-          )}
-        </div>
-
-        {/* Unli Wings Accordion */}
-        {menuType?.id === 1 && (
-          <div className="mt-4">
-            <button
-              onClick={() => {
-                setIsUnliWingsOpen(!isUnliWingsOpen);
-                setActiveSection(isUnliWingsOpen ? "alaCarte" : "unliWings");
-              }}
-              className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200"
-            >
-              <span className="font-semibold">Unli Wings</span>
-              {isUnliWingsOpen ? <FaMinus /> : <FaPlus />}
-            </button>
-            {isUnliWingsOpen && (
-              <div className="p-3 border border-t-0 border-gray-300 space-y-4">
-                {activeSection === "unliWings" && (
-                  <button
-                    className="w-full py-2 bg-[#E88504] text-white rounded"
-                    onClick={handleAddNewUnliOrder}
-                  >
-                    Add New Unli Order
-                  </button>
-                )}
-                {allOrderKeys.map((orderNumber) => (
-                  <div key={orderNumber} className="mb-4">
-                    <h4 className="font-bold text-sm mb-2">
-                      Unli Wings #{orderNumber}
-                    </h4>
-                    <p className="mb-2 text-sm text-gray-600">
-                      Base Amount: ₱{UNLI_BASE_AMOUNT}
+          </div>
+        ) : (
+          <>
+            {/* Ala Carte Accordion for In-Store */}
+            <div className="mt-4">
+              <button
+                onClick={() => {
+                  setIsAlaCarteOpen(!isAlaCarteOpen);
+                  setActiveSection("alaCarte");
+                }}
+                className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200"
+              >
+                <span className="font-semibold">Ala Carte</span>
+                {isAlaCarteOpen ? <FaMinus /> : <FaPlus />}
+              </button>
+              {isAlaCarteOpen && (
+                <div className="p-3 border border-t-0 border-gray-300 space-y-4">
+                  {alaCarteItems.length === 0 ? (
+                    <p className="text-gray-500 text-center">
+                      No Order Details Added
                     </p>
-                    {groupedUnliOrders[orderNumber] &&
-                    groupedUnliOrders[orderNumber].length > 0 ? (
-                      groupedUnliOrders[orderNumber].map((item) => (
-                        <OrderProductCard
-                          key={getItemKey(item, menuType)}
-                          item={item}
-                          menuType={menuType}
-                          localQuantity={
-                            localQuantities[getItemKey(item, menuType)] || "1"
-                          }
-                          onLocalQuantityChange={onLocalQuantityChange}
-                          handleBlur={(id, group, discount) =>
-                            handleBlur(id, item.orderNumber, discount)
-                          }
-                          handleQuantityChange={handleQuantityChange}
-                          handleInstoreCategoryChange={
-                            handleInstoreCategoryChange
-                          }
-                          handleDiscountChange={handleDiscountChange}
-                          discounts={discounts}
-                        />
-                      ))
-                    ) : (
-                      <p className="text-gray-500 text-center">
-                        No items added.
-                      </p>
+                  ) : (
+                    alaCarteItems.map((item) => (
+                      <OrderProductCard
+                        key={getItemKey(item, menuType)}
+                        item={item}
+                        menuType={menuType}
+                        localQuantity={
+                          localQuantities[getItemKey(item, menuType)] || "1"
+                        }
+                        onLocalQuantityChange={onLocalQuantityChange}
+                        handleBlur={handleBlur}
+                        handleQuantityChange={wrappedHandleQuantityChange}
+                        handleInstoreCategoryChange={
+                          handleInstoreCategoryChange
+                        }
+                        handleDiscountChange={handleDiscountChange}
+                        discounts={discounts}
+                      />
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Unli Wings Accordion for In-Store */}
+            {menuType?.id === 1 && (
+              <div className="mt-4">
+                <button
+                  onClick={() => {
+                    setIsUnliWingsOpen(!isUnliWingsOpen);
+                    setActiveSection(
+                      isUnliWingsOpen ? "alaCarte" : "unliWings"
+                    );
+                  }}
+                  className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200"
+                >
+                  <span className="font-semibold">Unli Wings</span>
+                  {isUnliWingsOpen ? <FaMinus /> : <FaPlus />}
+                </button>
+                {isUnliWingsOpen && (
+                  <div className="p-3 border border-t-0 border-gray-300 space-y-4">
+                    {activeSection === "unliWings" && (
+                      <button
+                        className="w-full py-2 bg-[#E88504] text-white rounded"
+                        onClick={handleAddNewUnliOrder}
+                      >
+                        Add New Unli Order
+                      </button>
                     )}
+                    {allOrderKeys.map((orderNumber) => (
+                      <div key={orderNumber} className="mb-4">
+                        <h4 className="font-bold text-sm mb-2">
+                          Unli Wings #{orderNumber}
+                        </h4>
+                        <p className="mb-2 text-sm text-gray-600">
+                          Base Amount: ₱{UNLI_BASE_AMOUNT}
+                        </p>
+                        {groupedUnliOrders[orderNumber] &&
+                        groupedUnliOrders[orderNumber].length > 0 ? (
+                          groupedUnliOrders[orderNumber].map((item) => (
+                            <OrderProductCard
+                              key={getItemKey(item, menuType)}
+                              item={item}
+                              menuType={menuType}
+                              localQuantity={
+                                localQuantities[getItemKey(item, menuType)] ||
+                                "1"
+                              }
+                              onLocalQuantityChange={onLocalQuantityChange}
+                              handleBlur={(id, group, discount) =>
+                                handleBlur(id, item.orderNumber, discount)
+                              }
+                              handleQuantityChange={wrappedHandleQuantityChange}
+                              handleInstoreCategoryChange={
+                                handleInstoreCategoryChange
+                              }
+                              handleDiscountChange={handleDiscountChange}
+                              discounts={discounts}
+                            />
+                          ))
+                        ) : (
+                          <p className="text-gray-500 text-center">
+                            No Order Details Added
+                          </p>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
 

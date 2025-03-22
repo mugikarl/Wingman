@@ -35,7 +35,6 @@ const OrderProductCard = ({
   setOpenDropdownId,
   discounts,
 }) => {
-  // If item is undefined, return null to avoid further errors.
   if (!item) return null;
 
   // For In‑Store orders, default to "Ala Carte" if instoreCategory is not set.
@@ -121,7 +120,6 @@ const OrderProductCard = ({
           </button>
           <input
             type="number"
-            min="0"
             value={localQuantity}
             onChange={(e) =>
               onLocalQuantityChange(compositeKey, e.target.value)
