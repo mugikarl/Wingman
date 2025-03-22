@@ -21,6 +21,7 @@ const Order = () => {
   const [menuCategories, setMenuCategories] = useState([]);
   const [menuStatuses, setMenuStatuses] = useState([]);
   const [discounts, setDiscounts] = useState([]);
+  const [paymentMethods, setPaymentMethods] = useState([]);
 
   const fetchMenuOrders = async () => {
     try {
@@ -32,6 +33,7 @@ const Order = () => {
       setMenuCategories(response.data.menu_categories || []);
       setMenuStatuses(response.data.menu_statuses || []);
       setDiscounts(response.data.discounts || []);
+      setPaymentMethods(response.data.paymentMethods || []);
     } catch (error) {
       console.log("Error fetching menu data: ", error);
     }
@@ -454,10 +456,10 @@ const Order = () => {
         handleDiscountChange={handleDiscountChange}
         activeSection={activeSection}
         setActiveSection={setActiveSection}
-        // Pass the new handler to add a new unli order.
         handleAddNewUnliOrder={handleAddNewUnliOrder}
         currentUnliOrderNumber={currentUnliOrderNumber} // <-- Pass current order number
         discounts={discounts}
+        paymentMethods={paymentMethods} // pass paymentMethods to OrderSummary
       />
     </div>
   );

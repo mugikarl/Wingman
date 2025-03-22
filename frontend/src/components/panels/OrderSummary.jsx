@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { FaPlus, FaMinus } from "react-icons/fa6";
 import OrderProductCard from "../cards/OrderProductCard";
+import OrderPayment from "../popups/OrderPayment";
 
 // Helper to create a composite key for an item
 const getItemKey = (item, menuType) => {
@@ -24,6 +25,13 @@ const OrderSummary = ({
   menuType,
   handleInstoreCategoryChange,
   handleDiscountChange,
+  activeSection,
+  setActiveSection,
+  handleAddNewUnliOrder,
+  discounts,
+  onPlaceOrder,
+  paymentMethods,
+  handleDiscountChange,
   // from Order.jsx
   handleAddNewUnliOrder,
   currentUnliOrderNumber, // current unli order number from parent
@@ -37,6 +45,9 @@ const OrderSummary = ({
   // Accordion open/close states (default closed)
   const [isAlaCarteOpen, setIsAlaCarteOpen] = useState(false);
   const [isUnliWingsOpen, setIsUnliWingsOpen] = useState(false);
+
+  // State to control payment modal visibility
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
   // Deduction percentage (default to 0)
   const deduction = menuType?.deduction_percentage || 0;
@@ -146,6 +157,12 @@ const OrderSummary = ({
       currentOrderKey, // ensure current order key is included even if empty
     ])
   ).sort((a, b) => Number(a) - Number(b));
+
+  // Sample onPlaceOrder function if not passed as prop.
+  const defaultOnPlaceOrder = (paymentMethod, cashReceived) => {
+    console.log("Placing order with:", paymentMethod, cashReceived);
+    // Add your order processing logic here.
+  };
 
   return (
     <div className="w-1/4 bg-white p-4 flex flex-col h-full">
@@ -305,10 +322,36 @@ const OrderSummary = ({
                 ).toFixed(2)}`}
           </span>
         </div>
-        <button className="w-full bg-green-500 text-white py-2 mt-4 rounded">
+        <button
+          className="w-full bg-green-500 text-white py-2 mt-4 rounded"
+          onClick={() => {
+            if (selectedItems.length === 0) {
+              alert(
+                "Please add at least one item before proceeding to payment"
+              );
+              return;
+            }
+            setIsPaymentOpen(true);
+          }}
+        >
           Proceed to Payment
         </button>
       </div>
+
+      {/* Render the OrderPayment modal */}
+      {isPaymentOpen && (
+        <OrderPayment
+          isOpen={isPaymentOpen}
+          onClose={() => setIsPaymentOpen(false)}
+          totalAmount={
+            menuType?.id === 1
+              ? calculateSubtotal()
+              : calculateSubtotal() - calculateSubtotal() * deduction
+          }
+          onPlaceOrder={onPlaceOrder || defaultOnPlaceOrder}
+          paymentMethods={paymentMethods}
+        />
+      )}
     </div>
   );
 };
