@@ -20,6 +20,7 @@ const getKeyFromParams = (id, groupIdentifier, discount, isUnli) => {
 
 const OrderSummary = ({
   selectedItems,
+  setSelectedItems,
   handleQuantityChange,
   handleRemoveItem,
   menuType,
@@ -51,16 +52,12 @@ const OrderSummary = ({
   // If a key already exists and its value is an empty string (user cleared it),
   // we preserve the empty string. Otherwise, we update it to match the parent's quantity.
   useEffect(() => {
-    setLocalQuantities((prevQuantities) => {
-      const newQuantities = {};
-      selectedItems.forEach((item) => {
-        const key = getItemKey(item, menuType);
-        // If the previous value is "", preserve it; otherwise update.
-        newQuantities[key] =
-          prevQuantities[key] === "" ? "" : item.quantity.toString();
-      });
-      return newQuantities;
+    const newQuantities = {};
+    selectedItems.forEach((item) => {
+      const key = getItemKey(item, menuType);
+      newQuantities[key] = item.quantity.toString();
     });
+    setLocalQuantities(newQuantities);
   }, [selectedItems, menuType]);
 
   useEffect(() => {
@@ -113,8 +110,9 @@ const OrderSummary = ({
     const isUnli = menuType?.id === 1 && activeSection === "unliWings";
     const key = getKeyFromParams(id, groupIdentifier, discount, isUnli);
     const inputVal = localQuantities[key];
+    // If the field is empty, interpret it as 0 (i.e. removal)
     if (inputVal === "") {
-      // Do nothing so that the textbox remains empty.
+      handleQuantityChange(id, groupIdentifier, discount, 0);
       return;
     }
     const newQuantity = parseInt(inputVal, 10);
@@ -206,7 +204,9 @@ const OrderSummary = ({
                     item={item}
                     menuType={menuType}
                     localQuantity={
-                      localQuantities[getItemKey(item, menuType)] || "1"
+                      localQuantities[getItemKey(item, menuType)] !== undefined
+                        ? localQuantities[getItemKey(item, menuType)]
+                        : item.quantity.toString()
                     }
                     onLocalQuantityChange={onLocalQuantityChange}
                     handleBlur={handleBlur}
@@ -246,7 +246,10 @@ const OrderSummary = ({
                         item={item}
                         menuType={menuType}
                         localQuantity={
-                          localQuantities[getItemKey(item, menuType)] || "1"
+                          localQuantities[getItemKey(item, menuType)] !==
+                          undefined
+                            ? localQuantities[getItemKey(item, menuType)]
+                            : item.quantity.toString()
                         }
                         onLocalQuantityChange={onLocalQuantityChange}
                         handleBlur={handleBlur}
@@ -303,8 +306,10 @@ const OrderSummary = ({
                               item={item}
                               menuType={menuType}
                               localQuantity={
-                                localQuantities[getItemKey(item, menuType)] ||
-                                "1"
+                                localQuantities[getItemKey(item, menuType)] !==
+                                undefined
+                                  ? localQuantities[getItemKey(item, menuType)]
+                                  : item.quantity.toString()
                               }
                               onLocalQuantityChange={onLocalQuantityChange}
                               handleBlur={(id, group, discount) =>

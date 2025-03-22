@@ -282,9 +282,13 @@ const Order = () => {
 
   const handleQuantityChange = (id, groupIdentifier, discount, newQuantity) => {
     if (newQuantity <= 0) {
-      // Remove item from the order when quantity reaches 0 or negative.
-      setSelectedItems((prevItems) =>
-        prevItems.filter((item) => {
+      setSelectedItems((prevItems) => {
+        // For non‑In‑Store orders, remove the item by id.
+        if (!selectedMenuType || selectedMenuType.id !== 1) {
+          return prevItems.filter((item) => item.id !== id);
+        }
+        // For In‑Store orders, use the existing detailed check.
+        return prevItems.filter((item) => {
           if (item.id !== id) return true;
           if (item.instoreCategory === "Unli Wings") {
             return !(
@@ -296,8 +300,8 @@ const Order = () => {
             item.instoreCategory === groupIdentifier &&
             Number(item.discount || 0) === Number(discount)
           );
-        })
-      );
+        });
+      });
       return;
     }
     setSelectedItems((prevItems) =>
@@ -516,6 +520,7 @@ const Order = () => {
       {/* Summary Panel (Fixed) */}
       <OrderSummary
         selectedItems={selectedItems}
+        setSelectedItems={setSelectedItems}
         handleQuantityChange={handleQuantityChange}
         handleRemoveItem={handleRemoveItem}
         menuType={selectedMenuType} // pass current menu type
