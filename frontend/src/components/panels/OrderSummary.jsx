@@ -1,5 +1,21 @@
 import React, { useState, useEffect } from "react";
+import { FaPlus, FaMinus } from "react-icons/fa6";
 import OrderProductCard from "../cards/OrderProductCard";
+
+// Helper to create a composite key for an item
+const getItemKey = (item, menuType) => {
+  if (menuType?.id === 1 && item.instoreCategory === "Unli Wings") {
+    return `${item.id}-unli-${item.orderNumber}-${String(item.discount || 0)}`;
+  }
+  return `${item.id}-${item.instoreCategory || "Ala Carte"}-${String(
+    item.discount || 0
+  )}`;
+};
+
+const getKeyFromParams = (id, groupIdentifier, discount, isUnli) => {
+  if (isUnli) return `${id}-unli-${groupIdentifier}-${String(discount)}`;
+  return `${id}-${groupIdentifier}-${String(discount)}`;
+};
 
 const OrderSummary = ({
   selectedItems,
@@ -7,43 +23,41 @@ const OrderSummary = ({
   handleRemoveItem,
   menuType,
   handleInstoreCategoryChange,
-  handleDiscountChange, // passed from Order.jsx
-  activeSection, // "unli" or "alaCarte"
-  setActiveSection,
-  handleAddNewUnliOrder, // new handler from Order.jsx
-  discounts, // NEW: discounts data from backend
+  handleDiscountChange,
+  // from Order.jsx
+  handleAddNewUnliOrder,
+  currentUnliOrderNumber, // current unli order number from parent
+  discounts,
+  activeSection, // "alaCarte" or "unliWings"
+  setActiveSection, // function to update activeSection
 }) => {
   const [localQuantities, setLocalQuantities] = useState({});
-  const [openDropdownId, setOpenDropdownId] = useState(null);
-  // New state for base amounts for Unli orders (keyed by orderNumber)
-  const [baseAmounts, setBaseAmounts] = useState({});
+  const [baseAmounts, setBaseAmounts] = useState({}); // base amounts for Unli orders
 
-  // Retrieve deduction percentage from menuType (default to 0)
+  // Accordion open/close states (default closed)
+  const [isAlaCarteOpen, setIsAlaCarteOpen] = useState(false);
+  const [isUnliWingsOpen, setIsUnliWingsOpen] = useState(false);
+
+  // Deduction percentage (default to 0)
   const deduction = menuType?.deduction_percentage || 0;
 
-  // Update local quantities whenever selectedItems or menuType changes.
+  // Build localQuantities using consistent keys
   useEffect(() => {
     const newQuantities = {};
     selectedItems.forEach((item) => {
-      // Composite key: id, instoreCategory (or orderNumber for Unli orders), or "default"
-      const key = `${item.id}-${
-        menuType?.id === 1 && item.instoreCategory === "Unli Order"
-          ? item.orderNumber
-          : item.instoreCategory || "Ala Carte"
-      }-${menuType?.id === 1 ? item.discount || 0 : 0}`;
+      const key = getItemKey(item, menuType);
       newQuantities[key] = item.quantity ? item.quantity.toString() : "1";
     });
     setLocalQuantities(newQuantities);
   }, [selectedItems, menuType]);
 
-  // Group Unli items: those with instoreCategory "Unli Order"
+  // Group Unli Wings items (in-store only)
   const unliItems = selectedItems.filter(
     (item) =>
       menuType?.id === 1 &&
-      item.instoreCategory === "Unli Order" &&
+      item.instoreCategory === "Unli Wings" &&
       item.orderNumber !== undefined
   );
-  // Group by orderNumber
   const groupedUnliOrders = unliItems.reduce((groups, item) => {
     const orderKey = item.orderNumber;
     if (!groups[orderKey]) groups[orderKey] = [];
@@ -51,19 +65,12 @@ const OrderSummary = ({
     return groups;
   }, {});
 
-  // Determine if there are any Unli items (used for enabling the "Add New Unli Order" button)
-  const hasUnliItems = unliItems.length > 0;
-
-  // Ala Carte items: items not in Unli orders.
+  // Group Ala Carte items
   const alaCarteItems = selectedItems.filter(
-    (item) => !item.instoreCategory || item.instoreCategory !== "Unli Order"
+    (item) => item.instoreCategory === "Ala Carte"
   );
 
-  // Custom subtotal calculation:
-  // For In‑Store orders (menuType.id === 1) in Unli mode:
-  //   - Each Unli order's total is exactly the user‑entered base amount (ignoring individual item prices/quantities)
-  //   - Ala Carte items are summed normally.
-  // For non‑In‑Store orders, sum normally.
+  // Calculate subtotal
   const calculateSubtotal = () => {
     if (!menuType || menuType.id !== 1) {
       return selectedItems.reduce((total, item) => {
@@ -72,11 +79,11 @@ const OrderSummary = ({
       }, 0);
     } else {
       let subtotal = 0;
-      // Sum each Unli order's base amount
+      // Sum base amounts for all unli groups
       Object.entries(groupedUnliOrders).forEach(([orderNumber]) => {
         subtotal += Number(baseAmounts[orderNumber] || 0);
       });
-      // Add Ala Carte items normally.
+      // Also add items in the Ala Carte group
       alaCarteItems.forEach((item) => {
         const discountFactor = 1 - (item.discount || 0) / 100;
         subtotal += item.price * item.quantity * discountFactor;
@@ -85,20 +92,18 @@ const OrderSummary = ({
     }
   };
 
+  // Handle blur for quantity inputs
   const handleBlur = (id, groupIdentifier, discount) => {
-    const key = `${id}-${groupIdentifier}-${discount}`;
+    const isUnli = menuType?.id === 1 && activeSection === "unliWings";
+    const key = getKeyFromParams(id, groupIdentifier, discount, isUnli);
     const inputVal = localQuantities[key];
     if (inputVal === "") {
-      const currentItem = selectedItems.find(
-        (i) =>
-          i.id === id &&
-          (menuType?.id === 1
-            ? i.instoreCategory === "Unli Order"
-              ? i.orderNumber === groupIdentifier
-              : i.instoreCategory === groupIdentifier
-            : true) &&
-          (menuType?.id === 1 ? Number(i.discount) === Number(discount) : true)
-      );
+      const currentItem = selectedItems.find((i) => {
+        if (menuType?.id === 1 && i.instoreCategory === "Unli Wings") {
+          return i.id === id && i.orderNumber === groupIdentifier;
+        }
+        return i.id === id && i.instoreCategory === groupIdentifier;
+      });
       setLocalQuantities((prev) => ({
         ...prev,
         [key]: currentItem ? currentItem.quantity.toString() : "1",
@@ -107,16 +112,12 @@ const OrderSummary = ({
     }
     const newQuantity = parseInt(inputVal, 10);
     if (isNaN(newQuantity)) {
-      const currentItem = selectedItems.find(
-        (i) =>
-          i.id === id &&
-          (menuType?.id === 1
-            ? i.instoreCategory === "Unli Order"
-              ? i.orderNumber === groupIdentifier
-              : i.instoreCategory === groupIdentifier
-            : true) &&
-          (menuType?.id === 1 ? Number(i.discount) === Number(discount) : true)
-      );
+      const currentItem = selectedItems.find((i) => {
+        if (menuType?.id === 1 && i.instoreCategory === "Unli Wings") {
+          return i.id === id && i.orderNumber === groupIdentifier;
+        }
+        return i.id === id && i.instoreCategory === groupIdentifier;
+      });
       setLocalQuantities((prev) => ({
         ...prev,
         [key]: currentItem ? currentItem.quantity.toString() : "1",
@@ -133,152 +134,149 @@ const OrderSummary = ({
     }));
   };
 
-  // Allow Unli mode only when the menu type is In‑Store (ID 1)
-  const allowUnli = menuType?.id === 1;
+  // Current order key as string from parent's currentUnliOrderNumber
+  const currentOrderKey = currentUnliOrderNumber
+    ? String(currentUnliOrderNumber)
+    : "1";
+
+  // Create a sorted array of all order keys (as strings)
+  const allOrderKeys = Array.from(
+    new Set([
+      ...Object.keys(groupedUnliOrders), // order numbers with items
+      currentOrderKey, // ensure current order key is included even if empty
+    ])
+  ).sort((a, b) => Number(a) - Number(b));
 
   return (
-    <div className="w-1/4 bg-white p-4 flex flex-col justify-between overflow-hidden">
+    <div className="w-1/4 bg-white p-4 flex flex-col h-full">
+      {/* Title */}
       <div className="text-center font-bold text-lg border-b pb-2">
         Order Summary
       </div>
 
-      {/* Toggle Row for Active Section */}
-      <div className="flex space-x-4 mt-4">
-        <button
-          className={`flex-1 py-2 rounded ${
-            activeSection === "alaCarte"
-              ? "bg-[#E88504] text-white"
-              : "bg-gray-200 text-gray-700"
-          }`}
-          onClick={() => setActiveSection("alaCarte")}
-        >
-          Ala Carte
-        </button>
-        {allowUnli && (
-          <button
-            className={`flex-1 py-2 rounded ${
-              activeSection === "unli"
-                ? "bg-[#E88504] text-white"
-                : "bg-gray-200 text-gray-700"
-            }`}
-            onClick={() => setActiveSection("unli")}
-          >
-            Unli Order
-          </button>
-        )}
-      </div>
-
-      {/* Button to add a new Unli order, disabled if no Unli items exist yet */}
-      {allowUnli && activeSection === "unli" && (
+      {/* Scrollable content container for accordions */}
+      <div className="flex-grow overflow-y-auto">
+        {/* -- ALA CARTE ACCORDION -- */}
         <div className="mt-4">
           <button
-            className={`w-full py-2 bg-[#E88504] text-white rounded ${
-              !hasUnliItems ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-            onClick={handleAddNewUnliOrder}
-            disabled={!hasUnliItems}
+            onClick={() => {
+              setIsAlaCarteOpen(!isAlaCarteOpen);
+              setActiveSection("alaCarte");
+            }}
+            className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200"
           >
-            Add New Unli Order
+            <span className="font-semibold">Ala Carte</span>
+            {isAlaCarteOpen ? <FaMinus /> : <FaPlus />}
           </button>
-        </div>
-      )}
-
-      <div className="flex-grow overflow-y-auto mt-4 mb-4 space-y-4">
-        {activeSection === "alaCarte" && (
-          <div>
-            <h3 className="font-bold text-base mb-2">Ala Carte</h3>
-            {alaCarteItems.length === 0 ? (
-              <p className="text-gray-500 text-center">No items added.</p>
-            ) : (
-              <div className="space-y-4">
-                {alaCarteItems.map((item) => (
+          {isAlaCarteOpen && (
+            <div className="p-3 border border-t-0 border-gray-300 space-y-4">
+              {alaCarteItems.length === 0 ? (
+                <p className="text-gray-500 text-center">No items added.</p>
+              ) : (
+                alaCarteItems.map((item) => (
                   <OrderProductCard
-                    key={`${item.id}-${item.instoreCategory || "Ala Carte"}-${
-                      item.discount || 0
-                    }`}
+                    key={getItemKey(item, menuType)}
                     item={item}
                     menuType={menuType}
                     localQuantity={
-                      localQuantities[
-                        `${item.id}-${item.instoreCategory || "Ala Carte"}-${
-                          item.discount || 0
-                        }`
-                      ] || "1"
+                      localQuantities[getItemKey(item, menuType)] || "1"
                     }
                     onLocalQuantityChange={onLocalQuantityChange}
                     handleBlur={handleBlur}
                     handleQuantityChange={handleQuantityChange}
                     handleInstoreCategoryChange={handleInstoreCategoryChange}
                     handleDiscountChange={handleDiscountChange}
-                    openDropdownId={openDropdownId}
-                    setOpenDropdownId={setOpenDropdownId}
-                    discounts={discounts} // Pass discount data to OrderProductCard
+                    discounts={discounts}
                   />
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* -- UNLI WINGS ACCORDION (Only if menuType is In-Store) -- */}
+        {menuType?.id === 1 && (
+          <div className="mt-4">
+            <button
+              onClick={() => {
+                setIsUnliWingsOpen(!isUnliWingsOpen);
+                if (!isUnliWingsOpen) {
+                  setActiveSection("unliWings");
+                } else {
+                  setActiveSection("alaCarte");
+                }
+              }}
+              className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200"
+            >
+              <span className="font-semibold">Unli Wings</span>
+              {isUnliWingsOpen ? <FaMinus /> : <FaPlus />}
+            </button>
+            {isUnliWingsOpen && (
+              <div className="p-3 border border-t-0 border-gray-300 space-y-4">
+                {activeSection === "unliWings" && (
+                  <button
+                    className="w-full py-2 bg-[#E88504] text-white rounded"
+                    onClick={handleAddNewUnliOrder}
+                  >
+                    Add New Unli Order
+                  </button>
+                )}
+                {/* Render all Unli order groups in sorted order */}
+                {allOrderKeys.map((orderNumber) => (
+                  <div key={orderNumber} className="mb-4">
+                    <h4 className="font-bold text-sm mb-2">
+                      Unli Wings #{orderNumber}
+                    </h4>
+                    <div className="mb-2">
+                      <input
+                        type="number"
+                        className="w-full p-2 border rounded"
+                        value={baseAmounts[orderNumber] || ""}
+                        onChange={(e) =>
+                          setBaseAmounts((prev) => ({
+                            ...prev,
+                            [orderNumber]: e.target.value,
+                          }))
+                        }
+                        placeholder="Enter base amount"
+                      />
+                    </div>
+                    {groupedUnliOrders[orderNumber] &&
+                    groupedUnliOrders[orderNumber].length > 0 ? (
+                      groupedUnliOrders[orderNumber].map((item) => (
+                        <OrderProductCard
+                          key={getItemKey(item, menuType)}
+                          item={item}
+                          menuType={menuType}
+                          localQuantity={
+                            localQuantities[getItemKey(item, menuType)] || "1"
+                          }
+                          onLocalQuantityChange={onLocalQuantityChange}
+                          handleBlur={(id, group, discount) =>
+                            handleBlur(id, item.orderNumber, discount)
+                          }
+                          handleQuantityChange={handleQuantityChange}
+                          handleInstoreCategoryChange={
+                            handleInstoreCategoryChange
+                          }
+                          handleDiscountChange={handleDiscountChange}
+                          discounts={discounts}
+                        />
+                      ))
+                    ) : (
+                      <p className="text-gray-500 text-center">
+                        No items added.
+                      </p>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
           </div>
         )}
-
-        {activeSection === "unli" && (
-          <div>
-            <h3 className="font-bold text-base mb-2">Unli Orders</h3>
-            {Object.entries(groupedUnliOrders).length === 0 ? (
-              <p className="text-gray-500 text-center">No Unli orders added.</p>
-            ) : (
-              Object.entries(groupedUnliOrders).map(([orderNumber, items]) => (
-                <div key={orderNumber} className="mb-4">
-                  <h4 className="font-bold text-sm mb-2">
-                    Unli Order #{orderNumber}
-                  </h4>
-                  {/* Input for base amount for this Unli order */}
-                  <div className="mb-2">
-                    <input
-                      type="number"
-                      className="w-full p-2 border rounded"
-                      value={baseAmounts[orderNumber] || ""}
-                      onChange={(e) =>
-                        setBaseAmounts({
-                          ...baseAmounts,
-                          [orderNumber]: e.target.value,
-                        })
-                      }
-                      placeholder="Enter base amount"
-                    />
-                  </div>
-                  <div className="space-y-4">
-                    {items.map((item) => (
-                      <OrderProductCard
-                        key={`${item.id}-unli-${item.discount || 0}`}
-                        item={item}
-                        menuType={menuType}
-                        localQuantity={
-                          localQuantities[
-                            `${item.id}-unli-${item.discount || 0}`
-                          ] || "1"
-                        }
-                        onLocalQuantityChange={onLocalQuantityChange}
-                        handleBlur={(id, group, discount) =>
-                          handleBlur(id, item.orderNumber, discount)
-                        }
-                        handleQuantityChange={handleQuantityChange}
-                        handleInstoreCategoryChange={
-                          handleInstoreCategoryChange
-                        }
-                        handleDiscountChange={handleDiscountChange}
-                        openDropdownId={openDropdownId}
-                        setOpenDropdownId={setOpenDropdownId}
-                        discounts={discounts} // Pass discount data to OrderProductCard
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
       </div>
 
+      {/* Footer with totals (fixed) */}
       <div className="bg-gray-100 p-4 rounded-t-lg">
         <div className="flex justify-between mb-2">
           {menuType?.id === 1 ? (

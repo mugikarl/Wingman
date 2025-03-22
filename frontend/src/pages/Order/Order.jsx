@@ -145,14 +145,13 @@ const Order = () => {
 
     if (selectedMenuType?.id === 1) {
       let defaultCategory, defaultDiscount;
-      if (activeSection === "unli") {
+      if (activeSection === "unliWings") {
         // For Unli mode, only allow items in allowed category IDs: 1 (Wings), 4 (Sides), 5 (Drinks)
         if (
           item.category_id === 1 ||
           item.category_id === 5 ||
           item.category_id === 4
         ) {
-          // For category 4 (Sides), only allow items with "rice" in their name
           if (
             item.category_id === 4 &&
             !item.name.toLowerCase().includes("rice")
@@ -161,8 +160,7 @@ const Order = () => {
               "Only Rice items can be added for Sides in the Unli section."
             );
           }
-          // For all Unli orders, we'll use a single default label
-          defaultCategory = "Unli Order";
+          defaultCategory = "Unli Wings";
           defaultDiscount = 0;
         } else {
           return alert(
@@ -175,10 +173,9 @@ const Order = () => {
         defaultDiscount = 0;
       }
 
-      // Merge if same product, same instoreCategory, same discount, and for unli orders, same orderNumber.
+      // Merge if same product, same instoreCategory, same discount, and for unli items, same orderNumber.
       const existingItem = selectedItems.find((i) => {
-        // For unli orders, also match orderNumber.
-        if (activeSection === "unli") {
+        if (activeSection === "unliWings") {
           return (
             i.id === item.id &&
             i.instoreCategory === defaultCategory &&
@@ -196,7 +193,7 @@ const Order = () => {
       if (existingItem) {
         setSelectedItems(
           selectedItems.map((i) => {
-            if (activeSection === "unli") {
+            if (activeSection === "unliWings") {
               return i.id === item.id &&
                 i.instoreCategory === defaultCategory &&
                 i.discount === defaultDiscount &&
@@ -212,9 +209,8 @@ const Order = () => {
           })
         );
       } else {
-        // For unli, attach the current unli order number.
         const newItem =
-          activeSection === "unli"
+          activeSection === "unliWings"
             ? {
                 ...item,
                 quantity: 1,
@@ -248,9 +244,18 @@ const Order = () => {
     }
   };
 
-  // Handler to add a new Unli order.
-  // This increments the currentUnliOrderNumber so that subsequent unli items go to a new order group.
+  // CHANGED: Prevent adding a new Unli order if the current Unli order is empty.
   const handleAddNewUnliOrder = () => {
+    const hasItemsInCurrentOrder = selectedItems.some(
+      (i) =>
+        i.orderNumber === currentUnliOrderNumber &&
+        i.instoreCategory === "Unli Wings"
+    );
+    if (!hasItemsInCurrentOrder) {
+      return alert(
+        "Please add at least one item to the current Unli Order before adding a new order."
+      );
+    }
     setCurrentUnliOrderNumber(currentUnliOrderNumber + 1);
   };
 
@@ -420,6 +425,7 @@ const Order = () => {
             </div>
           </div>
         </div>
+
         {/* Scrollable Grid Layout for Sorted Menu Items */}
         <div className="flex-grow overflow-y-auto pb-2">
           <div className="grid grid-cols-4 gap-x-4 gap-y-4">
@@ -450,6 +456,7 @@ const Order = () => {
         setActiveSection={setActiveSection}
         // Pass the new handler to add a new unli order.
         handleAddNewUnliOrder={handleAddNewUnliOrder}
+        currentUnliOrderNumber={currentUnliOrderNumber} // <-- Pass current order number
         discounts={discounts}
       />
     </div>
