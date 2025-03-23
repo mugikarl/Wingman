@@ -89,17 +89,23 @@ const OrderSummary = ({
   const calculateSubtotal = () => {
     if (!menuType || menuType.id !== 1) {
       return selectedItems.reduce((total, item) => {
-        const discountFactor = 1 - (item.discount || 0) / 100;
-        return total + item.price * item.quantity * discountFactor;
+        const discountOption = discounts.find((d) => d.id === item.discount);
+        const discountDecimal = discountOption ? discountOption.percentage : 0;
+        const subtotal = item.price * item.quantity;
+        const totalForItem = subtotal - subtotal * discountDecimal;
+        return total + totalForItem;
       }, 0);
     } else {
+      // For In‑Store orders, similar logic applies for Ala Carte items.
       let subtotal = 0;
       Object.keys(groupedUnliOrders).forEach(() => {
         subtotal += Number(UNLI_BASE_AMOUNT) || 0;
       });
       alaCarteItems.forEach((item) => {
-        const discountFactor = 1 - (item.discount || 0) / 100;
-        subtotal += item.price * item.quantity * discountFactor;
+        const discountOption = discounts.find((d) => d.id === item.discount);
+        const discountDecimal = discountOption ? discountOption.percentage : 0;
+        const sub = item.price * item.quantity;
+        subtotal += sub - sub * discountDecimal;
       });
       return subtotal;
     }

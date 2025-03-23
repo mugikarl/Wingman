@@ -47,9 +47,18 @@ const OrderProductCard = ({
     isUnliOrder && item.orderNumber !== undefined
       ? item.orderNumber
       : instoreCat;
+
+  // currentDiscount is now the discount ID (or 0 for none)
   const currentDiscount = menuType?.id === 1 ? item.discount || 0 : 0;
   const compositeKey = getItemKey(item, menuType);
-  const discountFactor = 1 - currentDiscount / 100;
+
+  // Calculate the final price after discount:
+  // Look up the discount option based on the discount ID.
+  const discountOption = discounts.find((d) => d.id === currentDiscount);
+  const discountDecimal = discountOption ? discountOption.percentage : 0;
+  const subtotal = item.price * item.quantity;
+  const finalPrice = subtotal - subtotal * discountDecimal;
+
   const discountOptions = discounts || [];
 
   return (
@@ -142,12 +151,13 @@ const OrderProductCard = ({
           </button>
           {menuType?.id === 1 && (
             <select
-              value={currentDiscount}
+              // If no discount is applied, item.discount will be 0 (as a string or number)
+              value={item.discount || "0"}
               onChange={(e) =>
                 handleDiscountChange(
                   item.id,
                   groupIdentifier,
-                  parseFloat(e.target.value),
+                  parseInt(e.target.value, 10),
                   compositeKey
                 )
               }
@@ -155,7 +165,7 @@ const OrderProductCard = ({
             >
               <option value="0">None (0%)</option>
               {discountOptions.map((disc) => (
-                <option key={disc.id} value={disc.percentage}>
+                <option key={disc.id} value={disc.id}>
                   {disc.type} ({(disc.percentage * 100).toFixed(0)}%)
                 </option>
               ))}
@@ -166,10 +176,10 @@ const OrderProductCard = ({
         {!isUnliOrder && (
           <div className="flex justify-between items-center mt-1">
             <span className="text-sm text-gray-600 whitespace-nowrap">
-              ₱{item.price.toFixed(2)}
+              ₱{(item.price || 0).toFixed(2)}
             </span>
             <span className="font-semibold text-green-600 whitespace-nowrap">
-              ₱{(item.price * item.quantity * discountFactor).toFixed(2)}
+              ₱{finalPrice.toFixed(2)}
             </span>
           </div>
         )}

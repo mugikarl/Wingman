@@ -3,6 +3,7 @@ import ItemBox from "../../components/tables/ItemBox";
 import axios from "axios";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
 import OrderSummary from "../../components/panels/OrderSummary";
+import { useLocation } from "react-router-dom";
 
 const Order = () => {
   // Modal and dropdown states
@@ -24,6 +25,46 @@ const Order = () => {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [inStoreCategories, setInStoreCategories] = useState([]);
   const [employees, setEmployees] = useState([]); // New state for employees
+
+  const location = useLocation();
+
+  // Retrieve transaction details either from location.state or localStorage
+  useEffect(() => {
+    let transactionFromState = null;
+    if (location.state && location.state.transaction) {
+      transactionFromState = location.state.transaction;
+    } else {
+      const storedTransaction = localStorage.getItem("transaction");
+      if (storedTransaction) {
+        transactionFromState = JSON.parse(storedTransaction);
+      }
+    }
+    if (transactionFromState) {
+      // Map order_details keys for In‑Store orders.
+      const mappedOrderDetails = transactionFromState.order_details.map(
+        (detail) => ({
+          ...detail,
+          // Rename instore_category to instoreCategory
+          instoreCategory: detail.instore_category,
+          // Use unli_wings_group as orderNumber (for Unli Wings orders)
+          orderNumber: detail.unli_wings_group,
+          // Optionally, if discount should be a number:
+          // discount: detail.discount ? detail.discount.percentage : 0,
+        })
+      );
+      transactionFromState.order_details = mappedOrderDetails;
+      setSelectedItems(transactionFromState.order_details);
+      const transMenuType = menuTypes.find(
+        (type) =>
+          type.id === transactionFromState.order_details[0].menu_item.type_id
+      );
+      if (transMenuType) {
+        setSelectedMenuType(transMenuType);
+      }
+      // Optionally clear localStorage if no longer needed:
+      // localStorage.removeItem("transaction");
+    }
+  }, [location, menuTypes]);
 
   const fetchMenuOrders = async () => {
     try {
@@ -63,7 +104,6 @@ const Order = () => {
       setActiveSection("alaCarte");
     }
   }, [selectedMenuType]);
-
   // Handle filter selection for type
   const handleTypeFilter = (type) => {
     if (
@@ -266,14 +306,16 @@ const Order = () => {
   };
 
   // Update discount only for the targeted card.
-  const handleDiscountChange = (id, category, newDiscount, targetKey) => {
+  const handleDiscountChange = (
+    id,
+    groupIdentifier,
+    newDiscountId,
+    compositeKey
+  ) => {
     setSelectedItems((prevItems) =>
       prevItems.map((item) => {
-        const key = `${item.id}-${item.instoreCategory || "default"}-${
-          item.discount || 0
-        }`;
-        if (item.id.toString() === id.toString() && key === targetKey) {
-          return { ...item, discount: Number(newDiscount) };
+        if (getItemKey(item, selectedMenuType) === compositeKey) {
+          return { ...item, discount: Number(newDiscountId) };
         }
         return item;
       })
@@ -282,13 +324,8 @@ const Order = () => {
 
   const handleQuantityChange = (id, groupIdentifier, discount, newQuantity) => {
     if (newQuantity <= 0) {
-      setSelectedItems((prevItems) => {
-        // For non‑In‑Store orders, remove the item by id.
-        if (!selectedMenuType || selectedMenuType.id !== 1) {
-          return prevItems.filter((item) => item.id !== id);
-        }
-        // For In‑Store orders, use the existing detailed check.
-        return prevItems.filter((item) => {
+      setSelectedItems((prevItems) =>
+        prevItems.filter((item) => {
           if (item.id !== id) return true;
           if (item.instoreCategory === "Unli Wings") {
             return !(
@@ -300,24 +337,11 @@ const Order = () => {
             item.instoreCategory === groupIdentifier &&
             Number(item.discount || 0) === Number(discount)
           );
-        });
-      });
+        })
+      );
       return;
     }
-    setSelectedItems((prevItems) =>
-      prevItems.map((item) => {
-        if (item.id === id && Number(item.discount || 0) === Number(discount)) {
-          if (item.instoreCategory === "Unli Wings") {
-            if (item.orderNumber === groupIdentifier) {
-              return { ...item, quantity: newQuantity };
-            }
-          } else if (item.instoreCategory === groupIdentifier) {
-            return { ...item, quantity: newQuantity };
-          }
-        }
-        return item;
-      })
-    );
+    handleQuantityChange(id, groupIdentifier, discount, newQuantity);
   };
 
   // Remove item from the order
