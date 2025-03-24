@@ -164,13 +164,16 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
   const paymentAmount = transaction.payment_amount || 0;
   const change = paymentAmount - finalTotal;
 
-  // Handle Edit: store the transaction in localStorage then navigate
+  // Handle Edit: store the transaction then navigate to the Edit Order page
   const handleEdit = () => {
     console.log("Editing transaction:", transaction);
-    // Save transaction in localStorage
+    // Save transaction in localStorage (if needed)
     localStorage.setItem("transaction", JSON.stringify(transaction));
-    // Navigate to "/order"
-    navigate("/order", { state: { transaction } });
+    // Save transaction in localStorage (if needed)
+    localStorage.setItem("transaction", JSON.stringify(transaction));
+    // Navigate to the Order page with the transaction ID
+
+    navigate(`/order/${transaction.id}`, { state: { transaction } });
   };
 
   return (

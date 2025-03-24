@@ -37,6 +37,7 @@ import GrabMenu from "./pages/Inventory/GrabMenu";
 import NewMenuForm from "./components/popups/NewMenuForm";
 import NewMenuModal from "./components/popups/NewMenuModal";
 import EditMenuModal from "./components/popups/EditMenuModal";
+import AdminRedirect from "./components/admin/AdminRedirect";
 
 // You might have a separate dashboard for employees if needed.
 const EmployeeDashboard = Dashboard; // For this example, we reuse Dashboard
@@ -63,6 +64,7 @@ const App = () => {
           <Routes>
             {/* Login Page */}
             <Route path="/login" element={<Login setIsAdmin={setIsAdmin} />} />
+
             {/* Admin Dashboard Routes (protected by AdminRoute) */}
             {/** ORDER */}
             <Route
@@ -81,6 +83,16 @@ const App = () => {
                 </AdminRoute>
               }
             />
+
+            <Route
+              path="/dashboard-admin/order/:transactionId"
+              element={
+                <AdminRoute>
+                  <Order />
+                </AdminRoute>
+              }
+            />
+
             {/** INVENTORY */}
             <Route
               path="/dashboard-admin/inventory"
@@ -122,7 +134,6 @@ const App = () => {
                 </AdminRoute>
               }
             />
-
             <Route
               path="/dashboard-admin/stockout"
               element={
@@ -147,7 +158,6 @@ const App = () => {
                 </AdminRoute>
               }
             />
-
             <Route
               path="/dashboard-admin"
               element={
@@ -227,6 +237,7 @@ const App = () => {
                 )
               }
             />
+            {/* For non-admin order routes */}
             <Route
               path="/order"
               element={
@@ -237,15 +248,22 @@ const App = () => {
                 )
               }
             />
+            <Route
+              path="/order/:transactionId"
+              element={
+                localStorage.getItem("role") === "Admin" ? (
+                  <AdminRedirect to="/dashboard-admin/order/:transactionId" />
+                ) : (
+                  <Order />
+                )
+              }
+            />
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/schedule" element={<Schedule />} />
             <Route path="/legendmodal" element={<LegendModal />} />
             <Route path="/employeeleave" element={<EmployeeLeave />} />
             <Route path="/holidays" element={<Holidays />} />
-
             <Route path="/salescalendar" element={<SalesCalendar />} />
-
-            <Route path="/order" element={<Order />} />
             <Route path="/chooseorder" element={<ChooseOrder />} />
             <Route path="/testconnection" element={<TestConnection />} />
             <Route path="/attendancereview" element={<AttendanceReview />} />

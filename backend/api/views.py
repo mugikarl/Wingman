@@ -2160,7 +2160,7 @@ def delete_menu_item(request, menu_id):
 @api_view(['GET'])
 @authentication_classes([])  # You can add authentication classes if needed
 @permission_classes([AllowAny])   
-def fetch_order_data(request):
+def fetch_order_data(request, transactionId=None):
     try:
         # Fetch menu types
         menu_types = supabase_anon.table("menu_type").select("id, name, deduction_percentage").execute().data or []
@@ -2245,6 +2245,13 @@ def fetch_order_data(request):
                 "order_details": related_orders
             })
         
+        # If a transactionId is provided, filter the transaction.
+        if transactionId is not None:
+            filtered = [tx for tx in formatted_transactions if tx["id"] == transactionId]
+            if not filtered:
+                return Response({"error": "Transaction not found."}, status=404)
+            return Response(filtered[0])
+
         return Response({
             "menu_types": menu_types,
             "menu_statuses": menu_statuses,

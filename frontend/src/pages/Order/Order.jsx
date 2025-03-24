@@ -7,16 +7,16 @@ import { useLocation } from "react-router-dom";
 
 const Order = () => {
   // Modal and dropdown states
-  const [selectedItems, setSelectedItems] = useState([]);
+  const [selectedItems, setSelectedItems] = useState([]); // starts empty
   const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
   const [selectedMenuType, setSelectedMenuType] = useState(null);
   const [selectedMenuCategory, setSelectedMenuCategory] = useState(null);
-  // Active section: "alaCarte" or "unli"
+  // Active section: "alaCarte" or "unliWings"
   const [activeSection, setActiveSection] = useState("alaCarte");
   // For Unli orders, track the current order number (starts at 1)
   const [currentUnliOrderNumber, setCurrentUnliOrderNumber] = useState(1);
 
-  // Data states
+  // Data states (menu data only)
   const [menuItems, setMenuItems] = useState([]);
   const [menuTypes, setMenuTypes] = useState([]);
   const [menuCategories, setMenuCategories] = useState([]);
@@ -24,49 +24,12 @@ const Order = () => {
   const [discounts, setDiscounts] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [inStoreCategories, setInStoreCategories] = useState([]);
-  const [employees, setEmployees] = useState([]); // New state for employees
+  const [employees, setEmployees] = useState([]);
 
   const location = useLocation();
 
-  // Retrieve transaction details either from location.state or localStorage
-  useEffect(() => {
-    let transactionFromState = null;
-    if (location.state && location.state.transaction) {
-      transactionFromState = location.state.transaction;
-    } else {
-      const storedTransaction = localStorage.getItem("transaction");
-      if (storedTransaction) {
-        transactionFromState = JSON.parse(storedTransaction);
-      }
-    }
-    if (transactionFromState) {
-      // Map order_details keys for In‑Store orders.
-      const mappedOrderDetails = transactionFromState.order_details.map(
-        (detail) => ({
-          ...detail,
-          // Rename instore_category to instoreCategory
-          instoreCategory: detail.instore_category,
-          // Use unli_wings_group as orderNumber (for Unli Wings orders)
-          orderNumber: detail.unli_wings_group,
-          // Optionally, if discount should be a number:
-          // discount: detail.discount ? detail.discount.percentage : 0,
-        })
-      );
-      transactionFromState.order_details = mappedOrderDetails;
-      setSelectedItems(transactionFromState.order_details);
-      const transMenuType = menuTypes.find(
-        (type) =>
-          type.id === transactionFromState.order_details[0].menu_item.type_id
-      );
-      if (transMenuType) {
-        setSelectedMenuType(transMenuType);
-      }
-      // Optionally clear localStorage if no longer needed:
-      // localStorage.removeItem("transaction");
-    }
-  }, [location, menuTypes]);
-
-  const fetchMenuOrders = async () => {
+  // Fetch menu data only.
+  const fetchMenuData = async () => {
     try {
       const response = await axios.get(
         "http://127.0.0.1:8000/fetch-order-data/"
@@ -78,20 +41,19 @@ const Order = () => {
       setDiscounts(response.data.discounts || []);
       setPaymentMethods(response.data.paymentMethods || []);
       setInStoreCategories(response.data.instore_categories || []);
-      setEmployees(response.data.employees || []); // Fetch employees from backend
+      setEmployees(response.data.employees || []);
     } catch (error) {
       console.log("Error fetching menu data: ", error);
     }
   };
 
   useEffect(() => {
-    fetchMenuOrders();
+    fetchMenuData();
   }, []);
 
-  // Set default selected menu type to "In‑Store" immediately
+  // Set default selected menu type to "In‑Store" when menuTypes are loaded.
   useEffect(() => {
     if (menuTypes.length > 0 && !selectedMenuType) {
-      // Assuming the "In‑Store" type has id 1
       const inStoreType = menuTypes.find((type) => type.id === 1);
       setSelectedMenuType(inStoreType);
     }
@@ -104,7 +66,7 @@ const Order = () => {
       setActiveSection("alaCarte");
     }
   }, [selectedMenuType]);
-  // Handle filter selection for type
+
   const handleTypeFilter = (type) => {
     if (
       selectedMenuType &&
@@ -123,20 +85,11 @@ const Order = () => {
     }
   };
 
-  // Category filter remains unchanged
   const handleCategoryFilter = (cat) => {
-    if (selectedItems.length > 0) {
-      const ok = window.confirm(
-        "Changing categories will remove the current items in the order summary. Proceed?"
-      );
-      if (!ok) return;
-      setSelectedItems([]);
-    }
     setSelectedMenuCategory(cat);
     setIsCatDropdownOpen(false);
   };
 
-  // Filter items based on selected type and category
   const filteredMenuItems = menuItems.filter((item) => {
     const matchesType = selectedMenuType
       ? item.type_id === selectedMenuType.id
@@ -148,14 +101,12 @@ const Order = () => {
     return matchesType && matchesCategory;
   });
 
-  // Sort items so that available (status_id === 1) come first
   const sortedFilteredMenuItems = filteredMenuItems.slice().sort((a, b) => {
     if (a.status_id === 1 && b.status_id !== 1) return -1;
     if (a.status_id !== 1 && b.status_id === 1) return 1;
     return 0;
   });
 
-  // Helper functions for button styles
   const getMenuTypeButtonStyles = (type) => {
     switch (type.id) {
       case 1:
@@ -182,8 +133,6 @@ const Order = () => {
     }
   };
 
-  // Add item or increment quantity.
-  // For Unli orders, assign a default category "Unli Wings" and include the currentUnliOrderNumber.
   const handleAddItem = (item) => {
     if (item.status_id === 2) {
       return alert("This item is unavailable!");
@@ -192,7 +141,6 @@ const Order = () => {
     if (selectedMenuType?.id === 1) {
       let defaultCategory, defaultDiscount;
       if (activeSection === "unliWings") {
-        // For Unli mode, only allow items in allowed category IDs: 1 (Wings), 4 (Sides), 5 (Drinks)
         if (
           item.category_id === 1 ||
           item.category_id === 5 ||
@@ -214,12 +162,10 @@ const Order = () => {
           );
         }
       } else {
-        // For Ala Carte mode.
         defaultCategory = "Ala Carte";
         defaultDiscount = 0;
       }
 
-      // Merge if same product, same instoreCategory, same discount, and for unli items, same orderNumber.
       const existingItem = selectedItems.find((i) => {
         if (activeSection === "unliWings") {
           return (
@@ -273,7 +219,6 @@ const Order = () => {
         setSelectedItems([...selectedItems, newItem]);
       }
     } else {
-      // For non‑In‑Store types, use the existing behavior.
       const existingItem = selectedItems.find((i) => i.id === item.id);
       if (existingItem) {
         setSelectedItems(
@@ -290,7 +235,6 @@ const Order = () => {
     }
   };
 
-  // Prevent adding a new Unli order if the current Unli order is empty.
   const handleAddNewUnliOrder = () => {
     const hasItemsInCurrentOrder = selectedItems.some(
       (i) =>
@@ -305,126 +249,13 @@ const Order = () => {
     setCurrentUnliOrderNumber(currentUnliOrderNumber + 1);
   };
 
-  // Update discount only for the targeted card.
-  const handleDiscountChange = (
-    id,
-    groupIdentifier,
-    newDiscountId,
-    compositeKey
-  ) => {
-    setSelectedItems((prevItems) =>
-      prevItems.map((item) => {
-        if (getItemKey(item, selectedMenuType) === compositeKey) {
-          return { ...item, discount: Number(newDiscountId) };
-        }
-        return item;
-      })
-    );
-  };
-
-  const handleQuantityChange = (id, groupIdentifier, discount, newQuantity) => {
-    if (newQuantity <= 0) {
-      setSelectedItems((prevItems) =>
-        prevItems.filter((item) => {
-          if (item.id !== id) return true;
-          if (item.instoreCategory === "Unli Wings") {
-            return !(
-              item.orderNumber === groupIdentifier &&
-              Number(item.discount || 0) === Number(discount)
-            );
-          }
-          return !(
-            item.instoreCategory === groupIdentifier &&
-            Number(item.discount || 0) === Number(discount)
-          );
-        })
-      );
-      return;
-    }
-    handleQuantityChange(id, groupIdentifier, discount, newQuantity);
-  };
-
-  // Remove item from the order
-  const handleRemoveItem = (id) => {
-    setSelectedItems(selectedItems.filter((i) => i.id !== id));
-  };
-
-  // Update instore category for a product
-  const handleInstoreCategoryChange = (id, category) => {
-    setSelectedItems(
-      selectedItems.map((item) =>
-        item.id === id ? { ...item, instoreCategory: category } : item
-      )
-    );
-  };
-
-  // NEW: Function to post the transaction to the backend.
-  // This function builds a payload from the current order state and calls the add_order API.
-  const handlePlaceOrder = async (
-    employeeId,
-    paymentMethod,
-    cashReceived,
-    gcashReferenceNo,
-    gcashReferenceImage
-  ) => {
-    // Construct order_details from selectedItems:
-    const orderDetails = selectedItems.map((item) => {
-      if (selectedMenuType && selectedMenuType.id === 1) {
-        // For In‑Store orders, include instore_category and unli_wings_group.
-        return {
-          menu_id: item.id,
-          quantity: item.quantity,
-          discount_id: item.discount || null,
-          instore_category: item.instoreCategory === "Unli Wings" ? 2 : 1,
-          unli_wings_group:
-            item.instoreCategory === "Unli Wings" ? item.orderNumber : null,
-        };
-      } else {
-        // For non‑In‑Store orders (FoodPanda/Grab), do not include instore_category.
-        return {
-          menu_id: item.id,
-          quantity: item.quantity,
-          discount_id: item.discount || null,
-        };
-      }
-    });
-
-    const payload = {
-      employee_id: employeeId,
-      payment_method: paymentMethod,
-      payment_amount: Number(cashReceived) || 0,
-      reference_id: null,
-      receipt_image: gcashReferenceImage,
-      order_details: orderDetails,
-    };
-
-    try {
-      const response = await axios.post(
-        "http://127.0.0.1:8000/add-order/",
-        payload,
-        {
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-      console.log("Order placed successfully:", response.data);
-      // Optionally clear order state or show confirmation
-      setSelectedItems([]);
-    } catch (error) {
-      console.error(
-        "Error placing order:",
-        error.response ? error.response.data : error.message
-      );
-    }
-  };
+  // Removed transaction fetching and mapping logic—OrderSummary now solely depends on selectedItems
 
   return (
     <div className="h-screen w-full flex bg-[#E2D6D5]">
-      {/* Main Content */}
       <div className="flex-grow p-6 flex flex-col">
-        {/* Fixed Header: Search Bar and Filters */}
         <div>
           <div className="flex flex-col space-y-4 mb-4">
-            {/* Search Bar */}
             <div className="w-full">
               <div className="flex justify-between items-center w-full space-x-4">
                 <div className="flex w-[430px]">
@@ -436,9 +267,7 @@ const Order = () => {
                 </div>
               </div>
             </div>
-            {/* Filters Section */}
             <div className="flex flex-col space-y-4">
-              {/* Menu Type Buttons */}
               <div className="flex gap-4">
                 {menuTypes.map((type) => (
                   <button
@@ -469,7 +298,6 @@ const Order = () => {
                   </button>
                 ))}
               </div>
-              {/* Select Category Dropdown */}
               <div className="relative inline-block text-left">
                 <button
                   onClick={() => setIsCatDropdownOpen(!isCatDropdownOpen)}
@@ -522,8 +350,6 @@ const Order = () => {
             </div>
           </div>
         </div>
-
-        {/* Scrollable Grid Layout for Sorted Menu Items */}
         <div className="flex-grow overflow-y-auto pb-2">
           <div className="grid grid-cols-4 gap-x-4 gap-y-4">
             {sortedFilteredMenuItems.map((item) => (
@@ -541,24 +367,24 @@ const Order = () => {
           </div>
         </div>
       </div>
-      {/* Summary Panel (Fixed) */}
       <OrderSummary
         selectedItems={selectedItems}
         setSelectedItems={setSelectedItems}
-        handleQuantityChange={handleQuantityChange}
-        handleRemoveItem={handleRemoveItem}
-        menuType={selectedMenuType} // pass current menu type
-        handleInstoreCategoryChange={handleInstoreCategoryChange}
-        handleDiscountChange={handleDiscountChange}
+        // Pass down necessary handlers and data
+        handleQuantityChange={() => {}}
+        handleRemoveItem={() => {}}
+        menuType={selectedMenuType}
+        handleInstoreCategoryChange={() => {}}
+        handleDiscountChange={() => {}}
         activeSection={activeSection}
         setActiveSection={setActiveSection}
         handleAddNewUnliOrder={handleAddNewUnliOrder}
-        currentUnliOrderNumber={currentUnliOrderNumber} // Pass current order number
+        currentUnliOrderNumber={currentUnliOrderNumber}
         discounts={discounts}
         paymentMethods={paymentMethods}
         inStoreCategories={inStoreCategories}
-        employees={employees} // Pass employees to OrderSummary
-        onPlaceOrder={handlePlaceOrder} // Pass our new onPlaceOrder function
+        employees={employees}
+        onPlaceOrder={() => {}}
       />
     </div>
   );
