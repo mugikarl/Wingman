@@ -1,14 +1,24 @@
 import React, { useState } from "react";
 import Table from "../../components/tables/Table";
 import { useNavigate } from "react-router-dom";
+import { FaAngleUp, FaAngleDown } from "react-icons/fa6";
+import { FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { FaClipboardList } from "react-icons/fa";
 
 const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
-  if (!isOpen || !transaction) return null; // Remove isInStore from here if needed
+  if (!isOpen || !transaction) return null;
 
   const navigate = useNavigate();
 
   // Local state for managing accordion open/closed status
   const [openAccordion, setOpenAccordion] = useState({});
+  const [unliOverallOpen, setUnliOverallOpen] = useState(true);
+  const [alaCarteOverallOpen, setAlaCarteOverallOpen] = useState(true);
+
+  // State for order status, starting with "Pending"
+  const [orderStatus, setOrderStatus] = useState("Pending");
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+
   const toggleAccordion = (groupKey) => {
     setOpenAccordion((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
   };
@@ -40,6 +50,20 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
     }
   };
 
+  // Helper to style the left container of the dropdown (for status)
+  const getStatusLeftBg = (status) => {
+    switch (status) {
+      case "Pending":
+        return "bg-orange-600";
+      case "Completed":
+        return "bg-green-600";
+      case "Cancelled":
+        return "bg-red-600";
+      default:
+        return "bg-gray-600";
+    }
+  };
+
   const getMenuTypeClass = (menuTypeName) => {
     switch (menuTypeName) {
       case "In-Store":
@@ -53,7 +77,6 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
     }
   };
 
-  const orderStatus = transaction.order_status?.name || "Unknown";
   const menuTypeId = transaction.order_details?.[0]?.menu_item?.type_id;
   const menuTypeData = menuTypes.find((type) => type.id === menuTypeId);
   const menuType = menuTypeData ? menuTypeData.name : "Unknown";
@@ -62,7 +85,7 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
   const isInStore = menuType === "In-Store";
   const isDelivery = menuType === "Grab" || menuType === "FoodPanda";
 
-  // For Unli Wings orders (In‑Store), display only the menu item and quantity.
+  // For Unli Wings orders (In‑Store)
   const formatUnliWingsTableData = (orders) =>
     orders.length > 0
       ? orders.map((detail) => [
@@ -71,7 +94,7 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
         ])
       : [["None", "-"]];
 
-  // For Ala Carte orders (In‑Store), compute subtotal: quantity * price * (1 - discount/100)
+  // For Ala Carte orders (In‑Store)
   const formatAlaCarteTableData = (orders) =>
     orders.length > 0
       ? orders.map((detail) => {
@@ -91,7 +114,7 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
         })
       : [["None", "-", "-", "-", "-"]];
 
-  // For delivery orders (Grab/FoodPanda), show table with Menu Item, Quantity, Price.
+  // For Delivery orders (Grab/FoodPanda)
   const formatDeliveryTableData = (orders) =>
     orders.length > 0
       ? orders.map((detail) => {
@@ -105,8 +128,6 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
         })
       : [["None", "-", "-"]];
 
-  // Separate orders into Unli Wings (id:2) and Ala Carte (id:1) for In‑Store;
-  // For delivery orders, we use all order_details.
   const orderDetails = transaction.order_details || [];
   const unliWingsOrders = orderDetails.filter(
     (detail) => Number(detail.instore_category?.id) === 2
@@ -115,7 +136,6 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
     (detail) => Number(detail.instore_category?.id) === 1
   );
 
-  // Group Unli Wings orders by unli_wings_group
   const groupedUnliWingsOrders = unliWingsOrders.reduce((acc, detail) => {
     const groupKey = detail.unli_wings_group || "Ungrouped";
     if (!acc[groupKey]) acc[groupKey] = [];
@@ -123,7 +143,6 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
     return acc;
   }, {});
 
-  // Compute total for Unli Wings: for each group, add the group's base amount (once per group)
   const totalUnliWings = Object.keys(groupedUnliWingsOrders).reduce(
     (sum, groupKey) => {
       const groupOrders = groupedUnliWingsOrders[groupKey];
@@ -133,7 +152,6 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
     0
   );
 
-  // Compute total for Ala Carte orders (In‑Store)
   const totalAlaCarte = alaCarteOrders.reduce((sum, detail) => {
     const quantity = detail?.quantity || 0;
     const price = detail?.menu_item?.price || 0;
@@ -143,14 +161,12 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
     return sum + quantity * price * (1 - discount / 100);
   }, 0);
 
-  // For Delivery orders, compute subtotal: sum of (quantity * price) for all order_details.
   const totalDeliverySubtotal = orderDetails.reduce((sum, detail) => {
     const quantity = detail?.quantity || 0;
     const price = detail?.menu_item?.price || 0;
     return sum + quantity * price;
   }, 0);
 
-  // For Delivery orders, retrieve deduction percentage from the menu type (from menuTypeData)
   const deductionPercentage = isDelivery
     ? menuTypeData?.deduction_percentage || 0
     : 0;
@@ -164,30 +180,42 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
   const paymentAmount = transaction.payment_amount || 0;
   const change = paymentAmount - finalTotal;
 
-  // Handle Edit: store the transaction then navigate to the Edit Order page
-  const handleEdit = () => {
-    console.log("Editing transaction:", transaction);
-    // Save transaction in localStorage (if needed)
-    localStorage.setItem("transaction", JSON.stringify(transaction));
-    // Save transaction in localStorage (if needed)
-    localStorage.setItem("transaction", JSON.stringify(transaction));
-    // Navigate to the Order page with the transaction ID
+  // Placeholder update and add handlers
+  const handleUpdate = (type, groupKey) => {
+    console.log(`Update ${type}, ${groupKey ? `Group: ${groupKey}` : ""}`);
+  };
 
-    navigate(`/order/${transaction.id}`, { state: { transaction } });
+  const handleAdd = (e) => {
+    e.stopPropagation();
+    console.log("Add a new Unli Order");
+  };
+
+  // Handler for updating status via dropdown selection
+  const updateStatus = (newStatus) => {
+    if (newStatus === "Cancelled") {
+      if (window.confirm("Switching to Cancelled. Are you sure?")) {
+        setOrderStatus(newStatus);
+      }
+    } else if (newStatus === "Completed") {
+      if (
+        window.confirm(
+          "Switching to Completed. This will deduct the quantity from the inventory. Are you sure?"
+        )
+      ) {
+        setOrderStatus(newStatus);
+      }
+    } else {
+      setOrderStatus(newStatus);
+    }
+    setIsStatusDropdownOpen(false);
   };
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      {/* Modal container with fixed height and relative positioning */}
-      <div className="bg-white rounded-lg shadow-lg p-6 w-[1000px] h-[650px] flex flex-col relative">
-        {/* Top Controls: Close and Edit Buttons */}
-        <div className="absolute top-2 right-2 flex space-x-2">
-          <button
-            onClick={handleEdit}
-            className="p-2 rounded bg-orange-500 text-white hover:bg-orange-700 flex items-center justify-center border"
-          >
-            Edit
-          </button>
+      {/* Modal container */}
+      <div className="bg-white rounded-lg shadow-lg p-6 w-[500px] h-[650px] flex flex-col relative">
+        {/* Close Button */}
+        <div className="absolute top-2 right-2">
           <button
             onClick={onClose}
             className="p-1 rounded hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
@@ -197,62 +225,127 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
         </div>
 
         {/* Header */}
-        <div>
+        <div className="border-b pb-2">
           <h2 className="text-xl font-semibold mt-4">
             Transaction No. {transaction.id}
           </h2>
-          <div className="flex justify-between items-start mt-2">
-            <div>
-              <p>
-                <strong>Date:</strong> {formatDate(transaction.date)}
-              </p>
-              <p>
-                <strong>Time:</strong> {formatTime(transaction.date)}
-              </p>
-            </div>
-            <div className="flex flex-col items-end space-y-1">
-              <div
-                className={`text-sm px-3 py-1 rounded-md ${getOrderStatusClass(
-                  orderStatus
-                )}`}
-              >
-                <strong>{orderStatus}</strong>
+          <div className="mt-2">
+            <div className="flex justify-between items-start">
+              <div>
+                <p>
+                  <strong>Date:</strong> {formatDate(transaction.date)}
+                </p>
+                <p>
+                  <strong>Time:</strong> {formatTime(transaction.date)}
+                </p>
               </div>
-              <div
-                className={`text-sm px-3 py-1 rounded-md ${getMenuTypeClass(
-                  menuType
-                )}`}
-              >
-                <strong>{menuType}</strong>
+            </div>
+            {/* Horizontal row for Menu Type (left) and Status Dropdown (right) */}
+            <div className="flex justify-between items-center">
+              <p>
+                <strong>Menu Type:</strong> {menuType}
+              </p>
+              {/* Custom Order Status Dropdown */}
+              <div className="relative inline-block text-left">
+                <button
+                  onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                  className={`flex items-center ${getOrderStatusClass(
+                    orderStatus
+                  )} rounded-md shadow-md hover:opacity-90 active:scale-95 transition-transform duration-150 w-40 overflow-hidden`}
+                >
+                  <div
+                    className={`flex items-center justify-center ${getStatusLeftBg(
+                      orderStatus
+                    )} p-2`}
+                  >
+                    <FaClipboardList className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="flex-1 text-left px-2 text-white text-sm">
+                    {orderStatus}
+                  </span>
+                  <div className="flex items-center justify-center p-2">
+                    {isStatusDropdownOpen ? (
+                      <FaChevronUp className="w-4 h-4 text-white" />
+                    ) : (
+                      <FaChevronDown className="w-4 h-4 text-white" />
+                    )}
+                  </div>
+                </button>
+                {isStatusDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-40 rounded-md shadow-lg z-10">
+                    <div className="bg-white rounded-md py-2">
+                      <button
+                        onClick={() => updateStatus("Pending")}
+                        className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                      >
+                        Pending
+                      </button>
+                      <button
+                        onClick={() => updateStatus("Completed")}
+                        className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                      >
+                        Completed
+                      </button>
+                      <button
+                        onClick={() => updateStatus("Cancelled")}
+                        className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                      >
+                        Cancelled
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
+          <h3 className="font-semibold text-xl mt-2">Order Summary</h3>
         </div>
 
-        {/* Scrollable Content Area with extra bottom padding */}
-        <div className="flex-1 mt-4">
+        {/* Scrollable Content */}
+        <div className="flex-1 mt-4 overflow-y-auto">
           {isInStore ? (
             <>
-              <h3 className="font-semibold">Order Summary</h3>
-              {unliWingsOrders.length > 0 && alaCarteOrders.length > 0 ? (
-                <div className="flex flex-row space-x-4">
-                  {/* Unli Wings Orders container */}
-                  <div className="w-1/2 max-h-[300px] overflow-y-auto">
-                    <h4 className="font-semibold">Unli Wings Orders</h4>
-                    {Object.keys(groupedUnliWingsOrders).map((groupKey) => {
-                      const groupOrders = groupedUnliWingsOrders[groupKey];
-                      const baseAmount =
-                        groupOrders[0]?.instore_category?.base_amount || 0;
-                      return (
-                        <div key={groupKey} className="border rounded mb-2">
-                          <button
-                            onClick={() => toggleAccordion(groupKey)}
-                            className="w-full text-left px-3 py-2 bg-gray-200 hover:bg-gray-300"
-                          >
+              {/* Unli Wings Overall Accordion Header */}
+              <div
+                className="flex items-center justify-between mb-2 cursor-pointer border hover:bg-gray-100 px-3 py-5 rounded-lg"
+                onClick={() => setUnliOverallOpen(!unliOverallOpen)}
+              >
+                <h4 className="font-semibold">Unli Wings Orders</h4>
+                <div>{unliOverallOpen ? <FaAngleUp /> : <FaAngleDown />}</div>
+              </div>
+              {unliOverallOpen && (
+                <div className="w-full max-h-[300px] overflow-y-auto">
+                  {/* Full-width Add button inside the accordion */}
+                  <button
+                    onClick={handleAdd}
+                    className="w-full mb-3 px-3 py-2 bg-[#E88504] text-white rounded hover:bg-[#E88504]/70"
+                  >
+                    Add a new Unli Order
+                  </button>
+                  {Object.keys(groupedUnliWingsOrders).map((groupKey) => {
+                    const groupOrders = groupedUnliWingsOrders[groupKey];
+                    const baseAmount =
+                      groupOrders[0]?.instore_category?.base_amount || 0;
+                    return (
+                      <div key={groupKey} className="border rounded mb-2">
+                        <div
+                          className="flex justify-between items-center bg-gray-200 hover:bg-gray-300 px-3 py-2 cursor-pointer"
+                          onClick={() => toggleAccordion(groupKey)}
+                        >
+                          <span className="flex-1 text-left">
                             Unli Wings Order #{groupKey} - ₱
                             {baseAmount.toFixed(2)}
-                          </button>
-                          {openAccordion[groupKey] && (
+                          </span>
+                          <span>
+                            {openAccordion[groupKey] ? (
+                              <FaAngleUp />
+                            ) : (
+                              <FaAngleDown />
+                            )}
+                          </span>
+                        </div>
+                        {openAccordion[groupKey] && (
+                          <div className="px-3 py-2">
                             <div className="max-h-[200px] overflow-y-auto overflow-x-hidden">
                               <Table
                                 columns={["Menu Item", "Quantity"]}
@@ -261,61 +354,35 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
                                   detail?.quantity || 0,
                                 ])}
                               />
+                              <button
+                                onClick={() => handleUpdate("unli", groupKey)}
+                                className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                              >
+                                Update
+                              </button>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {/* Ala Carte Orders container */}
-                  <div className="w-1/2 max-h-[300px] overflow-y-auto">
-                    <h4 className="font-semibold">Ala Carte Orders</h4>
-                    <Table
-                      columns={[
-                        "Menu Item",
-                        "Quantity",
-                        "Price",
-                        "Discounts",
-                        "Total",
-                      ]}
-                      data={formatAlaCarteTableData(alaCarteOrders)}
-                    />
-                  </div>
-                </div>
-              ) : unliWingsOrders.length > 0 ? (
-                <div className="max-h-[300px] overflow-y-auto">
-                  <h4 className="font-semibold">Unli Wings Orders</h4>
-                  {Object.keys(groupedUnliWingsOrders).map((groupKey) => {
-                    const groupOrders = groupedUnliWingsOrders[groupKey];
-                    const baseAmount =
-                      groupOrders[0]?.instore_category?.base_amount || 0;
-                    return (
-                      <div key={groupKey} className="border rounded mb-2">
-                        <button
-                          onClick={() => toggleAccordion(groupKey)}
-                          className="w-full text-left px-3 py-2 bg-gray-200 hover:bg-gray-300"
-                        >
-                          Unli Wings Order #{groupKey} - ₱
-                          {baseAmount.toFixed(2)}
-                        </button>
-                        {openAccordion[groupKey] && (
-                          <div className="max-h-[200px] overflow-y-auto overflow-x-hidden">
-                            <Table
-                              columns={["Menu Item", "Quantity"]}
-                              data={groupOrders.map((detail) => [
-                                detail?.menu_item?.name || "N/A",
-                                detail?.quantity || 0,
-                              ])}
-                            />
                           </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
-              ) : alaCarteOrders.length > 0 ? (
-                <div className="max-h-[300px] overflow-y-auto">
-                  <h4 className="font-semibold">Ala Carte Orders</h4>
+              )}
+
+              {/* Ala Carte Overall Accordion Header */}
+              <div
+                className="flex items-center justify-between mb-2 mt-4 cursor-pointer border hover:bg-gray-100 px-3 py-5 rounded-lg"
+                onClick={() => setAlaCarteOverallOpen(!alaCarteOverallOpen)}
+              >
+                <h4 className="font-semibold">
+                  Ala Carte Orders - ₱{totalAlaCarte.toFixed(2)}
+                </h4>
+                <div>
+                  {alaCarteOverallOpen ? <FaAngleUp /> : <FaAngleDown />}
+                </div>
+              </div>
+              {alaCarteOverallOpen && (
+                <div className="w-full max-h-[300px] overflow-y-auto">
                   <Table
                     columns={[
                       "Menu Item",
@@ -326,8 +393,14 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
                     ]}
                     data={formatAlaCarteTableData(alaCarteOrders)}
                   />
+                  <button
+                    onClick={() => handleUpdate("alaCarte")}
+                    className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                  >
+                    Update
+                  </button>
                 </div>
-              ) : null}
+              )}
             </>
           ) : isDelivery ? (
             <>
@@ -337,6 +410,12 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
                   columns={["Menu Item", "Quantity", "Price"]}
                   data={formatDeliveryTableData(orderDetails)}
                 />
+                <button
+                  onClick={() => handleUpdate("delivery")}
+                  className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                >
+                  Update
+                </button>
               </div>
             </>
           ) : null}
@@ -369,18 +448,6 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
                 <p>
                   <strong>Change:</strong> ₱{change.toFixed(2)}
                 </p>
-              </>
-            )}
-          </div>
-          <div className="mt-2 flex justify-end space-x-2">
-            {orderStatus === "Pending" && (
-              <>
-                <button className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-                  Cancel Order
-                </button>
-                <button className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
-                  Complete Order
-                </button>
               </>
             )}
           </div>
