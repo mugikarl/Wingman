@@ -8,7 +8,13 @@ import { FaClipboardList } from "react-icons/fa";
 import EditTransactionMenu from "../panels/EditTransactionMenu";
 import EditTransactionOrderSummary from "../panels/EditTransactionOrderSummary";
 
-const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
+const TransactionModal = ({
+  isOpen,
+  onClose,
+  transaction,
+  menuTypes,
+  discountsData,
+}) => {
   if (!isOpen || !transaction) return null;
 
   const navigate = useNavigate();
@@ -534,10 +540,12 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
               onCancelUpdate={handleCancelUpdate}
               onAddOrderDetails={handleAddOrderDetails}
               menuType={menuType}
-              discounts={[]} // Pass discounts as needed
+              discounts={discountsData} // Pass discounts as needed
               openDropdownId={openDropdownId}
               setOpenDropdownId={setOpenDropdownId}
               deductionPercentage={deductionPercentage}
+              groupedUnliWingsOrders={groupedUnliWingsOrders}
+              alaCarteOrders={alaCarteOrders}
             />
           </>
         )}

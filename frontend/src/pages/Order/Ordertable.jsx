@@ -262,6 +262,7 @@ const OrderTable = () => {
         onClose={closeTransactionModal}
         transaction={selectedTransaction}
         menuTypes={orderData.menu_types}
+        discountsData={orderData.discounts}
       />
     </div>
   );

@@ -83,7 +83,7 @@ const EditableProductCard = ({
             <select
               value={item.discount || 0}
               onChange={handleDiscountChange}
-              className="ml-2 h-8 text-sm border rounded"
+              className="ml-2 h-8 text-sm border rounded w-24"
             >
               <option value={0}>None</option>
               {discounts.map((disc) => (
@@ -121,7 +121,7 @@ const EditTransactionOrderSummary = ({
   setOpenDropdownId,
   deductionPercentage = 0, // for Delivery orders (FoodPanda/Grab)
 }) => {
-  // Local state for controlling accordion open/closed for Unli Wings groups
+  // Local state for controlling accordion open/closed for groups
   const [openAccordion, setOpenAccordion] = useState({});
 
   // Create local state for order details so that quantity and discount updates are reflected
@@ -129,11 +129,12 @@ const EditTransactionOrderSummary = ({
 
   // Update local state if orderDetails prop changes
   useEffect(() => {
+    console.log("Received orderDetails:", orderDetails);
     setLocalOrderDetails(orderDetails);
   }, [orderDetails]);
 
-  const toggleAccordion = (groupKey) => {
-    setOpenAccordion((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
+  const toggleAccordion = (key) => {
+    setOpenAccordion((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   // Handler for quantity change in a product card
@@ -181,107 +182,154 @@ const EditTransactionOrderSummary = ({
       ? newSubtotal - newSubtotal * deductionPercentage
       : newSubtotal;
 
-  return (
-    // Set the component width to 350px
-    <div
-      className="p-4 flex flex-col h-full overflow-y-auto"
-      style={{ width: "350px" }}
-    >
-      {menuType === "In-Store" ? (
-        <>
-          {/* Unli Wings Section */}
-          <div className="mt-4">
-            <button
-              className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200 rounded"
-              onClick={() => toggleAccordion("unliWings")}
-            >
-              <span className="font-semibold">Unli Wings Orders</span>
-              {openAccordion["unliWings"] ? (
-                <span>&#9650;</span>
-              ) : (
-                <span>&#9660;</span>
-              )}
-            </button>
-            {openAccordion["unliWings"] &&
-              Object.keys(groupedUnliWingsOrders).map((groupKey) => {
-                const groupOrders = groupedUnliWingsOrders[groupKey];
-                return (
-                  <div key={groupKey} className="border rounded mb-2 p-2">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-bold text-sm">
-                        Unli Wings #{groupKey}
-                      </h4>
-                      <button
-                        onClick={() => console.log("Update group", groupKey)}
-                        className="bg-green-500 text-white px-2 py-1 rounded text-xs"
-                      >
-                        Update
-                      </button>
-                    </div>
-                    {groupOrders.map((item) => (
-                      <EditableProductCard
-                        key={getItemKey(item, { id: 1, name: "In-Store" })}
-                        item={item}
-                        onQuantityChange={handleQuantityChange}
-                      />
-                    ))}
-                  </div>
-                );
-              })}
-          </div>
+  // Compute total for ala carte orders (if needed in header)
+  const alaCarteTotal = alaCarteOrders.reduce(
+    (sum, detail) =>
+      sum + (detail.menu_item?.price || 0) * (detail.quantity || 0),
+    0
+  );
 
-          {/* Ala Carte Section */}
-          <div className="mt-4">
-            {console.log("Ala Carte Orders:", alaCarteOrders)}
-            <h3 className="font-semibold text-lg mb-2">Ala Carte Orders</h3>
-            {alaCarteOrders.length === 0 ? (
+  // Compute total for unli wings orders (if needed in header)
+  const unliWingsTotal = Object.keys(groupedUnliWingsOrders).reduce(
+    (sum, key) => {
+      const group = groupedUnliWingsOrders[key];
+      return (
+        sum +
+        group.reduce(
+          (groupSum, detail) =>
+            groupSum + (detail.menu_item?.price || 0) * (detail.quantity || 0),
+          0
+        )
+      );
+    },
+    0
+  );
+
+  return (
+    // Parent container with fixed width and relative positioning
+    <div className="relative" style={{ width: "350px", height: "100%" }}>
+      {/* Header (not scrollable) */}
+      <div className="">
+        <h2 className="text-xl font-bold">Order Summary</h2>
+      </div>
+
+      {/* Main scrollable order details section */}
+      <div
+        className="p-4 flex flex-col flex-grow overflow-y-auto"
+        style={{ height: "calc(100% - 150px)" }}
+      >
+        {menuType === "In-Store" ? (
+          <>
+            {/* Ala Carte Orders Accordion */}
+            <div className="">
+              <button
+                className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200 rounded"
+                onClick={() => toggleAccordion("alaCarte")}
+              >
+                <span className="font-semibold">
+                  Ala Carte Orders - ₱{alaCarteTotal.toFixed(2)}
+                </span>
+                {openAccordion["alaCarte"] ? (
+                  <span>&#9650;</span>
+                ) : (
+                  <span>&#9660;</span>
+                )}
+              </button>
+              {openAccordion["alaCarte"] &&
+                (alaCarteOrders.length === 0 ? (
+                  <p className="text-gray-500 text-center">
+                    No Order Details Found
+                  </p>
+                ) : (
+                  alaCarteOrders.map((item) => (
+                    <EditableProductCard
+                      key={getItemKey(item, { id: 1, name: "In-Store" })}
+                      item={item}
+                      onQuantityChange={handleQuantityChange}
+                      discounts={discounts} // Pass discount options for Ala Carte
+                      onDiscountChange={handleDiscountChange}
+                    />
+                  ))
+                ))}
+            </div>
+
+            {/* Unli Wings Orders Accordion */}
+            <div className="mt-2">
+              <button
+                className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200 rounded"
+                onClick={() => toggleAccordion("unliWings")}
+              >
+                <span className="font-semibold">
+                  Unli Wings Orders - ₱{unliWingsTotal.toFixed(2)}
+                </span>
+                {openAccordion["unliWings"] ? (
+                  <span>&#9650;</span>
+                ) : (
+                  <span>&#9660;</span>
+                )}
+              </button>
+              {openAccordion["unliWings"] &&
+                Object.keys(groupedUnliWingsOrders).map((groupKey) => {
+                  const groupOrders = groupedUnliWingsOrders[groupKey];
+                  const baseAmount =
+                    groupOrders[0]?.instore_category?.base_amount || 0;
+                  return (
+                    <div key={groupKey} className="border rounded mb-2 p-2">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-bold text-sm">
+                          Unli Wings Order #{groupKey} - ₱
+                          {baseAmount.toFixed(2)}
+                        </h4>
+                        <button
+                          onClick={() => console.log("Update group", groupKey)}
+                          className="bg-green-500 text-white px-2 py-1 rounded text-xs"
+                        >
+                          Update
+                        </button>
+                      </div>
+                      {groupOrders.map((item) => (
+                        <EditableProductCard
+                          key={getItemKey(item, { id: 1, name: "In-Store" })}
+                          item={item}
+                          onQuantityChange={handleQuantityChange}
+                        />
+                      ))}
+                    </div>
+                  );
+                })}
+            </div>
+          </>
+        ) : (
+          // For Delivery orders, simply list the items using the same product card layout.
+          <div>
+            {localOrderDetails.length === 0 ? (
               <p className="text-gray-500 text-center">
                 No Order Details Found
               </p>
             ) : (
-              alaCarteOrders.map((item) => (
+              localOrderDetails.map((item) => (
                 <EditableProductCard
-                  key={getItemKey(item, { id: 1, name: "In-Store" })}
+                  key={getItemKey(item, { id: 2, name: "Delivery" })}
                   item={item}
                   onQuantityChange={handleQuantityChange}
-                  discounts={discounts} // Pass discount options for Ala Carte
-                  onDiscountChange={handleDiscountChange}
                 />
               ))
             )}
           </div>
-        </>
-      ) : (
-        // For Delivery orders, simply list the items using the same product card layout.
-        <div>
-          <h3 className="font-semibold text-lg mb-2">Order Summary</h3>
-          {localOrderDetails.length === 0 ? (
-            <p className="text-gray-500 text-center">No Order Details Found</p>
-          ) : (
-            localOrderDetails.map((item) => (
-              <EditableProductCard
-                key={getItemKey(item, { id: 2, name: "Delivery" })}
-                item={item}
-                onQuantityChange={handleQuantityChange}
-              />
-            ))
-          )}
-          <div className="mt-4 text-right">
-            <p>
-              <strong>Percentage Deduction:</strong>{" "}
-              {(deductionPercentage * 100).toFixed(2)}%
-            </p>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Footer with computed new subtotal and total */}
-      <div className="border-t pt-2 mt-2">
+      {/* Fixed Footer */}
+      <div className="sticky bottom-0 left-0 right-0 bg-white border-t p-2">
         {menuType === "Grab" || menuType === "FoodPanda" ? (
           <>
             <div className="flex justify-between">
               <span>New Subtotal:</span>
               <span>₱{newSubtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Percentage Deduction:</span>
+              <span>{(deductionPercentage * 100).toFixed(2)}%</span>
             </div>
             <div className="flex justify-between">
               <span>New Total:</span>
@@ -300,28 +348,28 @@ const EditTransactionOrderSummary = ({
             </div>
           </>
         )}
-      </div>
-      <div className="flex space-x-2 mt-4">
-        <button
-          onClick={() => {
-            if (
-              window.confirm(
-                "Are you sure you want to cancel updating the order?"
-              )
-            ) {
-              onCancelUpdate();
-            }
-          }}
-          className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={() => onAddOrderDetails()}
-          className="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600"
-        >
-          Add Order Details
-        </button>
+        <div className="flex space-x-2 mt-2">
+          <button
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Are you sure you want to cancel updating the order?"
+                )
+              ) {
+                onCancelUpdate();
+              }
+            }}
+            className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600 whitespace-nowrap"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onAddOrderDetails()}
+            className="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 whitespace-nowrap"
+          >
+            Add Order Details
+          </button>
+        </div>
       </div>
     </div>
   );
