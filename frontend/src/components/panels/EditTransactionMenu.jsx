@@ -7,7 +7,7 @@ const EditTransactionMenu = ({
   setIsCatDropdownOpen,
   selectedMenuCategory,
   setSelectedMenuCategory,
-  finalMenuItems,
+  filteredMenuItems,
   onItemSelect, // callback when a menu item is selected
 }) => {
   return (
@@ -43,9 +43,10 @@ const EditTransactionMenu = ({
           <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg z-10">
             <div className="bg-white rounded-md py-2">
               <button
-                onClick={() =>
-                  setSelectedMenuCategory({ id: 0, name: "Overall" })
-                }
+                onClick={() => {
+                  setSelectedMenuCategory({ id: 0, name: "Overall" });
+                  setIsCatDropdownOpen(false);
+                }}
                 className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
               >
                 Overall
@@ -69,7 +70,7 @@ const EditTransactionMenu = ({
       {/* Render filtered menu items as rectangular cards */}
       <div className="flex-1 overflow-y-auto">
         <div className="space-y-2">
-          {finalMenuItems.map((item) => (
+          {filteredMenuItems.map((item) => (
             <div
               key={item.id}
               className="flex items-center border rounded cursor-pointer hover:shadow-md w-full"

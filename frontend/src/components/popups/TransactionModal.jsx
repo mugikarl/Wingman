@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Table from "../../components/tables/Table";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { FaAngleUp, FaAngleDown } from "react-icons/fa6";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
@@ -14,6 +13,8 @@ const TransactionModal = ({
   transaction,
   menuTypes,
   discountsData,
+  menuItems, // Passed from OrderTable
+  menuCategories, // Passed from OrderTable
 }) => {
   if (!isOpen || !transaction) return null;
 
@@ -22,9 +23,7 @@ const TransactionModal = ({
   // State to track expansion
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // States for menu data & category dropdown
-  const [menuItems, setMenuItems] = useState([]);
-  const [menuCategories, setMenuCategories] = useState([]);
+  // States for category dropdown
   const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
   const [selectedMenuCategory, setSelectedMenuCategory] = useState(null);
 
@@ -105,33 +104,15 @@ const TransactionModal = ({
   const isInStore = menuType === "In-Store";
   const isDelivery = menuType === "Grab" || menuType === "FoodPanda";
 
-  // Fetch menu items and categories for the expanded Menu panel
-  useEffect(() => {
-    const fetchMenuData = async () => {
-      try {
-        const response = await axios.get(
-          "http://127.0.0.1:8000/fetch-order-data/"
-        );
-        setMenuItems(response.data.menu_items || []);
-        setMenuCategories(response.data.menu_categories || []);
-      } catch (error) {
-        console.error("Error fetching menu data:", error);
-      }
-    };
-    fetchMenuData();
-  }, []);
-
-  // Filter menu items by transaction type
+  // Filter items based on menu type (from menuTypeData) and selected menu category (if any)
   const filteredMenuItems = menuItems.filter((item) => {
-    if (!menuTypeData) return true;
-    return item.type_id === menuTypeData.id;
+    const matchesType = menuTypeData ? item.type_id === menuTypeData.id : true;
+    const matchesCategory =
+      selectedMenuCategory && selectedMenuCategory.id !== 0
+        ? item.category_id === selectedMenuCategory.id
+        : true;
+    return matchesType && matchesCategory;
   });
-
-  const finalMenuItems = selectedMenuCategory
-    ? filteredMenuItems.filter(
-        (item) => item.category_id === selectedMenuCategory.id
-      )
-    : filteredMenuItems;
 
   // --- Original Left Side: Transaction Details ---
   const orderDetails = transaction.order_details || [];
@@ -172,7 +153,7 @@ const TransactionModal = ({
     : 0;
   const finalTotal = isDelivery
     ? totalDeliverySubtotal - totalDeliverySubtotal * deductionPercentage
-    : totalAlaCarte; // Replace with your In‑Store logic as needed
+    : totalAlaCarte;
   const totalPrice = isDelivery ? totalDeliverySubtotal : totalAlaCarte;
   const paymentAmount = transaction.payment_amount || 0;
   const change = paymentAmount - finalTotal;
@@ -220,22 +201,6 @@ const TransactionModal = ({
     // Replace with your logic for updating the order.
   };
 
-  // --- Right Section: Render Order Summary Panel using separate component ---
-  const renderOrderSummary = () => {
-    return (
-      <EditTransactionOrderSummary
-        orderDetails={orderDetails}
-        finalTotal={finalTotal}
-        onCancelUpdate={handleCancelUpdate}
-        onAddOrderDetails={handleAddOrderDetails}
-        menuType={menuType}
-        discounts={[]} // Pass discounts as needed
-        openDropdownId={openDropdownId}
-        setOpenDropdownId={setOpenDropdownId}
-      />
-    );
-  };
-
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
       {/* Modal container */}
@@ -254,7 +219,7 @@ const TransactionModal = ({
           </button>
         </div>
 
-        {/* Left Side: Transaction Details (original content with tables) */}
+        {/* Left Side: Transaction Details */}
         <div
           className={
             isExpanded
@@ -339,7 +304,7 @@ const TransactionModal = ({
             <h3 className="font-semibold text-xl mt-2">Order Summary</h3>
           </div>
 
-          {/* Scrollable Content for Left Side: Original tables */}
+          {/* Scrollable Content for Left Side */}
           <div className="flex-1 mt-4 overflow-y-auto overflow-x-hidden">
             {isInStore ? (
               <>
@@ -531,7 +496,7 @@ const TransactionModal = ({
               setIsCatDropdownOpen={setIsCatDropdownOpen}
               selectedMenuCategory={selectedMenuCategory}
               setSelectedMenuCategory={setSelectedMenuCategory}
-              finalMenuItems={finalMenuItems}
+              filteredMenuItems={filteredMenuItems}
               onItemSelect={(item) => console.log("Selected item", item)}
             />
             <EditTransactionOrderSummary
@@ -540,7 +505,7 @@ const TransactionModal = ({
               onCancelUpdate={handleCancelUpdate}
               onAddOrderDetails={handleAddOrderDetails}
               menuType={menuType}
-              discounts={discountsData} // Pass discounts as needed
+              discounts={discountsData}
               openDropdownId={openDropdownId}
               setOpenDropdownId={setOpenDropdownId}
               deductionPercentage={deductionPercentage}

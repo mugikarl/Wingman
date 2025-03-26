@@ -83,19 +83,6 @@ const Order = () => {
     }
   };
 
-  // Category filter remains unchanged
-  const handleCategoryFilter = (cat) => {
-    if (selectedItems.length > 0) {
-      const ok = window.confirm(
-        "Changing categories will remove the current items in the order summary. Proceed?"
-      );
-      if (!ok) return;
-      setSelectedItems([]);
-    }
-    setSelectedMenuCategory(cat);
-    setIsCatDropdownOpen(false);
-  };
-
   // Filter items based on selected type and category
   const filteredMenuItems = menuItems.filter((item) => {
     const matchesType = selectedMenuType
@@ -472,7 +459,7 @@ const Order = () => {
                     <div className="bg-white rounded-md py-2">
                       <button
                         onClick={() =>
-                          handleCategoryFilter({ id: 0, name: "Overall" })
+                          setSelectedMenuCategory({ id: 0, name: "Overall" })
                         }
                         className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
                       >
@@ -481,7 +468,10 @@ const Order = () => {
                       {menuCategories.map((cat) => (
                         <button
                           key={cat.id}
-                          onClick={() => handleCategoryFilter(cat)}
+                          onClick={() => {
+                            setSelectedMenuCategory(cat);
+                            setIsCatDropdownOpen(false);
+                          }}
                           className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
                         >
                           {cat.name}
