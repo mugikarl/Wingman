@@ -1,73 +1,37 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { getItemKey } from "../cards/OrderProductCard";
 import EditableProductCard from "../cards/EditableProductCard";
 
 const EditTransactionOrderSummary = ({
   orderDetails,
-  groupedUnliWingsOrders = {},
-  alaCarteOrders = [],
   finalTotal,
   onCancelUpdate,
   onAddOrderDetails,
   menuType,
   discounts,
+  onQuantityChange, // Parent callback
+  onDiscountChange, // Parent callback
   openDropdownId,
   setOpenDropdownId,
   deductionPercentage = 0,
 }) => {
-  const [openAccordion, setOpenAccordion] = useState({});
-  const [localOrderDetails, setLocalOrderDetails] = useState(orderDetails);
+  // Compute orders directly from orderDetails prop.
+  const alaCarteOrders = orderDetails.filter(
+    (detail) => detail.instore_category?.id === 1
+  );
+  const unliWingsOrders = orderDetails.filter(
+    (detail) => detail.instore_category?.id === 2
+  );
+  const groupedUnliWingsOrders = unliWingsOrders.reduce((acc, detail) => {
+    const groupKey = detail.unli_wings_group || "Ungrouped";
+    if (!acc[groupKey]) acc[groupKey] = [];
+    acc[groupKey].push(detail);
+    return acc;
+  }, {});
 
-  useEffect(() => {
-    console.log("Received orderDetails:", orderDetails);
-    setLocalOrderDetails(orderDetails);
-  }, [orderDetails]);
-
-  const toggleAccordion = (key) => {
-    setOpenAccordion((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const handleQuantityChange = (changedItem, newQty) => {
-    console.log(
-      "Quantity changed for",
-      changedItem.menu_item?.name,
-      "to",
-      newQty
-    );
-    const updated = localOrderDetails.map((item) => {
-      if (item.id === changedItem.id) {
-        return { ...item, quantity: newQty };
-      }
-      return item;
-    });
-    setLocalOrderDetails(updated);
-  };
-
-  // Look up the full discount object from the discounts list
-  const handleDiscountChange = (changedItem, newDiscountId) => {
-    console.log(
-      "Discount changed for",
-      changedItem.menu_item?.name,
-      "to",
-      newDiscountId
-    );
-    const newDiscountObj =
-      discounts.find((disc) => disc.id === newDiscountId) || null;
-    const updated = localOrderDetails.map((item) => {
-      if (item.id === changedItem.id) {
-        return { ...item, discount: newDiscountObj };
-      }
-      return item;
-    });
-    setLocalOrderDetails(updated);
-  };
-
-  // Recalculate subtotal applying discount for each item from localOrderDetails.
-  // For Unli Wings orders (instore_category id 2) use the base_amount instead.
-  const newSubtotal = localOrderDetails.reduce((sum, item) => {
+  const newSubtotal = orderDetails.reduce((sum, item) => {
     const quantity = item.quantity || 0;
     if (item.instore_category?.id === 2) {
-      // Use the base amount for Unli Wings orders.
       const baseAmount = item.instore_category?.base_amount || 0;
       return sum + baseAmount * quantity;
     } else {
@@ -82,31 +46,15 @@ const EditTransactionOrderSummary = ({
       ? newSubtotal - newSubtotal * deductionPercentage
       : newSubtotal;
 
-  // Recalculate totals for each group from localOrderDetails.
-  // For Ala Carte orders, use menu_item price with discount.
-  const computedAlaCarteTotal = localOrderDetails
-    .filter((detail) => detail.instore_category?.id === 1)
-    .reduce((sum, detail) => {
-      const price = detail.menu_item?.price || 0;
-      const quantity = detail.quantity || 0;
-      const discountPercentage = detail.discount
-        ? detail.discount.percentage
-        : 0;
-      return sum + price * quantity * (1 - discountPercentage);
-    }, 0);
+  const [openAccordion, setOpenAccordion] = React.useState({});
 
-  // For Unli Wings orders, use the base_amount instead.
-  const computedUnliWingsTotal = localOrderDetails
-    .filter((detail) => detail.instore_category?.id === 2)
-    .reduce((sum, detail) => {
-      const baseAmount = detail.instore_category?.base_amount || 0;
-      const quantity = detail.quantity || 0;
-      return sum + baseAmount * quantity;
-    }, 0);
+  const toggleAccordion = (key) => {
+    setOpenAccordion((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   return (
     <div className="relative" style={{ width: "350px", height: "100%" }}>
-      <div className="">
+      <div>
         <h2 className="text-xl font-bold">Order Summary</h2>
       </div>
       <div
@@ -115,13 +63,23 @@ const EditTransactionOrderSummary = ({
       >
         {menuType === "In-Store" ? (
           <>
-            <div className="">
+            <div>
               <button
                 className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200 rounded"
                 onClick={() => toggleAccordion("alaCarte")}
               >
                 <span className="font-semibold">
-                  Ala Carte Orders - ₱{computedAlaCarteTotal.toFixed(2)}
+                  Ala Carte Orders - ₱
+                  {alaCarteOrders
+                    .reduce((sum, detail) => {
+                      const price = detail.menu_item?.price || 0;
+                      const quantity = detail.quantity || 0;
+                      const discountPercentage = detail.discount
+                        ? detail.discount.percentage
+                        : 0;
+                      return sum + price * quantity * (1 - discountPercentage);
+                    }, 0)
+                    .toFixed(2)}
                 </span>
                 {openAccordion["alaCarte"] ? (
                   <span>&#9650;</span>
@@ -139,20 +97,29 @@ const EditTransactionOrderSummary = ({
                     <EditableProductCard
                       key={getItemKey(item, { id: 1, name: "In-Store" })}
                       item={item}
-                      onQuantityChange={handleQuantityChange}
+                      onQuantityChange={onQuantityChange}
                       discounts={discounts}
-                      onDiscountChange={handleDiscountChange}
+                      onDiscountChange={onDiscountChange}
                     />
                   ))
                 ))}
             </div>
+            {/* Unli Wings Section */}
             <div className="mt-2">
               <button
                 className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200 rounded"
                 onClick={() => toggleAccordion("unliWings")}
               >
                 <span className="font-semibold">
-                  Unli Wings Orders - ₱{computedUnliWingsTotal.toFixed(2)}
+                  Unli Wings Orders - ₱
+                  {unliWingsOrders
+                    .reduce((sum, detail) => {
+                      const baseAmount =
+                        detail.instore_category?.base_amount || 0;
+                      const quantity = detail.quantity || 0;
+                      return sum + baseAmount * quantity;
+                    }, 0)
+                    .toFixed(2)}
                 </span>
                 {openAccordion["unliWings"] ? (
                   <span>&#9650;</span>
@@ -163,7 +130,6 @@ const EditTransactionOrderSummary = ({
               {openAccordion["unliWings"] &&
                 Object.keys(groupedUnliWingsOrders).map((groupKey) => {
                   const groupOrders = groupedUnliWingsOrders[groupKey];
-                  // For each unli group, use the base_amount from the instore_category
                   const baseAmount =
                     groupOrders[0]?.instore_category?.base_amount || 0;
                   return (
@@ -184,26 +150,65 @@ const EditTransactionOrderSummary = ({
                         <EditableProductCard
                           key={getItemKey(item, { id: 1, name: "In-Store" })}
                           item={item}
-                          onQuantityChange={handleQuantityChange}
+                          onQuantityChange={onQuantityChange}
                         />
                       ))}
                     </div>
                   );
                 })}
+              {/* Add New Unli Wings Order Button */}
+              {openAccordion["unliWings"] && (
+                <div className="mb-2">
+                  <button
+                    onClick={() => {
+                      // Add a new unli wings order group.
+                      // Find current groups.
+                      const currentGroups = unliWingsOrders
+                        .map((detail) => detail.unli_wings_group)
+                        .filter((g) => g !== undefined)
+                        .map(Number);
+                      const newGroupNumber =
+                        currentGroups.length > 0
+                          ? Math.max(...currentGroups) + 1
+                          : 1;
+                      // Use base_amount from an existing unli wings order if available.
+                      const baseAmount =
+                        unliWingsOrders.length > 0
+                          ? unliWingsOrders[0].instore_category.base_amount
+                          : 0;
+                      // Create a new group header detail with no menu_item.
+                      const newDetail = {
+                        id: Date.now(),
+                        unli_wings_group: newGroupNumber,
+                        instore_category: { id: 2, base_amount: baseAmount },
+                        quantity: 0,
+                        menu_item: null,
+                        discount: { id: 0, type: "None", percentage: 0 },
+                      };
+                      // Update orderDetails by adding new detail.
+                      // (Assuming onQuantityChange can be used to update parent's state for new items as well.)
+                      onQuantityChange(newDetail, newDetail.quantity);
+                    }}
+                    className="w-full px-3 py-2 bg-[#E88504] text-white rounded"
+                  >
+                    Add New Unli Wings Order
+                  </button>
+                </div>
+              )}
             </div>
           </>
         ) : (
           <div>
-            {localOrderDetails.length === 0 ? (
+            {orderDetails.length === 0 ? (
               <p className="text-gray-500 text-center">
                 No Order Details Found
               </p>
             ) : (
-              localOrderDetails.map((item) => (
+              orderDetails.map((item) => (
                 <EditableProductCard
                   key={getItemKey(item, { id: 2, name: "Delivery" })}
                   item={item}
-                  onQuantityChange={handleQuantityChange}
+                  onQuantityChange={onQuantityChange}
                 />
               ))
             )}

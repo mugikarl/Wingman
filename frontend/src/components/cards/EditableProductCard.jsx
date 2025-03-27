@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { getItemKey } from "../cards/OrderProductCard";
 
 const EditableProductCard = ({
@@ -8,6 +8,11 @@ const EditableProductCard = ({
   onDiscountChange,
 }) => {
   const [qty, setQty] = useState(item.quantity);
+
+  // Sync local quantity with item.quantity prop when it changes.
+  useEffect(() => {
+    setQty(item.quantity);
+  }, [item.quantity]);
 
   const originalPrice = item.menu_item?.price || 0;
   // If discount exists, use its percentage; otherwise, no discount (0%)
@@ -42,7 +47,7 @@ const EditableProductCard = ({
 
   return (
     <div
-      className="flex items-center border rounded p-1 mb-2"
+      className="flex items-center border rounded p-1 mb-2 w-full"
       style={{ width: "100%" }}
     >
       <div className="flex-shrink-0">

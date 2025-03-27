@@ -11,8 +11,8 @@ const EditTransactionMenu = ({
   onItemSelect, // callback when a menu item is selected
 }) => {
   return (
-    <div className="w-[350px] border-l px-4 flex flex-col h-full">
-      <h3 className="font-semibold text-xl mb-4">Menu</h3>
+    <div className="w-400 px-4 flex flex-col h-full">
+      <h3 className="font-bold text-xl mb-4">Menu</h3>
       {/* Select Category Dropdown */}
       <div className="relative inline-block text-left mb-4">
         <button
@@ -68,7 +68,7 @@ const EditTransactionMenu = ({
         )}
       </div>
       {/* Render filtered menu items as rectangular cards */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto w-full">
         <div className="space-y-2">
           {filteredMenuItems.map((item) => (
             <div
@@ -84,7 +84,11 @@ const EditTransactionMenu = ({
               />
               {/* Details: name and price */}
               <div className="flex-grow pl-2">
-                <p className="font-semibold truncate">{item.name}</p>
+                <p className="font-semibold truncate">
+                  {item.name.length > 15
+                    ? item.name.substring(0, 15) + "..."
+                    : item.name}
+                </p>
               </div>
               <p className="font-semibold pr-2">₱{item.price.toFixed(2)}</p>
             </div>

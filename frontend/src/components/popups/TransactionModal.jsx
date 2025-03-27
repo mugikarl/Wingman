@@ -6,6 +6,7 @@ import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 import { FaClipboardList } from "react-icons/fa";
 import EditTransactionMenu from "../panels/EditTransactionMenu";
 import EditTransactionOrderSummary from "../panels/EditTransactionOrderSummary";
+import OrderEditModal from "./OrderEditModal";
 
 const TransactionModal = ({
   isOpen,
@@ -38,6 +39,9 @@ const TransactionModal = ({
 
   // Dropdown state for OrderProductCard
   const [openDropdownId, setOpenDropdownId] = useState(null);
+
+  // New state to control the editing modal visibility.
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const toggleAccordion = (groupKey) => {
     setOpenAccordion((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
@@ -104,7 +108,7 @@ const TransactionModal = ({
   const isInStore = menuType === "In-Store";
   const isDelivery = menuType === "Grab" || menuType === "FoodPanda";
 
-  // Filter items based on menu type (from menuTypeData) and selected menu category (if any)
+  // Filter items based on menu type and selected category (if any)
   const filteredMenuItems = menuItems.filter((item) => {
     const matchesType = menuTypeData ? item.type_id === menuTypeData.id : true;
     const matchesCategory =
@@ -130,14 +134,13 @@ const TransactionModal = ({
     return acc;
   }, {});
 
-  // Calculate totals (example for Delivery orders; adjust as needed for In‑Store)
+  // Calculate totals
   const totalDeliverySubtotal = orderDetails.reduce(
     (sum, detail) =>
       sum + (detail?.quantity || 0) * (detail?.menu_item?.price || 0),
     0
   );
 
-  // Calculate total for Ala Carte orders (for In‑Store)
   const totalAlaCarte = alaCarteOrders.reduce((sum, detail) => {
     const quantity = detail?.quantity || 0;
     const price = detail?.menu_item?.price || 0;
@@ -147,7 +150,6 @@ const TransactionModal = ({
     return sum + quantity * price * (1 - discount / 100);
   }, 0);
 
-  // For Delivery orders totals (as an example)
   const deductionPercentage = isDelivery
     ? menuTypeData?.deduction_percentage || 0
     : 0;
@@ -158,16 +160,21 @@ const TransactionModal = ({
   const paymentAmount = transaction.payment_amount || 0;
   const change = paymentAmount - finalTotal;
 
-  // Handlers for expanding/collapsing editing mode
-  const handleUpdate = (type, groupKey) => {
-    console.log(`Update ${type}, ${groupKey ? `Group: ${groupKey}` : ""}`);
-    setIsExpanded(true);
+  // When an Update button is clicked:
+  const handleUpdateClick = () => {
+    setIsEditModalOpen(true);
+    // Do not call onClose() here so that OrderEditModal (rendered below) remains in the tree.
+  };
+
+  // Callback for when OrderEditModal completes update
+  const handleUpdateComplete = (updatedOrderDetails) => {
+    console.log("Updated order details:", updatedOrderDetails);
+    // You might update the transaction or send the data to your API.
   };
 
   const handleAdd = (e) => {
     e.stopPropagation();
     console.log("Create new Unli Wings Order Group");
-    // Implement your logic to add a new group.
   };
 
   const updateStatus = (newStatus) => {
@@ -189,7 +196,6 @@ const TransactionModal = ({
     setIsStatusDropdownOpen(false);
   };
 
-  // Handlers for Order Summary actions (right panel)
   const handleCancelUpdate = () => {
     if (window.confirm("Are you sure you want to cancel updating the order?")) {
       onClose();
@@ -198,7 +204,6 @@ const TransactionModal = ({
 
   const handleAddOrderDetails = () => {
     console.log("Add Order Details triggered");
-    // Replace with your logic for updating the order.
   };
 
   return (
@@ -356,7 +361,7 @@ const TransactionModal = ({
                                   ])}
                                 />
                                 <button
-                                  onClick={() => handleUpdate("unli", groupKey)}
+                                  onClick={handleUpdateClick}
                                   className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
                                 >
                                   Update
@@ -413,7 +418,7 @@ const TransactionModal = ({
                       }
                     />
                     <button
-                      onClick={() => handleUpdate("alaCarte")}
+                      onClick={handleUpdateClick}
                       className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
                     >
                       Update
@@ -442,7 +447,7 @@ const TransactionModal = ({
                     }
                   />
                   <button
-                    onClick={() => handleUpdate("delivery")}
+                    onClick={handleUpdateClick}
                     className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
                   >
                     Update
@@ -487,32 +492,17 @@ const TransactionModal = ({
           </div>
         </div>
 
-        {/* When expanded, render Middle and Right sections */}
-        {isExpanded && (
-          <>
-            <EditTransactionMenu
-              menuCategories={menuCategories}
-              isCatDropdownOpen={isCatDropdownOpen}
-              setIsCatDropdownOpen={setIsCatDropdownOpen}
-              selectedMenuCategory={selectedMenuCategory}
-              setSelectedMenuCategory={setSelectedMenuCategory}
-              filteredMenuItems={filteredMenuItems}
-              onItemSelect={(item) => console.log("Selected item", item)}
-            />
-            <EditTransactionOrderSummary
-              orderDetails={orderDetails}
-              finalTotal={finalTotal}
-              onCancelUpdate={handleCancelUpdate}
-              onAddOrderDetails={handleAddOrderDetails}
-              menuType={menuType}
-              discounts={discountsData}
-              openDropdownId={openDropdownId}
-              setOpenDropdownId={setOpenDropdownId}
-              deductionPercentage={deductionPercentage}
-              groupedUnliWingsOrders={groupedUnliWingsOrders}
-              alaCarteOrders={alaCarteOrders}
-            />
-          </>
+        {isEditModalOpen && (
+          <OrderEditModal
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            transaction={transaction}
+            menuCategories={menuCategories}
+            menuItems={menuItems}
+            discountsData={discountsData}
+            menuTypes={menuTypes}
+            onUpdateComplete={handleUpdateComplete}
+          />
         )}
       </div>
     </div>
