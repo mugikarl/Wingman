@@ -4,20 +4,44 @@ import { useNavigate } from "react-router-dom";
 import { FaAngleUp, FaAngleDown } from "react-icons/fa6";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 import { FaClipboardList } from "react-icons/fa";
+import EditTransactionMenu from "../panels/EditTransactionMenu";
+import EditTransactionOrderSummary from "../panels/EditTransactionOrderSummary";
+import OrderEditModal from "./OrderEditModal";
 
-const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
+const TransactionModal = ({
+  isOpen,
+  onClose,
+  transaction,
+  menuTypes,
+  discountsData,
+  menuItems, // Passed from OrderTable
+  menuCategories, // Passed from OrderTable
+}) => {
   if (!isOpen || !transaction) return null;
 
   const navigate = useNavigate();
 
-  // Local state for managing accordion open/closed status
+  // State to track expansion
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // States for category dropdown
+  const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
+  const [selectedMenuCategory, setSelectedMenuCategory] = useState(null);
+
+  // States for accordion groups
   const [openAccordion, setOpenAccordion] = useState({});
   const [unliOverallOpen, setUnliOverallOpen] = useState(true);
   const [alaCarteOverallOpen, setAlaCarteOverallOpen] = useState(true);
 
-  // State for order status, starting with "Pending"
+  // Order status and its dropdown
   const [orderStatus, setOrderStatus] = useState("Pending");
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+
+  // Dropdown state for OrderProductCard
+  const [openDropdownId, setOpenDropdownId] = useState(null);
+
+  // New state to control the editing modal visibility.
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const toggleAccordion = (groupKey) => {
     setOpenAccordion((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
@@ -50,7 +74,6 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
     }
   };
 
-  // Helper to style the left container of the dropdown (for status)
   const getStatusLeftBg = (status) => {
     switch (status) {
       case "Pending":
@@ -85,49 +108,17 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
   const isInStore = menuType === "In-Store";
   const isDelivery = menuType === "Grab" || menuType === "FoodPanda";
 
-  // For Unli Wings orders (In‑Store)
-  const formatUnliWingsTableData = (orders) =>
-    orders.length > 0
-      ? orders.map((detail) => [
-          detail?.menu_item?.name || "N/A",
-          detail?.quantity || 0,
-        ])
-      : [["None", "-"]];
+  // Filter items based on menu type and selected category (if any)
+  const filteredMenuItems = menuItems.filter((item) => {
+    const matchesType = menuTypeData ? item.type_id === menuTypeData.id : true;
+    const matchesCategory =
+      selectedMenuCategory && selectedMenuCategory.id !== 0
+        ? item.category_id === selectedMenuCategory.id
+        : true;
+    return matchesType && matchesCategory;
+  });
 
-  // For Ala Carte orders (In‑Store)
-  const formatAlaCarteTableData = (orders) =>
-    orders.length > 0
-      ? orders.map((detail) => {
-          const quantity = detail?.quantity || 0;
-          const price = detail?.menu_item?.price || 0;
-          const discount = detail?.discount?.percentage
-            ? detail.discount.percentage * 100
-            : 0;
-          const computedTotal = quantity * price * (1 - discount / 100);
-          return [
-            detail?.menu_item?.name || "N/A",
-            quantity,
-            `₱${price.toFixed(2)}`,
-            `${discount}%`,
-            `₱${computedTotal.toFixed(2)}`,
-          ];
-        })
-      : [["None", "-", "-", "-", "-"]];
-
-  // For Delivery orders (Grab/FoodPanda)
-  const formatDeliveryTableData = (orders) =>
-    orders.length > 0
-      ? orders.map((detail) => {
-          const quantity = detail?.quantity || 0;
-          const price = detail?.menu_item?.price || 0;
-          return [
-            detail?.menu_item?.name || "N/A",
-            quantity,
-            `₱${price.toFixed(2)}`,
-          ];
-        })
-      : [["None", "-", "-"]];
-
+  // --- Original Left Side: Transaction Details ---
   const orderDetails = transaction.order_details || [];
   const unliWingsOrders = orderDetails.filter(
     (detail) => Number(detail.instore_category?.id) === 2
@@ -143,12 +134,10 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
     return acc;
   }, {});
 
-  const totalUnliWings = Object.keys(groupedUnliWingsOrders).reduce(
-    (sum, groupKey) => {
-      const groupOrders = groupedUnliWingsOrders[groupKey];
-      const baseAmount = groupOrders[0]?.instore_category?.base_amount || 0;
-      return sum + baseAmount;
-    },
+  // Calculate totals
+  const totalDeliverySubtotal = orderDetails.reduce(
+    (sum, detail) =>
+      sum + (detail?.quantity || 0) * (detail?.menu_item?.price || 0),
     0
   );
 
@@ -161,36 +150,33 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
     return sum + quantity * price * (1 - discount / 100);
   }, 0);
 
-  const totalDeliverySubtotal = orderDetails.reduce((sum, detail) => {
-    const quantity = detail?.quantity || 0;
-    const price = detail?.menu_item?.price || 0;
-    return sum + quantity * price;
-  }, 0);
-
   const deductionPercentage = isDelivery
     ? menuTypeData?.deduction_percentage || 0
     : 0;
   const finalTotal = isDelivery
     ? totalDeliverySubtotal - totalDeliverySubtotal * deductionPercentage
-    : totalUnliWings + totalAlaCarte;
-
-  const totalPrice = isDelivery
-    ? totalDeliverySubtotal
-    : totalUnliWings + totalAlaCarte;
+    : totalAlaCarte;
+  const totalPrice = isDelivery ? totalDeliverySubtotal : totalAlaCarte;
   const paymentAmount = transaction.payment_amount || 0;
   const change = paymentAmount - finalTotal;
 
-  // Placeholder update and add handlers
-  const handleUpdate = (type, groupKey) => {
-    console.log(`Update ${type}, ${groupKey ? `Group: ${groupKey}` : ""}`);
+  // When an Update button is clicked:
+  const handleUpdateClick = () => {
+    setIsEditModalOpen(true);
+    // Do not call onClose() here so that OrderEditModal (rendered below) remains in the tree.
+  };
+
+  // Callback for when OrderEditModal completes update
+  const handleUpdateComplete = (updatedOrderDetails) => {
+    console.log("Updated order details:", updatedOrderDetails);
+    // You might update the transaction or send the data to your API.
   };
 
   const handleAdd = (e) => {
     e.stopPropagation();
-    console.log("Add a new Unli Order");
+    console.log("Create new Unli Wings Order Group");
   };
 
-  // Handler for updating status via dropdown selection
   const updateStatus = (newStatus) => {
     if (newStatus === "Cancelled") {
       if (window.confirm("Switching to Cancelled. Are you sure?")) {
@@ -210,10 +196,24 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
     setIsStatusDropdownOpen(false);
   };
 
+  const handleCancelUpdate = () => {
+    if (window.confirm("Are you sure you want to cancel updating the order?")) {
+      onClose();
+    }
+  };
+
+  const handleAddOrderDetails = () => {
+    console.log("Add Order Details triggered");
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
       {/* Modal container */}
-      <div className="bg-white rounded-lg shadow-lg p-6 w-[500px] h-[650px] flex flex-col relative">
+      <div
+        className={`bg-white rounded-lg shadow-lg p-6 ${
+          isExpanded ? "w-[1200px] flex" : "w-[500px] flex flex-col"
+        } h-[650px] relative`}
+      >
         {/* Close Button */}
         <div className="absolute top-2 right-2">
           <button
@@ -224,234 +224,286 @@ const TransactionModal = ({ isOpen, onClose, transaction, menuTypes }) => {
           </button>
         </div>
 
-        {/* Header */}
-        <div className="border-b pb-2">
-          <h2 className="text-xl font-semibold mt-4">
-            Transaction No. {transaction.id}
-          </h2>
-          <div className="mt-2">
-            <div className="flex justify-between items-start">
-              <div>
+        {/* Left Side: Transaction Details */}
+        <div
+          className={
+            isExpanded
+              ? "w-[500px] pr-4 flex flex-col h-full"
+              : "w-full flex flex-col h-full"
+          }
+        >
+          <div className="border-b pb-2">
+            <h2 className="text-xl font-semibold mt-4">
+              Transaction No. {transaction.id}
+            </h2>
+            <div className="mt-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p>
+                    <strong>Date:</strong> {formatDate(transaction.date)}
+                  </p>
+                  <p>
+                    <strong>Time:</strong> {formatTime(transaction.date)}
+                  </p>
+                </div>
+              </div>
+              {/* Row for Menu Type and Status Dropdown */}
+              <div className="flex justify-between items-center">
                 <p>
-                  <strong>Date:</strong> {formatDate(transaction.date)}
+                  <strong>Menu Type:</strong> {menuType}
                 </p>
-                <p>
-                  <strong>Time:</strong> {formatTime(transaction.date)}
-                </p>
+                <div className="relative inline-block text-left">
+                  <button
+                    onClick={() =>
+                      setIsStatusDropdownOpen(!isStatusDropdownOpen)
+                    }
+                    className={`flex items-center ${getOrderStatusClass(
+                      orderStatus
+                    )} rounded-md shadow-md hover:opacity-90 active:scale-95 transition-transform duration-150 w-40 overflow-hidden`}
+                  >
+                    <div
+                      className={`flex items-center justify-center ${getStatusLeftBg(
+                        orderStatus
+                      )} p-2`}
+                    >
+                      <FaClipboardList className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="flex-1 text-left px-2 text-white text-sm">
+                      {orderStatus}
+                    </span>
+                    <div className="flex items-center justify-center p-2">
+                      {isStatusDropdownOpen ? (
+                        <FaChevronUp className="w-4 h-4 text-white" />
+                      ) : (
+                        <FaChevronDown className="w-4 h-4 text-white" />
+                      )}
+                    </div>
+                  </button>
+                  {isStatusDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-40 rounded-md shadow-lg z-10">
+                      <div className="bg-white rounded-md py-2">
+                        <button
+                          onClick={() => updateStatus("Pending")}
+                          className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                        >
+                          Pending
+                        </button>
+                        <button
+                          onClick={() => updateStatus("Completed")}
+                          className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                        >
+                          Completed
+                        </button>
+                        <button
+                          onClick={() => updateStatus("Cancelled")}
+                          className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                        >
+                          Cancelled
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-            {/* Horizontal row for Menu Type (left) and Status Dropdown (right) */}
-            <div className="flex justify-between items-center">
-              <p>
-                <strong>Menu Type:</strong> {menuType}
-              </p>
-              {/* Custom Order Status Dropdown */}
-              <div className="relative inline-block text-left">
-                <button
-                  onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-                  className={`flex items-center ${getOrderStatusClass(
-                    orderStatus
-                  )} rounded-md shadow-md hover:opacity-90 active:scale-95 transition-transform duration-150 w-40 overflow-hidden`}
+            <h3 className="font-semibold text-xl mt-2">Order Summary</h3>
+          </div>
+
+          {/* Scrollable Content for Left Side */}
+          <div className="flex-1 mt-4 overflow-y-auto overflow-x-hidden">
+            {isInStore ? (
+              <>
+                <div
+                  className="flex items-center justify-between mb-2 cursor-pointer border hover:bg-gray-100 px-3 py-5 rounded-lg"
+                  onClick={() => setUnliOverallOpen(!unliOverallOpen)}
                 >
-                  <div
-                    className={`flex items-center justify-center ${getStatusLeftBg(
-                      orderStatus
-                    )} p-2`}
-                  >
-                    <FaClipboardList className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="flex-1 text-left px-2 text-white text-sm">
-                    {orderStatus}
-                  </span>
-                  <div className="flex items-center justify-center p-2">
-                    {isStatusDropdownOpen ? (
-                      <FaChevronUp className="w-4 h-4 text-white" />
-                    ) : (
-                      <FaChevronDown className="w-4 h-4 text-white" />
-                    )}
-                  </div>
-                </button>
-                {isStatusDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-40 rounded-md shadow-lg z-10">
-                    <div className="bg-white rounded-md py-2">
-                      <button
-                        onClick={() => updateStatus("Pending")}
-                        className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
-                      >
-                        Pending
-                      </button>
-                      <button
-                        onClick={() => updateStatus("Completed")}
-                        className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
-                      >
-                        Completed
-                      </button>
-                      <button
-                        onClick={() => updateStatus("Cancelled")}
-                        className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
-                      >
-                        Cancelled
-                      </button>
-                    </div>
+                  <h4 className="font-semibold">Unli Wings Orders</h4>
+                  <div>{unliOverallOpen ? <FaAngleUp /> : <FaAngleDown />}</div>
+                </div>
+                {unliOverallOpen && (
+                  <div className="w-full max-h-[300px] overflow-y-auto">
+                    <button
+                      onClick={handleAdd}
+                      className="w-full mb-3 px-3 py-2 bg-[#E88504] text-white rounded hover:bg-[#E88504]/70"
+                    >
+                      Add a new Unli Order
+                    </button>
+                    {Object.keys(groupedUnliWingsOrders).map((groupKey) => {
+                      const groupOrders = groupedUnliWingsOrders[groupKey];
+                      const baseAmount =
+                        groupOrders[0]?.instore_category?.base_amount || 0;
+                      return (
+                        <div key={groupKey} className="border rounded mb-2">
+                          <div
+                            className="flex justify-between items-center bg-gray-200 hover:bg-gray-300 px-3 py-2 cursor-pointer"
+                            onClick={() => toggleAccordion(groupKey)}
+                          >
+                            <span className="flex-1 text-left">
+                              Unli Wings Order #{groupKey} - ₱
+                              {baseAmount.toFixed(2)}
+                            </span>
+                            <span>
+                              {openAccordion[groupKey] ? (
+                                <FaAngleUp />
+                              ) : (
+                                <FaAngleDown />
+                              )}
+                            </span>
+                          </div>
+                          {openAccordion[groupKey] && (
+                            <div className="px-3 py-2">
+                              <div className="max-h-[200px] overflow-y-auto overflow-x-hidden">
+                                <Table
+                                  columns={["Menu Item", "Quantity"]}
+                                  data={groupOrders.map((detail) => [
+                                    detail?.menu_item?.name || "N/A",
+                                    detail?.quantity || 0,
+                                  ])}
+                                />
+                                <button
+                                  onClick={handleUpdateClick}
+                                  className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                                >
+                                  Update
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-          <h3 className="font-semibold text-xl mt-2">Order Summary</h3>
-        </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 mt-4 overflow-y-auto">
-          {isInStore ? (
-            <>
-              {/* Unli Wings Overall Accordion Header */}
-              <div
-                className="flex items-center justify-between mb-2 cursor-pointer border hover:bg-gray-100 px-3 py-5 rounded-lg"
-                onClick={() => setUnliOverallOpen(!unliOverallOpen)}
-              >
-                <h4 className="font-semibold">Unli Wings Orders</h4>
-                <div>{unliOverallOpen ? <FaAngleUp /> : <FaAngleDown />}</div>
-              </div>
-              {unliOverallOpen && (
-                <div className="w-full max-h-[300px] overflow-y-auto">
-                  {/* Full-width Add button inside the accordion */}
-                  <button
-                    onClick={handleAdd}
-                    className="w-full mb-3 px-3 py-2 bg-[#E88504] text-white rounded hover:bg-[#E88504]/70"
-                  >
-                    Add a new Unli Order
-                  </button>
-                  {Object.keys(groupedUnliWingsOrders).map((groupKey) => {
-                    const groupOrders = groupedUnliWingsOrders[groupKey];
-                    const baseAmount =
-                      groupOrders[0]?.instore_category?.base_amount || 0;
-                    return (
-                      <div key={groupKey} className="border rounded mb-2">
-                        <div
-                          className="flex justify-between items-center bg-gray-200 hover:bg-gray-300 px-3 py-2 cursor-pointer"
-                          onClick={() => toggleAccordion(groupKey)}
-                        >
-                          <span className="flex-1 text-left">
-                            Unli Wings Order #{groupKey} - ₱
-                            {baseAmount.toFixed(2)}
-                          </span>
-                          <span>
-                            {openAccordion[groupKey] ? (
-                              <FaAngleUp />
-                            ) : (
-                              <FaAngleDown />
-                            )}
-                          </span>
-                        </div>
-                        {openAccordion[groupKey] && (
-                          <div className="px-3 py-2">
-                            <div className="max-h-[200px] overflow-y-auto overflow-x-hidden">
-                              <Table
-                                columns={["Menu Item", "Quantity"]}
-                                data={groupOrders.map((detail) => [
-                                  detail?.menu_item?.name || "N/A",
-                                  detail?.quantity || 0,
-                                ])}
-                              />
-                              <button
-                                onClick={() => handleUpdate("unli", groupKey)}
-                                className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                              >
-                                Update
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                <div
+                  className="flex items-center justify-between mb-2 mt-4 cursor-pointer border hover:bg-gray-100 px-3 py-5 rounded-lg"
+                  onClick={() => setAlaCarteOverallOpen(!alaCarteOverallOpen)}
+                >
+                  <h4 className="font-semibold">
+                    Ala Carte Orders - ₱{totalAlaCarte.toFixed(2)}
+                  </h4>
+                  <div>
+                    {alaCarteOverallOpen ? <FaAngleUp /> : <FaAngleDown />}
+                  </div>
                 </div>
-              )}
-
-              {/* Ala Carte Overall Accordion Header */}
-              <div
-                className="flex items-center justify-between mb-2 mt-4 cursor-pointer border hover:bg-gray-100 px-3 py-5 rounded-lg"
-                onClick={() => setAlaCarteOverallOpen(!alaCarteOverallOpen)}
-              >
-                <h4 className="font-semibold">
-                  Ala Carte Orders - ₱{totalAlaCarte.toFixed(2)}
-                </h4>
-                <div>
-                  {alaCarteOverallOpen ? <FaAngleUp /> : <FaAngleDown />}
-                </div>
-              </div>
-              {alaCarteOverallOpen && (
-                <div className="w-full max-h-[300px] overflow-y-auto">
+                {alaCarteOverallOpen && (
+                  <div className="w-full max-h-[300px] overflow-y-auto overflow-x-hidden">
+                    <Table
+                      columns={[
+                        "Menu Item",
+                        "Quantity",
+                        "Price",
+                        "Discounts",
+                        "Total",
+                      ]}
+                      data={
+                        alaCarteOrders.length > 0
+                          ? alaCarteOrders.map((detail) => {
+                              const quantity = detail?.quantity || 0;
+                              const price = detail?.menu_item?.price || 0;
+                              const discount = detail?.discount?.percentage
+                                ? detail.discount.percentage * 100
+                                : 0;
+                              const computedTotal =
+                                quantity * price * (1 - discount / 100);
+                              return [
+                                detail?.menu_item?.name || "N/A",
+                                detail?.quantity || 0,
+                                `₱${price.toFixed(2)}`,
+                                `${discount}%`,
+                                `₱${computedTotal.toFixed(2)}`,
+                              ];
+                            })
+                          : [["None", "-", "-", "-", "-"]]
+                      }
+                    />
+                    <button
+                      onClick={handleUpdateClick}
+                      className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                    >
+                      Update
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : isDelivery ? (
+              <>
+                <h3 className="font-semibold">Order Summary</h3>
+                <div className="max-h-[300px] overflow-y-auto overflow-x-hidden">
                   <Table
-                    columns={[
-                      "Menu Item",
-                      "Quantity",
-                      "Price",
-                      "Discounts",
-                      "Total",
-                    ]}
-                    data={formatAlaCarteTableData(alaCarteOrders)}
+                    columns={["Menu Item", "Quantity", "Price"]}
+                    data={
+                      orderDetails.length > 0
+                        ? orderDetails.map((detail) => {
+                            const quantity = detail?.quantity || 0;
+                            const price = detail?.menu_item?.price || 0;
+                            return [
+                              detail?.menu_item?.name || "N/A",
+                              quantity,
+                              `₱${price.toFixed(2)}`,
+                            ];
+                          })
+                        : [["None", "-", "-"]]
+                    }
                   />
                   <button
-                    onClick={() => handleUpdate("alaCarte")}
+                    onClick={handleUpdateClick}
                     className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
                   >
                     Update
                   </button>
                 </div>
-              )}
-            </>
-          ) : isDelivery ? (
-            <>
-              <h3 className="font-semibold">Order Summary</h3>
-              <div className="max-h-[300px] overflow-y-auto">
-                <Table
-                  columns={["Menu Item", "Quantity", "Price"]}
-                  data={formatDeliveryTableData(orderDetails)}
-                />
-                <button
-                  onClick={() => handleUpdate("delivery")}
-                  className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                >
-                  Update
-                </button>
-              </div>
-            </>
-          ) : null}
-        </div>
+              </>
+            ) : null}
+          </div>
 
-        {/* Fixed Footer */}
-        <div className="border-t pt-4 mt-4">
-          <div className="flex flex-col text-right">
-            {isDelivery ? (
-              <>
-                <p>
-                  <strong>Subtotal:</strong> ₱{totalDeliverySubtotal.toFixed(2)}
-                </p>
-                <p>
-                  <strong>Percentage Deduction:</strong>{" "}
-                  {(deductionPercentage * 100).toFixed(2)}%
-                </p>
-                <p>
-                  <strong>Total:</strong> ₱{finalTotal.toFixed(2)}
-                </p>
-              </>
-            ) : (
-              <>
-                <p>
-                  <strong>Payment Amount:</strong> ₱{paymentAmount.toFixed(2)}
-                </p>
-                <p>
-                  <strong>Total Price:</strong> ₱{totalPrice.toFixed(2)}
-                </p>
-                <p>
-                  <strong>Change:</strong> ₱{change.toFixed(2)}
-                </p>
-              </>
-            )}
+          <div className="border-t pt-4 mt-4" style={{ flexShrink: 0 }}>
+            <div className="flex flex-col text-right">
+              {isDelivery ? (
+                <>
+                  <p>
+                    <strong>Subtotal:</strong> ₱
+                    {(totalDeliverySubtotal || 0).toFixed(2)}
+                  </p>
+                  <p>
+                    <strong>Percentage Deduction:</strong>{" "}
+                    {(deductionPercentage * 100).toFixed(2)}%
+                  </p>
+                  <p>
+                    <strong>Total:</strong> ₱{(finalTotal || 0).toFixed(2)}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p>
+                    <strong>Payment Amount:</strong> ₱
+                    {(paymentAmount || 0).toFixed(2)}
+                  </p>
+                  <p>
+                    <strong>Total Price:</strong> ₱
+                    {(totalPrice || 0).toFixed(2)}
+                  </p>
+                  <p>
+                    <strong>Change:</strong> ₱{(change || 0).toFixed(2)}
+                  </p>
+                </>
+              )}
+            </div>
           </div>
         </div>
+
+        {isEditModalOpen && (
+          <OrderEditModal
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            transaction={transaction}
+            menuCategories={menuCategories}
+            menuItems={menuItems}
+            discountsData={discountsData}
+            menuTypes={menuTypes}
+            onUpdateComplete={handleUpdateComplete}
+          />
+        )}
       </div>
     </div>
   );

@@ -262,6 +262,9 @@ const OrderTable = () => {
         onClose={closeTransactionModal}
         transaction={selectedTransaction}
         menuTypes={orderData.menu_types}
+        discountsData={orderData.discounts}
+        menuItems={orderData.menu_items} // Pass menu items from fetched orderData
+        menuCategories={orderData.menu_categories} // Pass menu categories from fetched orderData
       />
     </div>
   );
