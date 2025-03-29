@@ -160,24 +160,6 @@ const OrderSummary = ({
     discount,
     newQuantity
   ) => {
-    if (newQuantity <= 0) {
-      setSelectedItems((prevItems) =>
-        prevItems.filter((item) => {
-          if (item.id !== id) return true;
-          if (item.instoreCategory === "Unli Wings") {
-            return !(
-              item.orderNumber === groupIdentifier &&
-              Number(item.discount || 0) === Number(discount)
-            );
-          }
-          return !(
-            item.instoreCategory === groupIdentifier &&
-            Number(item.discount || 0) === Number(discount)
-          );
-        })
-      );
-      return;
-    }
     handleQuantityChange(id, groupIdentifier, discount, newQuantity);
   };
 
