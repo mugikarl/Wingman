@@ -43,6 +43,12 @@ const OrderTable = () => {
     );
   };
 
+  // After orderData is fetched:
+  const unliWingsCategory = orderData?.instore_categories?.find(
+    (cat) => Number(cat.id) === 2
+  );
+  console.log("Unli Wings Category:", unliWingsCategory);
+
   const filteredTransactions =
     orderData?.transactions?.filter((order) => {
       if (!orderData) return []; // Ensure orderData is available
@@ -265,6 +271,7 @@ const OrderTable = () => {
         discountsData={orderData.discounts}
         menuItems={orderData.menu_items} // Pass menu items from fetched orderData
         menuCategories={orderData.menu_categories} // Pass menu categories from fetched orderData
+        unliWingsCategory={unliWingsCategory}
       />
     </div>
   );

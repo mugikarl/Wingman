@@ -11,6 +11,7 @@ const OrderEditModal = ({
   discountsData,
   menuTypes,
   onUpdateComplete, // Callback when editing is finished and updated order details should be saved
+  unliWingsCategory,
 }) => {
   if (!isOpen) return null;
 
@@ -26,6 +27,9 @@ const OrderEditModal = ({
   const [selectedMenuCategory, setSelectedMenuCategory] = useState(null);
   const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
 
+  // NEW: state for tracking which Unli Wings group is active for update.
+  const [activeUnliWingsGroup, setActiveUnliWingsGroup] = useState(null);
+
   // Filter menu items based on the current menu type and selected category.
   const filteredMenuItems = menuItems.filter((item) => {
     const matchesType = menuTypeData ? item.type_id === menuTypeData.id : true;
@@ -40,6 +44,48 @@ const OrderEditModal = ({
   const onItemSelect = (menuItem) => {
     setLocalOrderDetails((prevDetails) => {
       const defaultDiscountId = 0;
+      // If there is an active Unli Wings group, add the item to that group.
+      if (activeUnliWingsGroup) {
+        // Look for an existing item in the same group with the same menu item and default discount.
+        const existingIndex = prevDetails.findIndex(
+          (detail) =>
+            detail.menu_item.id === menuItem.id &&
+            detail.unli_wings_group === activeUnliWingsGroup &&
+            (detail.discount?.id ?? 0) === defaultDiscountId
+        );
+        if (existingIndex !== -1) {
+          const updated = [...prevDetails];
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            quantity: updated[existingIndex].quantity + 1,
+          };
+          return updated;
+        } else {
+          // Get the base_amount from the existing group.
+          const groupBaseAmount =
+            prevDetails.find(
+              (detail) =>
+                detail.unli_wings_group === activeUnliWingsGroup &&
+                detail.instore_category?.id === 2
+            )?.instore_category?.base_amount ||
+            unliWingsCategory?.base_amount ||
+            0;
+
+          // Create a new detail for Unli Wings group using the group's base amount.
+          const newDetail = {
+            id: Date.now(),
+            menu_item: menuItem,
+            quantity: 1,
+            discount: { id: 0, type: "None", percentage: 0 },
+            // Assign the active Unli Wings group and use the group's base_amount.
+            unli_wings_group: activeUnliWingsGroup,
+            instore_category: { id: 2, base_amount: groupBaseAmount },
+          };
+          return [...prevDetails, newDetail];
+        }
+      }
+
+      // Otherwise, proceed as before.
       let existingIndex = -1;
       if (menuType === "In-Store") {
         existingIndex = prevDetails.findIndex(
@@ -80,24 +126,59 @@ const OrderEditModal = ({
 
   // Handlers for changes inside the EditTransactionOrderSummary component.
   const handleQuantityChange = (changedItem, newQty) => {
-    setLocalOrderDetails((prevDetails) =>
-      prevDetails.map((item) =>
-        item.id === changedItem.id ? { ...item, quantity: newQty } : item
-      )
-    );
+    const quantity = Number(newQty);
+    setLocalOrderDetails((prevDetails) => {
+      if (quantity <= 0) {
+        // Remove the item if quantity is zero or less.
+        return prevDetails.filter((item) => item.id !== changedItem.id);
+      }
+      // Otherwise update the quantity.
+      return prevDetails.map((item) =>
+        item.id === changedItem.id ? { ...item, quantity } : item
+      );
+    });
   };
 
   const handleDiscountChange = (changedItem, newDiscountId) => {
+    // (The merging logic remains unchanged.)
     const newDiscountObj = discountsData.find(
       (disc) => disc.id === newDiscountId
-    ) || { id: 0, type: "None", percentage: 0 };
-    setLocalOrderDetails((prevDetails) =>
-      prevDetails.map((item) =>
-        item.id === changedItem.id
-          ? { ...item, discount: newDiscountObj }
-          : item
-      )
-    );
+    ) || {
+      id: 0,
+      type: "None",
+      percentage: 0,
+    };
+
+    setLocalOrderDetails((prevDetails) => {
+      const duplicateIndex = prevDetails.findIndex((item) => {
+        if (item.id === changedItem.id) return false;
+        const sameMenuItem = item.menu_item.id === changedItem.menu_item.id;
+        const sameDiscount = (item.discount?.id ?? 0) === newDiscountId;
+        const sameCategory =
+          changedItem.instore_category?.id === 1
+            ? item.instore_category?.id === 1
+            : true;
+        return sameMenuItem && sameDiscount && sameCategory;
+      });
+
+      if (duplicateIndex !== -1) {
+        const duplicateItem = prevDetails[duplicateIndex];
+        const mergedQuantity = duplicateItem.quantity + changedItem.quantity;
+        return prevDetails
+          .filter((item) => item.id !== changedItem.id)
+          .map((item) =>
+            item.id === duplicateItem.id
+              ? { ...item, quantity: mergedQuantity }
+              : item
+          );
+      } else {
+        return prevDetails.map((item) =>
+          item.id === changedItem.id
+            ? { ...item, discount: newDiscountObj }
+            : item
+        );
+      }
+    });
   };
 
   const handleAddOrderDetails = () => {
@@ -128,9 +209,9 @@ const OrderEditModal = ({
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      {/* Modal Container with overall width reduced by 100px (from 1200px to 1100px) */}
+      {/* Modal Container */}
       <div className="bg-white rounded-lg shadow-lg p-6 w-[800px] h-[650px] flex">
-        {/* Left Panel: Menu (full width without left divider) */}
+        {/* Left Panel: Menu */}
         <div className="w-1/2">
           <EditTransactionMenu
             menuCategories={menuCategories}
@@ -142,7 +223,7 @@ const OrderEditModal = ({
             onItemSelect={onItemSelect}
           />
         </div>
-        {/* Right Panel: Order Summary with left divider */}
+        {/* Right Panel: Order Summary */}
         <div className="w-1/2 border-l border-gray-300 pl-4">
           <EditTransactionOrderSummary
             orderDetails={localOrderDetails}
@@ -152,7 +233,7 @@ const OrderEditModal = ({
             menuType={menuType}
             discounts={discountsData}
             openDropdownId={null}
-            onQuantityChange={handleQuantityChange} // NEW PROP
+            onQuantityChange={handleQuantityChange}
             onDiscountChange={handleDiscountChange}
             setOpenDropdownId={() => {}}
             deductionPercentage={
@@ -160,10 +241,13 @@ const OrderEditModal = ({
                 ? menuTypeData?.deduction_percentage || 0
                 : 0
             }
-            groupedUnliWingsOrders={{}} // Provide as needed.
+            // Pass down the active Unli Wings group and its setter
+            activeUnliWingsGroup={activeUnliWingsGroup}
+            setActiveUnliWingsGroup={setActiveUnliWingsGroup}
             alaCarteOrders={localOrderDetails.filter(
               (detail) => detail.instore_category?.id === 1
             )}
+            unliWingsCategory={unliWingsCategory}
           />
         </div>
       </div>

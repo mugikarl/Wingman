@@ -16,6 +16,7 @@ const TransactionModal = ({
   discountsData,
   menuItems, // Passed from OrderTable
   menuCategories, // Passed from OrderTable
+  unliWingsCategory,
 }) => {
   if (!isOpen || !transaction) return null;
 
@@ -502,6 +503,7 @@ const TransactionModal = ({
             discountsData={discountsData}
             menuTypes={menuTypes}
             onUpdateComplete={handleUpdateComplete}
+            unliWingsCategory={unliWingsCategory}
           />
         )}
       </div>

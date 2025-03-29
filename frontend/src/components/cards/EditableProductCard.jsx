@@ -7,49 +7,53 @@ const EditableProductCard = ({
   discounts,
   onDiscountChange,
 }) => {
-  const [qty, setQty] = useState(item.quantity);
+  // Use a string state for the input value.
+  const [inputQty, setInputQty] = useState(String(item.quantity));
 
-  // Sync local quantity with item.quantity prop when it changes.
+  // Keep local input in sync when the item's quantity changes externally.
   useEffect(() => {
-    setQty(item.quantity);
+    setInputQty(String(item.quantity));
   }, [item.quantity]);
 
-  const originalPrice = item.menu_item?.price || 0;
-  // If discount exists, use its percentage; otherwise, no discount (0%)
+  // Determine if the item is part of an Unli Wings group.
+  const isUnliWings = item.instore_category?.id === 2 && item.unli_wings_group;
+
+  // For non-Unli Wings, use the menu item's price.
+  const originalPrice = isUnliWings ? 0 : item.menu_item?.price || 0;
   const discountPercentage = item.discount ? item.discount.percentage : 0;
-  const computedPrice = originalPrice * qty * (1 - discountPercentage);
+  const computedPrice =
+    originalPrice * item.quantity * (1 - discountPercentage);
 
   const handleDecrease = () => {
-    if (qty > 1) {
-      const newQty = qty - 1;
-      setQty(newQty);
-      onQuantityChange(item, newQty);
-    }
+    const newQty = item.quantity - 1;
+    onQuantityChange(item, newQty);
   };
 
   const handleIncrease = () => {
-    const newQty = qty + 1;
-    setQty(newQty);
+    const newQty = item.quantity + 1;
     onQuantityChange(item, newQty);
   };
 
   const handleInputChange = (e) => {
-    const newQty = parseInt(e.target.value, 10) || 1;
-    setQty(newQty);
-    onQuantityChange(item, newQty);
+    setInputQty(e.target.value);
   };
 
-  // When a discount is selected, update the order detail.
+  const handleInputBlur = () => {
+    let newQty = parseInt(inputQty, 10);
+    if (isNaN(newQty)) {
+      newQty = 0;
+    }
+    onQuantityChange(item, newQty);
+    setInputQty(String(newQty));
+  };
+
   const handleDiscountChange = (e) => {
     const newDiscountId = parseInt(e.target.value, 10);
     onDiscountChange(item, newDiscountId);
   };
 
   return (
-    <div
-      className="flex items-center border rounded p-1 mb-2 w-full"
-      style={{ width: "100%" }}
-    >
+    <div className="flex items-center border rounded p-1 mb-2 w-full">
       <div className="flex-shrink-0">
         <img
           src={item.menu_item?.image || "/placeholder.svg"}
@@ -68,8 +72,9 @@ const EditableProductCard = ({
           </button>
           <input
             type="number"
-            value={qty}
+            value={inputQty}
             onChange={handleInputChange}
+            onBlur={handleInputBlur}
             className="w-10 text-center border text-sm h-8"
           />
           <button
@@ -78,7 +83,8 @@ const EditableProductCard = ({
           >
             +
           </button>
-          {discounts && item.instoreCategory !== "Unli Wings" && (
+          {/* Only show discount dropdown if not an Unli Wings order */}
+          {discounts && !isUnliWings && (
             <select
               value={item.discount ? item.discount.id : 0}
               onChange={handleDiscountChange}
@@ -93,14 +99,17 @@ const EditableProductCard = ({
             </select>
           )}
         </div>
-        <div className="flex justify-between items-center mt-1">
-          <span className="text-xs text-gray-600">
-            ₱{originalPrice.toFixed(2)}
-          </span>
-          <span className="text-xs font-semibold text-green-600">
-            ₱{computedPrice.toFixed(2)}
-          </span>
-        </div>
+        {/* For Unli Wings orders, don't show individual prices */}
+        {!isUnliWings && (
+          <div className="flex justify-between items-center mt-1">
+            <span className="text-xs text-gray-600">
+              ₱{originalPrice.toFixed(2)}
+            </span>
+            <span className="text-xs font-semibold text-green-600">
+              ₱{computedPrice.toFixed(2)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

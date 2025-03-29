@@ -4,16 +4,20 @@ import EditableProductCard from "../cards/EditableProductCard";
 
 const EditTransactionOrderSummary = ({
   orderDetails,
-  finalTotal,
+  finalTotal, // (You might recalc final total later)
   onCancelUpdate,
   onAddOrderDetails,
   menuType,
   discounts,
   onQuantityChange, // Parent callback
   onDiscountChange, // Parent callback
+  activeUnliWingsGroup, // NEW
+  setActiveUnliWingsGroup,
   openDropdownId,
   setOpenDropdownId,
   deductionPercentage = 0,
+  // unliWingsCategory is passed from the backend.
+  unliWingsCategory,
 }) => {
   // Compute orders directly from orderDetails prop.
   const alaCarteOrders = orderDetails.filter(
@@ -22,6 +26,8 @@ const EditTransactionOrderSummary = ({
   const unliWingsOrders = orderDetails.filter(
     (detail) => detail.instore_category?.id === 2
   );
+
+  // Group the unli wings orders by group.
   const groupedUnliWingsOrders = unliWingsOrders.reduce((acc, detail) => {
     const groupKey = detail.unli_wings_group || "Ungrouped";
     if (!acc[groupKey]) acc[groupKey] = [];
@@ -29,18 +35,58 @@ const EditTransactionOrderSummary = ({
     return acc;
   }, {});
 
-  const newSubtotal = orderDetails.reduce((sum, item) => {
-    const quantity = item.quantity || 0;
-    if (item.instore_category?.id === 2) {
-      const baseAmount = item.instore_category?.base_amount || 0;
-      return sum + baseAmount * quantity;
-    } else {
-      const price = item.menu_item?.price || 0;
-      const discountPercentage = item.discount ? item.discount.percentage : 0;
-      return sum + price * quantity * (1 - discountPercentage);
+  // Ensure the active group is always present—even if empty.
+  if (activeUnliWingsGroup && !groupedUnliWingsOrders[activeUnliWingsGroup]) {
+    groupedUnliWingsOrders[activeUnliWingsGroup] = [];
+  }
+
+  // Helper: get the base amount for Unli Wings.
+  // If there are existing orders in the group, use the first item's base_amount;
+  // otherwise, use unliWingsCategory's base_amount (retrieved from the backend).
+  const getUnliWingsBaseAmount = (groupOrders) => {
+    if (groupOrders.length > 0) {
+      return groupOrders[0]?.instore_category?.base_amount;
     }
+    return unliWingsCategory?.base_amount;
+  };
+
+  // Calculate subtotal for Ala Carte orders as before.
+  const alaCarteSubtotal = alaCarteOrders.reduce((sum, item) => {
+    const price = item.menu_item?.price || 0;
+    const quantity = item.quantity || 0;
+    const discountPercentage = item.discount ? item.discount.percentage : 0;
+    return sum + price * quantity * (1 - discountPercentage);
   }, 0);
 
+  // For Unli Wings orders, we only add the base_amount once per unique group.
+  const uniqueUnliWingsGroups = Array.from(
+    new Set(unliWingsOrders.map((item) => item.unli_wings_group))
+  ).filter((g) => g); // filter out falsy values if any
+
+  const unliWingsSubtotal = uniqueUnliWingsGroups.reduce((sum, groupKey) => {
+    const groupOrders = groupedUnliWingsOrders[groupKey] || [];
+    const baseAmount = getUnliWingsBaseAmount(groupOrders);
+    return sum + (baseAmount || 0);
+  }, 0);
+
+  // Overall subtotal: sum of ala carte and unli wings (flat fee per group)
+  const newSubtotal =
+    menuType === "Grab" || menuType === "FoodPanda"
+      ? orderDetails.reduce((sum, item) => {
+          if (item.instore_category?.id === 2) {
+            // For Unli Wings orders, use the base amount from backend * quantity
+            const base = unliWingsCategory?.base_amount || 0;
+            return sum + base * (item.quantity || 0);
+          } else {
+            const price = item.menu_item?.price || 0;
+            const quantity = item.quantity || 0;
+            const discount = item.discount ? item.discount.percentage : 0;
+            return sum + price * quantity * (1 - discount);
+          }
+        }, 0)
+      : alaCarteSubtotal + unliWingsSubtotal;
+
+  // For delivery menus, you might subtract a deduction percentage.
   const newTotal =
     menuType === "Grab" || menuType === "FoodPanda"
       ? newSubtotal - newSubtotal * deductionPercentage
@@ -53,33 +99,21 @@ const EditTransactionOrderSummary = ({
   };
 
   return (
-    <div className="relative" style={{ width: "350px", height: "100%" }}>
+    <div className="relative w-[350px] h-full">
       <div>
         <h2 className="text-xl font-bold">Order Summary</h2>
       </div>
-      <div
-        className="p-4 flex flex-col flex-grow overflow-y-auto"
-        style={{ height: "calc(100% - 150px)" }}
-      >
+      <div className="p-4 flex flex-col flex-grow overflow-y-auto h-[calc(100%-150px)]">
         {menuType === "In-Store" ? (
           <>
+            {/* Ala Carte Section */}
             <div>
               <button
                 className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200 rounded"
                 onClick={() => toggleAccordion("alaCarte")}
               >
                 <span className="font-semibold">
-                  Ala Carte Orders - ₱
-                  {alaCarteOrders
-                    .reduce((sum, detail) => {
-                      const price = detail.menu_item?.price || 0;
-                      const quantity = detail.quantity || 0;
-                      const discountPercentage = detail.discount
-                        ? detail.discount.percentage
-                        : 0;
-                      return sum + price * quantity * (1 - discountPercentage);
-                    }, 0)
-                    .toFixed(2)}
+                  Ala Carte Orders - ₱{alaCarteSubtotal.toFixed(2)}
                 </span>
                 {openAccordion["alaCarte"] ? (
                   <span>&#9650;</span>
@@ -111,15 +145,7 @@ const EditTransactionOrderSummary = ({
                 onClick={() => toggleAccordion("unliWings")}
               >
                 <span className="font-semibold">
-                  Unli Wings Orders - ₱
-                  {unliWingsOrders
-                    .reduce((sum, detail) => {
-                      const baseAmount =
-                        detail.instore_category?.base_amount || 0;
-                      const quantity = detail.quantity || 0;
-                      return sum + baseAmount * quantity;
-                    }, 0)
-                    .toFixed(2)}
+                  Unli Wings Orders - ₱{unliWingsSubtotal.toFixed(2)}
                 </span>
                 {openAccordion["unliWings"] ? (
                   <span>&#9650;</span>
@@ -130,22 +156,44 @@ const EditTransactionOrderSummary = ({
               {openAccordion["unliWings"] &&
                 Object.keys(groupedUnliWingsOrders).map((groupKey) => {
                   const groupOrders = groupedUnliWingsOrders[groupKey];
-                  const baseAmount =
-                    groupOrders[0]?.instore_category?.base_amount || 0;
+                  const baseAmount = getUnliWingsBaseAmount(groupOrders);
+                  // Convert groupKey to a number for accurate comparison.
+                  const isActive = Number(groupKey) === activeUnliWingsGroup;
                   return (
-                    <div key={groupKey} className="border rounded mb-2 p-2">
+                    <div
+                      key={groupKey}
+                      className={`border rounded mb-2 p-2 ${
+                        isActive ? "border-green-900" : "border-gray-300"
+                      }`}
+                    >
                       <div className="flex justify-between items-center mb-2">
                         <h4 className="font-bold text-sm">
                           Unli Wings Order #{groupKey} - ₱
-                          {baseAmount.toFixed(2)}
+                          {baseAmount && baseAmount.toFixed(2)}
                         </h4>
                         <button
-                          onClick={() => console.log("Update group", groupKey)}
-                          className="bg-green-500 text-white px-2 py-1 rounded text-xs"
+                          onClick={() => {
+                            if (isActive) {
+                              setActiveUnliWingsGroup(null);
+                            } else {
+                              setActiveUnliWingsGroup(Number(groupKey));
+                            }
+                          }}
+                          className={`px-2 py-1 rounded text-xs ${
+                            isActive
+                              ? "bg-green-500 text-white"
+                              : "bg-orange-500 text-white"
+                          }`}
                         >
-                          Update
+                          {isActive ? "Done" : "Update"}
                         </button>
                       </div>
+                      {/* If there are no items, show a placeholder */}
+                      {groupOrders.length === 0 && (
+                        <p className="text-gray-500 text-center">
+                          No items added yet
+                        </p>
+                      )}
                       {groupOrders.map((item) => (
                         <EditableProductCard
                           key={getItemKey(item, { id: 1, name: "In-Store" })}
@@ -161,8 +209,11 @@ const EditTransactionOrderSummary = ({
                 <div className="mb-2">
                   <button
                     onClick={() => {
-                      // Add a new unli wings order group.
-                      // Find current groups.
+                      // Ensure the Unli Wings accordion is open.
+                      setOpenAccordion((prev) => ({
+                        ...prev,
+                        unliWings: true,
+                      }));
                       const currentGroups = unliWingsOrders
                         .map((detail) => detail.unli_wings_group)
                         .filter((g) => g !== undefined)
@@ -171,23 +222,22 @@ const EditTransactionOrderSummary = ({
                         currentGroups.length > 0
                           ? Math.max(...currentGroups) + 1
                           : 1;
-                      // Use base_amount from an existing unli wings order if available.
-                      const baseAmount =
-                        unliWingsOrders.length > 0
-                          ? unliWingsOrders[0].instore_category.base_amount
-                          : 0;
-                      // Create a new group header detail with no menu_item.
+                      // Always use the base_amount from unliWingsCategory (retrieved from backend)
+                      const baseAmount = unliWingsCategory?.base_amount;
                       const newDetail = {
                         id: Date.now(),
                         unli_wings_group: newGroupNumber,
                         instore_category: { id: 2, base_amount: baseAmount },
-                        quantity: 0,
-                        menu_item: null,
+                        quantity: 1,
+                        menu_item: {
+                          id: 0,
+                          name: "New Unli Wings Order",
+                          price: 0,
+                        },
                         discount: { id: 0, type: "None", percentage: 0 },
                       };
-                      // Update orderDetails by adding new detail.
-                      // (Assuming onQuantityChange can be used to update parent's state for new items as well.)
                       onQuantityChange(newDetail, newDetail.quantity);
+                      setActiveUnliWingsGroup(newGroupNumber);
                     }}
                     className="w-full px-3 py-2 bg-[#E88504] text-white rounded"
                   >
@@ -215,20 +265,15 @@ const EditTransactionOrderSummary = ({
           </div>
         )}
       </div>
-      <div className="sticky bottom-0 left-0 right-0 bg-white border-t p-2">
+      <div className="sticky bottom-0 left-0 right-0 bg-white border-t p-4">
         {menuType === "Grab" || menuType === "FoodPanda" ? (
           <>
-            <div className="flex justify-between">
-              <span>New Subtotal:</span>
-              <span>₱{newSubtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Percentage Deduction:</span>
-              <span>{(deductionPercentage * 100).toFixed(2)}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span>New Total:</span>
-              <span>₱{newTotal.toFixed(2)}</span>
+            {/* Section for Total Amount to be Paid */}
+            <div className="">
+              <div className="flex justify-between">
+                <span className="">Total Amount to be Paid:</span>
+                <span className="font-bold">₱{newSubtotal.toFixed(2)}</span>
+              </div>
             </div>
           </>
         ) : (
@@ -243,7 +288,7 @@ const EditTransactionOrderSummary = ({
             </div>
           </>
         )}
-        <div className="flex space-x-2 mt-2">
+        <div className="flex space-x-2 mt-4">
           <button
             onClick={() => {
               if (
