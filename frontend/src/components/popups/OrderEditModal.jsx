@@ -187,7 +187,7 @@ const OrderEditModal = ({
   };
 
   const handleEditOrder = async (payloadWithUpdatedPayment = null) => {
-    // Filter out any menu items with ID 0 before sending to backend
+    // Always use localOrderDetails as the base
     const validOrderDetails = localOrderDetails.filter(
       (detail) => detail.menu_item && detail.menu_item.id !== 0
     );
@@ -209,22 +209,17 @@ const OrderEditModal = ({
       payload: orderDetailsPayload,
     });
 
+    // Start with either the provided payload or a default one
     const payload = payloadWithUpdatedPayment || {
       employee_id: transaction.employee.id,
       payment_method: transaction.payment_method.id,
       payment_amount: transaction.payment_amount,
       reference_id: transaction.reference_id,
       receipt_image: transaction.receipt_image,
-      order_details: orderDetailsPayload,
     };
 
-    // If we're using our generated payload, make sure order_details is correctly set
-    if (!payloadWithUpdatedPayment) {
-      payload.order_details = orderDetailsPayload;
-    } else if (payloadWithUpdatedPayment.order_details) {
-      // If we're using a provided payload but need to update order_details
-      payload.order_details = orderDetailsPayload;
-    }
+    // Always ensure order_details is set correctly
+    payload.order_details = orderDetailsPayload;
 
     try {
       console.log("Sending final payload:", payload);

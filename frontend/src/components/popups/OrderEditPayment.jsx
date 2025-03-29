@@ -20,8 +20,6 @@ const OrderEditPayment = ({
   // GCash fields
   const [gcashReferenceNo, setGcashReferenceNo] = useState("");
   const [gcashReferenceImage, setGcashReferenceImage] = useState(null);
-  // Selected employee
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
 
   // When modal opens, initialize state.
   useEffect(() => {
@@ -33,19 +31,63 @@ const OrderEditPayment = ({
       setChange(0);
       setGcashReferenceNo("");
       setGcashReferenceImage(null);
-      setSelectedEmployee(
-        employees && employees.length > 0 ? employees[0] : null
-      );
     }
-  }, [isOpen, paymentMethods, employees]);
+  }, [isOpen, paymentMethods]);
 
   console.log("Transaction:", transaction);
   console.log("Total Amount (original payment):", totalAmount);
   console.log("Final Total (new order total):", finalTotal);
 
-  // Compute extra payment required (without applying any deduction)
-  const extraPaymentRequired = Math.max(0, finalTotal - totalAmount);
-  // In this update scenario, the final payment the customer must make is ONLY the extra amount.
+  // Calculate the original order price (without considering payment amount)
+  const calculateOriginalOrderPrice = () => {
+    // For delivery orders
+    if (
+      transaction.order_details?.[0]?.menu_item?.type_id === 2 ||
+      transaction.order_details?.[0]?.menu_item?.type_id === 3
+    ) {
+      return transaction.order_details.reduce((sum, detail) => {
+        const price = detail.menu_item?.price || 0;
+        const quantity = detail.quantity || 0;
+        return sum + price * quantity;
+      }, 0);
+    }
+    // For in-store orders
+    else {
+      // Handle Ala Carte items
+      const alaCarteTotal = transaction.order_details
+        .filter((detail) => detail.instore_category?.id === 1)
+        .reduce((sum, detail) => {
+          const price = detail.menu_item?.price || 0;
+          const quantity = detail.quantity || 0;
+          const discount = detail.discount?.percentage || 0;
+          return sum + price * quantity * (1 - discount);
+        }, 0);
+
+      // Handle Unli Wings - calculate once per group
+      const unliWingsGroups = {};
+      transaction.order_details
+        .filter((detail) => detail.instore_category?.id === 2)
+        .forEach((detail) => {
+          const group = detail.unli_wings_group || "default";
+          if (!unliWingsGroups[group]) {
+            unliWingsGroups[group] = detail.instore_category?.base_amount || 0;
+          }
+        });
+
+      const unliWingsTotal = Object.values(unliWingsGroups).reduce(
+        (sum, amount) => sum + amount,
+        0
+      );
+
+      return alaCarteTotal + unliWingsTotal;
+    }
+  };
+
+  const originalOrderPrice = calculateOriginalOrderPrice();
+
+  // Compute extra payment required based on the price difference
+  const extraPaymentRequired = Math.max(0, finalTotal - originalOrderPrice);
+  // In this update scenario, the final payment the customer must make is ONLY the extra amount
   const finalPayment = extraPaymentRequired;
 
   useEffect(() => {
@@ -65,11 +107,7 @@ const OrderEditPayment = ({
   };
 
   const onSubmit = () => {
-    // Ensure an employee is selected.
-    if (!selectedEmployee) {
-      alert("Please select an employee.");
-      return;
-    }
+    // Ensure payment method is selected
     if (!selectedPaymentMethod) {
       alert("Please select a payment method.");
       return;
@@ -89,30 +127,21 @@ const OrderEditPayment = ({
     }
     setIsProcessing(true);
 
-    // Format the order details to match what the backend expects
-    const orderDetailsPayload = transaction.order_details.map((detail) => ({
-      menu_id: detail.menu_item.id,
-      quantity: detail.quantity,
-      discount_id: detail.discount?.id || null,
-      instore_category: detail.instore_category
-        ? detail.instore_category.id
-        : null,
-      unli_wings_group: detail.unli_wings_group || null,
-    }));
+    // Build payload details for the parent's update function
+    // Important: Add the previous payment amount to the new payment
+    const newPaymentAmount =
+      selectedPaymentMethod.name.toLowerCase() === "cash"
+        ? (Number.parseFloat(cashReceived) || 0) - change
+        : extraPaymentRequired;
 
-    // Build payload details for the parent's update function.
+    // Create the payload with payment details but without order_details
+    // handleEditOrder will use the localOrderDetails from OrderEditModal
     const payload = {
-      employee_id: selectedEmployee.id,
+      employee_id: transaction.employee.id, // Always use the original employee
       payment_method: selectedPaymentMethod.id,
-      payment_amount:
-        selectedPaymentMethod.name.toLowerCase() === "cash"
-          ? transaction.payment_amount +
-            Number.parseFloat(cashReceived || 0) -
-            change
-          : transaction.payment_amount + extraPaymentRequired, // For non-cash payments, just add the extra payment required
+      payment_amount: transaction.payment_amount + newPaymentAmount, // Add to the original payment amount
       reference_id: gcashReferenceNo || transaction.reference_id,
       receipt_image: transaction.receipt_image,
-      order_details: orderDetailsPayload,
     };
 
     console.log("Submitting payment with payload:", payload);
@@ -158,6 +187,7 @@ const OrderEditPayment = ({
             </span>
             <span className="text-xl font-bold">₱{finalTotal.toFixed(2)}</span>
           </div>
+
           {/* Display Extra Payment Required */}
           <div className="flex items-center justify-between border-b pb-4">
             <span className="text-lg font-medium text-gray-700">
@@ -167,26 +197,14 @@ const OrderEditPayment = ({
               ₱{extraPaymentRequired.toFixed(2)}
             </span>
           </div>
-          {/* Employee Selection */}
-          {employees && employees.length > 0 && (
-            <div className="space-y-2">
+          {/* Employee Display - Read-only */}
+          {transaction.employee && (
+            <div className="space-y-2 border-b pb-4">
               <label className="text-sm font-medium">Employee</label>
-              <select
-                value={selectedEmployee ? selectedEmployee.id : ""}
-                onChange={(e) => {
-                  const emp = employees.find(
-                    (employee) => employee.id.toString() === e.target.value
-                  );
-                  setSelectedEmployee(emp);
-                }}
-                className="w-full p-2 border rounded-md focus:outline-none"
-              >
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.first_name} {emp.last_name}
-                  </option>
-                ))}
-              </select>
+              <div className="w-full p-2 border rounded-md bg-gray-50 text-gray-700">
+                {transaction.employee.first_name}{" "}
+                {transaction.employee.last_name}
+              </div>
             </div>
           )}
           {/* Payment Method Selection */}
@@ -278,13 +296,41 @@ const OrderEditPayment = ({
                     step="0.01"
                   />
                 </div>
-                <div className="flex items-center justify-between border-t pt-4">
-                  <span className="text-lg font-medium text-gray-700">
-                    Change
-                  </span>
-                  <span className="text-xl font-bold text-green-600">
-                    ₱{change.toFixed(2)}
-                  </span>
+                {/* Show total payment amount and change after edit */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">
+                      Cash Amount
+                    </span>
+                    <span className="text-sm font-bold">
+                      ₱{parseFloat(cashReceived || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">
+                      Change
+                    </span>
+                    <span
+                      className={`text-sm font-bold ${
+                        change >= 0 ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      ₱{change.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2 border-t pt-2">
+                    <span className="text-sm font-medium text-gray-700">
+                      Total Payment After Edit
+                    </span>
+                    <span className="text-sm font-bold text-blue-600">
+                      ₱
+                      {(
+                        transaction.payment_amount +
+                        (Number.parseFloat(cashReceived) || 0) -
+                        change
+                      ).toFixed(2)}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
@@ -328,6 +374,18 @@ const OrderEditPayment = ({
                       {gcashReferenceImage.name}
                     </p>
                   )}
+                </div>
+
+                {/* Show total payment amount after edit */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">
+                      Payment Amount
+                    </span>
+                    <span className="text-sm font-bold">
+                      ₱{extraPaymentRequired.toFixed(2)}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}

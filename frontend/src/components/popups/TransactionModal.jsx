@@ -241,7 +241,7 @@ const TransactionModal = ({
           }
         >
           <div className="border-b pb-2">
-            <h2 className="text-xl font-semibold mt-4">
+            <h2 className="text-2xl font-bold mt-4">
               Transaction No. {transaction.id}
             </h2>
             <div className="mt-2">
@@ -256,9 +256,16 @@ const TransactionModal = ({
                 </div>
               </div>
               {/* Row for Menu Type and Status Dropdown */}
-              <div className="flex justify-between items-center">
-                <p>
-                  <strong>Menu Type:</strong> {menuType}
+              <div className="flex justify-between items-center mt-2">
+                <p className="font-medium">
+                  <strong>Menu Type:</strong>{" "}
+                  <span
+                    className={`px-2 py-1 rounded ${getMenuTypeClass(
+                      menuType
+                    )}`}
+                  >
+                    {menuType}
+                  </span>
                 </p>
                 <div className="relative inline-block text-left">
                   <button
@@ -325,7 +332,25 @@ const TransactionModal = ({
                   className="flex items-center justify-between mb-2 cursor-pointer border hover:bg-gray-100 px-3 py-5 rounded-lg"
                   onClick={() => setUnliOverallOpen(!unliOverallOpen)}
                 >
-                  <h4 className="font-semibold">Unli Wings Orders</h4>
+                  <h4 className="font-semibold">
+                    Unli Wings Orders - ₱
+                    {unliWingsOrders
+                      .reduce((sum, detail) => {
+                        const groupKey = detail.unli_wings_group || "Ungrouped";
+                        const isFirstItemInGroup =
+                          unliWingsOrders.findIndex(
+                            (d) => d.unli_wings_group === groupKey
+                          ) === unliWingsOrders.indexOf(detail);
+
+                        if (isFirstItemInGroup) {
+                          return (
+                            sum + (detail.instore_category?.base_amount || 0)
+                          );
+                        }
+                        return sum;
+                      }, 0)
+                      .toFixed(2)}
+                  </h4>
                   <div>{unliOverallOpen ? <FaAngleUp /> : <FaAngleDown />}</div>
                 </div>
                 {unliOverallOpen && (
@@ -491,15 +516,11 @@ const TransactionModal = ({
               ) : (
                 <>
                   <p>
+                    <strong>Subtotal:</strong> ₱{(actualTotal || 0).toFixed(2)}
+                  </p>
+                  <p className="font-bold">
                     <strong>Payment Amount:</strong> ₱
                     {(paymentAmount || 0).toFixed(2)}
-                  </p>
-                  <p>
-                    <strong>Total Price:</strong> ₱
-                    {(actualTotal || 0).toFixed(2)}
-                  </p>
-                  <p>
-                    <strong>Change:</strong> ₱{(change || 0).toFixed(2)}
                   </p>
                 </>
               )}
