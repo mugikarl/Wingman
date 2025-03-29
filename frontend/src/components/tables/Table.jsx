@@ -20,8 +20,8 @@ const Table = ({ columns, data, rowOnClick }) => {
                 key={rowIndex}
                 className={`${
                   rowIndex % 2 === 0
-                    ? "bg-white hover:bg-white/70"
-                    : "bg-white hover:bg-white/70"
+                    ? "bg-white hover:bg-gray-200"
+                    : "bg-white hover:bg-gray-200"
                 } border-b cursor-pointer`}
                 onClick={() => rowOnClick && rowOnClick(rowIndex)}
               >

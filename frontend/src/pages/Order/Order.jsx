@@ -269,7 +269,6 @@ const Order = () => {
 
   const handleQuantityChange = (id, groupIdentifier, discount, newQuantity) => {
     if (newQuantity <= 0) {
-      // Remove item from the order when quantity reaches 0 or negative.
       setSelectedItems((prevItems) =>
         prevItems.filter((item) => {
           if (item.id !== id) return true;
