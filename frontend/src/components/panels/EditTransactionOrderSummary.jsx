@@ -430,13 +430,6 @@ const EditTransactionOrderSummary = ({
                       : "bg-[#E88504]"
                   }`}
                   disabled={!hasOrderChanges()}
-                  title={
-                    !hasOrderChanges()
-                      ? "No changes have been made to the order"
-                      : requiresPayment
-                      ? "Payment required due to increased order total"
-                      : "Save all changes to the order"
-                  }
                 >
                   {requiresPayment ? "Complete Order" : "Save All Changes"}
                 </button>
@@ -484,15 +477,6 @@ const EditTransactionOrderSummary = ({
                     : "bg-[#E88504]"
                 }`}
                 disabled={activeUnliWingsGroup || !hasOrderChanges()}
-                title={
-                  activeUnliWingsGroup
-                    ? "Finish editing Unli Wings order first"
-                    : !hasOrderChanges()
-                    ? "No changes have been made to the order"
-                    : requiresPayment
-                    ? "Payment required due to increased order total"
-                    : "Save all changes to the order"
-                }
               >
                 {requiresPayment ? "Complete Order" : "Save All Changes"}
               </button>
