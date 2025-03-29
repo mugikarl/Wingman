@@ -141,7 +141,7 @@ const OrderPayment = ({
           {/* Total Amount */}
           <div className="flex items-center justify-between border-b pb-4">
             <span className="text-lg font-medium text-gray-700">
-              Total Amount
+              Total Amount to be Paid
             </span>
             <span className="text-xl font-bold">₱{totalAmount.toFixed(2)}</span>
           </div>

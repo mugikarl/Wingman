@@ -341,11 +341,13 @@ const OrderSummary = ({
           </span>
         </div>
         <div className="flex justify-between mb-2">
-          <span>Subtotal:</span>
+          <span>
+            {menuType?.id === 1 ? "Subtotal:" : "Total Amount to be Paid:"}
+          </span>
           <span>₱{calculateSubtotal().toFixed(2)}</span>
         </div>
         <div className="flex justify-between font-bold">
-          <span>Total:</span>
+          <span>{menuType?.id === 1 ? "Total:" : "Total Sales:"}</span>
           <span>
             {menuType?.id === 1
               ? `₱${calculateSubtotal().toFixed(2)}`
@@ -377,9 +379,9 @@ const OrderSummary = ({
           isOpen={isPaymentOpen}
           onClose={() => setIsPaymentOpen(false)}
           totalAmount={
-            menuType?.id === 1
-              ? calculateSubtotal()
-              : calculateSubtotal() - calculateSubtotal() * deduction
+            // For In-Store orders, keep the calculation;
+            // for Grab/FoodPanda (non‑In‑Store), use the Total Amount to be Paid (i.e. calculateSubtotal())
+            menuType?.id === 1 ? calculateSubtotal() : calculateSubtotal()
           }
           onPlaceOrder={onPlaceOrder || defaultOnPlaceOrder}
           paymentMethods={paymentMethods}
