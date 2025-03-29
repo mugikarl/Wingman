@@ -25,6 +25,7 @@ const EditTransactionOrderSummary = ({
   transaction,
   paymentMethods,
   employees,
+  fetchOrderData,
 }) => {
   const [openAccordion, setOpenAccordion] = useState({});
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -81,8 +82,21 @@ const EditTransactionOrderSummary = ({
     menuType === "Grab" || menuType === "FoodPanda"
       ? orderDetails.reduce((sum, item) => {
           if (item.instore_category?.id === 2) {
-            const base = unliWingsCategory?.base_amount || 0;
-            return sum + base * (item.quantity || 0);
+            // For Unli Wings in delivery, we should add the base amount once per group
+            const groupKey = item.unli_wings_group || "Ungrouped";
+            // Check if we're the first item in this group being processed
+            const isFirstItemInGroup =
+              orderDetails.findIndex(
+                (detail) =>
+                  detail.unli_wings_group === groupKey &&
+                  detail.instore_category?.id === 2
+              ) === orderDetails.indexOf(item);
+
+            if (isFirstItemInGroup) {
+              const base = unliWingsCategory?.base_amount || 0;
+              return sum + base;
+            }
+            return sum; // Skip other items in the same group
           } else {
             const price = item.menu_item?.price || 0;
             const quantity = item.quantity || 0;
@@ -92,8 +106,14 @@ const EditTransactionOrderSummary = ({
         }, 0)
       : alaCarteSubtotal + unliWingsSubtotal;
 
-  // For delivery menus, apply deduction if applicable.
+  // For payment purposes, we use the full subtotal without any deductions
   const newTotal = newSubtotal;
+
+  // Track deduction separately for reporting only
+  const deductionAmount =
+    menuType === "Grab" || menuType === "FoodPanda"
+      ? newSubtotal * deductionPercentage
+      : 0;
 
   const toggleAccordion = (key) => {
     setOpenAccordion((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -269,11 +289,22 @@ const EditTransactionOrderSummary = ({
       <div className="sticky bottom-0 left-0 right-0 bg-white border-t p-4">
         {menuType === "Grab" || menuType === "FoodPanda" ? (
           <>
-            {/* Section for Total Amount to be Paid */}
+            {/* Section for Total Amount to be Paid - without applying deduction to payment */}
             <div className="">
               <div className="flex justify-between">
-                <span className="">Total Amount to be Paid:</span>
+                <span className="">Subtotal:</span>
                 <span className="font-bold">₱{newSubtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-gray-500 text-sm">
+                <span className="">
+                  Platform Deduction ({(deductionPercentage * 100).toFixed(0)}
+                  %):
+                </span>
+                <span className="">₱{deductionAmount.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between mt-2 font-bold">
+                <span className="">Total Amount to be Paid:</span>
+                <span className="">₱{newTotal.toFixed(2)}</span>
               </div>
             </div>
           </>
@@ -316,14 +347,16 @@ const EditTransactionOrderSummary = ({
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
         transaction={transaction}
-        totalAmount={totalAmount} // initial total (already paid)
-        finalTotal={finalTotal} // full new total for the order
+        totalAmount={transaction.payment_amount}
+        finalTotal={newTotal}
         onUpdateComplete={(data) => {
           console.log("Update complete:", data);
+          onUpdateComplete && onUpdateComplete(data);
         }}
         handleEditOrder={handleEditOrder}
         paymentMethods={paymentMethods}
         employees={employees}
+        fetchOrderData={fetchOrderData}
       />
     </div>
   );

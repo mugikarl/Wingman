@@ -18,6 +18,7 @@ const TransactionModal = ({
   menuCategories, // Passed from OrderTable
   employees,
   unliWingsCategory,
+  fetchOrderData, // Add this prop for refreshing data
 }) => {
   if (!isOpen || !transaction) return null;
 
@@ -146,18 +147,24 @@ const TransactionModal = ({
   const totalAlaCarte = alaCarteOrders.reduce((sum, detail) => {
     const quantity = detail?.quantity || 0;
     const price = detail?.menu_item?.price || 0;
-    const discount = detail?.discount?.percentage
-      ? detail.discount.percentage * 100
-      : 0;
-    return sum + quantity * price * (1 - discount / 100);
+    const discount = detail?.discount?.percentage || 0;
+    return sum + quantity * price * (1 - discount);
   }, 0);
 
   const deductionPercentage = isDelivery
     ? menuTypeData?.deduction_percentage || 0
     : 0;
-  const finalTotal = isDelivery ? totalDeliverySubtotal : totalAlaCarte;
+
+  // For delivery, display the deduction but don't apply it to payment amount
+  const displayTotal = isDelivery
+    ? totalDeliverySubtotal * (1 - deductionPercentage)
+    : totalAlaCarte;
+
+  // The full price should be used for payment purposes
+  const actualTotal = isDelivery ? totalDeliverySubtotal : totalAlaCarte;
+
   const paymentAmount = transaction.payment_amount || 0;
-  const change = paymentAmount - finalTotal;
+  const change = paymentAmount - actualTotal;
 
   // When an Update button is clicked:
   const handleUpdateClick = () => {
@@ -168,7 +175,9 @@ const TransactionModal = ({
   // Callback for when OrderEditModal completes update
   const handleUpdateComplete = (updatedOrderDetails) => {
     console.log("Updated order details:", updatedOrderDetails);
-    // You might update the transaction or send the data to your API.
+    // Refresh the order data and close the transaction modal
+    fetchOrderData();
+    onClose();
   };
 
   const handleAdd = (e) => {
@@ -400,16 +409,15 @@ const TransactionModal = ({
                           ? alaCarteOrders.map((detail) => {
                               const quantity = detail?.quantity || 0;
                               const price = detail?.menu_item?.price || 0;
-                              const discount = detail?.discount?.percentage
-                                ? detail.discount.percentage * 100
-                                : 0;
+                              const discount =
+                                detail?.discount?.percentage || 0;
                               const computedTotal =
-                                quantity * price * (1 - discount / 100);
+                                quantity * price * (1 - discount);
                               return [
                                 detail?.menu_item?.name || "N/A",
                                 detail?.quantity || 0,
                                 `₱${price.toFixed(2)}`,
-                                `${discount}%`,
+                                `${(discount * 100).toFixed(0)}%`,
                                 `₱${computedTotal.toFixed(2)}`,
                               ];
                             })
@@ -464,12 +472,20 @@ const TransactionModal = ({
                     <strong>Subtotal:</strong> ₱
                     {(totalDeliverySubtotal || 0).toFixed(2)}
                   </p>
-                  <p>
-                    <strong>Percentage Deduction:</strong>{" "}
-                    {(deductionPercentage * 100).toFixed(2)}%
+                  <p className="text-gray-500 text-sm">
+                    <strong>
+                      Platform Deduction (
+                      {(deductionPercentage * 100).toFixed(2)}%):
+                    </strong>{" "}
+                    ₱{(totalDeliverySubtotal * deductionPercentage).toFixed(2)}
                   </p>
                   <p>
-                    <strong>Total:</strong> ₱{(finalTotal || 0).toFixed(2)}
+                    <strong>Display Total:</strong> ₱
+                    {(displayTotal || 0).toFixed(2)}
+                  </p>
+                  <p className="font-bold">
+                    <strong>Payment Amount:</strong> ₱
+                    {(paymentAmount || 0).toFixed(2)}
                   </p>
                 </>
               ) : (
@@ -480,7 +496,7 @@ const TransactionModal = ({
                   </p>
                   <p>
                     <strong>Total Price:</strong> ₱
-                    {(finalTotal || 0).toFixed(2)}
+                    {(actualTotal || 0).toFixed(2)}
                   </p>
                   <p>
                     <strong>Change:</strong> ₱{(change || 0).toFixed(2)}
@@ -496,7 +512,7 @@ const TransactionModal = ({
             isOpen={isEditModalOpen}
             onClose={() => setIsEditModalOpen(false)}
             transaction={transaction}
-            totalAmount={finalTotal}
+            totalAmount={transaction.payment_amount}
             menuCategories={menuCategories}
             menuItems={menuItems}
             discountsData={discountsData}
@@ -504,6 +520,7 @@ const TransactionModal = ({
             onUpdateComplete={handleUpdateComplete}
             employees={employees}
             unliWingsCategory={unliWingsCategory}
+            fetchOrderData={fetchOrderData}
           />
         )}
       </div>

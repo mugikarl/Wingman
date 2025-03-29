@@ -11,6 +11,7 @@ const OrderEditPayment = ({
   handleEditOrder, // Passed update function
   paymentMethods,
   employees, // Array of employee objects
+  fetchOrderData,
 }) => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
   const [cashReceived, setCashReceived] = useState("");
@@ -38,8 +39,12 @@ const OrderEditPayment = ({
     }
   }, [isOpen, paymentMethods, employees]);
 
-  // Compute extra payment required automatically.
-  const extraPaymentRequired = finalTotal - totalAmount;
+  console.log("Transaction:", transaction);
+  console.log("Total Amount (original payment):", totalAmount);
+  console.log("Final Total (new order total):", finalTotal);
+
+  // Compute extra payment required (without applying any deduction)
+  const extraPaymentRequired = Math.max(0, finalTotal - totalAmount);
   // In this update scenario, the final payment the customer must make is ONLY the extra amount.
   const finalPayment = extraPaymentRequired;
 
@@ -84,27 +89,39 @@ const OrderEditPayment = ({
     }
     setIsProcessing(true);
 
-    // For cash payments, add the extra payment to the initial total.
-    // For non-cash payments (e.g., GCash), assume the full final total is paid.
-    const paymentAmount =
-      selectedPaymentMethod.name.toLowerCase() === "cash"
-        ? totalAmount + Number.parseFloat(cashReceived)
-        : finalTotal;
+    // Format the order details to match what the backend expects
+    const orderDetailsPayload = transaction.order_details.map((detail) => ({
+      menu_id: detail.menu_item.id,
+      quantity: detail.quantity,
+      discount_id: detail.discount?.id || null,
+      instore_category: detail.instore_category
+        ? detail.instore_category.id
+        : null,
+      unli_wings_group: detail.unli_wings_group || null,
+    }));
 
     // Build payload details for the parent's update function.
     const payload = {
       employee_id: selectedEmployee.id,
       payment_method: selectedPaymentMethod.id,
-      payment_amount: paymentAmount,
-      reference_id: transaction.reference_id,
+      payment_amount:
+        selectedPaymentMethod.name.toLowerCase() === "cash"
+          ? transaction.payment_amount +
+            Number.parseFloat(cashReceived || 0) -
+            change
+          : transaction.payment_amount + extraPaymentRequired, // For non-cash payments, just add the extra payment required
+      reference_id: gcashReferenceNo || transaction.reference_id,
       receipt_image: transaction.receipt_image,
-      order_details: transaction.order_details,
+      order_details: orderDetailsPayload,
     };
+
+    console.log("Submitting payment with payload:", payload);
 
     handleEditOrder(payload)
       .then((data) => {
         onUpdateComplete(data);
         onClose();
+        fetchOrderData();
       })
       .catch((error) => {
         console.error(
@@ -134,12 +151,12 @@ const OrderEditPayment = ({
         </div>
         {/* Content */}
         <div className="p-4 space-y-6">
-          {/* Display Initial Total */}
+          {/* Display Current Order Total */}
           <div className="flex items-center justify-between border-b pb-4">
             <span className="text-lg font-medium text-gray-700">
-              Initial Total
+              Updated Order Total
             </span>
-            <span className="text-xl font-bold">₱{totalAmount.toFixed(2)}</span>
+            <span className="text-xl font-bold">₱{finalTotal.toFixed(2)}</span>
           </div>
           {/* Display Extra Payment Required */}
           <div className="flex items-center justify-between border-b pb-4">

@@ -15,6 +15,7 @@ const OrderEditModal = ({
   onUpdateComplete, // Callback when editing is finished and updated order details should be saved
   unliWingsCategory,
   employees,
+  fetchOrderData, // Add this prop for refreshing data
 }) => {
   if (!isOpen) return null;
 
@@ -23,6 +24,7 @@ const OrderEditModal = ({
   const menuTypeId = transaction.order_details?.[0]?.menu_item?.type_id;
   const menuTypeData = menuTypes.find((type) => type.id === menuTypeId);
   const menuType = menuTypeData ? menuTypeData.name : "Unknown";
+  const originalPaymentAmount = transaction.payment_amount || 0;
 
   // Local state to handle editing
   const [localOrderDetails, setLocalOrderDetails] =
@@ -184,10 +186,14 @@ const OrderEditModal = ({
     });
   };
 
-  // Build and send the PUT request to update the order.
-  const handleEditOrder = async () => {
-    // Convert local order details into the format expected by your backend.
-    const orderDetailsPayload = localOrderDetails.map((detail) => ({
+  const handleEditOrder = async (payloadWithUpdatedPayment = null) => {
+    // Filter out any menu items with ID 0 before sending to backend
+    const validOrderDetails = localOrderDetails.filter(
+      (detail) => detail.menu_item && detail.menu_item.id !== 0
+    );
+
+    // Format the order details to match backend expectations
+    const orderDetailsPayload = validOrderDetails.map((detail) => ({
       menu_id: detail.menu_item.id,
       quantity: detail.quantity,
       discount_id: detail.discount?.id || null,
@@ -197,7 +203,13 @@ const OrderEditModal = ({
       unli_wings_group: detail.unli_wings_group || null,
     }));
 
-    const payload = {
+    console.log("Preparing order payload", {
+      originalCount: localOrderDetails.length,
+      filteredCount: validOrderDetails.length,
+      payload: orderDetailsPayload,
+    });
+
+    const payload = payloadWithUpdatedPayment || {
       employee_id: transaction.employee.id,
       payment_method: transaction.payment_method.id,
       payment_amount: transaction.payment_amount,
@@ -206,23 +218,39 @@ const OrderEditModal = ({
       order_details: orderDetailsPayload,
     };
 
+    // If we're using our generated payload, make sure order_details is correctly set
+    if (!payloadWithUpdatedPayment) {
+      payload.order_details = orderDetailsPayload;
+    } else if (payloadWithUpdatedPayment.order_details) {
+      // If we're using a provided payload but need to update order_details
+      payload.order_details = orderDetailsPayload;
+    }
+
     try {
+      console.log("Sending final payload:", payload);
       const response = await axios.put(
         `http://127.0.0.1:8000/edit-order/${transaction.id}/`,
         payload,
         { headers: { "Content-Type": "application/json" } }
       );
       if (response.status === 200) {
+        // Refresh order data before calling onUpdateComplete
+        if (fetchOrderData) {
+          await fetchOrderData();
+        }
         onUpdateComplete(response.data);
         onClose();
+        return response.data;
       } else {
         console.error("Failed to update order:", response.data);
+        throw new Error("Failed to update order");
       }
     } catch (error) {
       console.error(
         "Error updating order:",
         error.response ? error.response.data : error.message
       );
+      throw error;
     }
   };
 
@@ -238,8 +266,21 @@ const OrderEditModal = ({
   const newSubtotal = localOrderDetails.reduce((sum, item) => {
     const quantity = item.quantity || 0;
     if (item.instore_category?.id === 2) {
-      const baseAmount = item.instore_category?.base_amount || 0;
-      return sum + baseAmount * quantity;
+      // For Unli Wings, we only count the base amount once per group
+      const groupKey = item.unli_wings_group || "Ungrouped";
+      // Check if we're the first item in this group being processed
+      const isFirstItemInGroup =
+        localOrderDetails.findIndex(
+          (detail) =>
+            detail.unli_wings_group === groupKey &&
+            detail.instore_category?.id === 2
+        ) === localOrderDetails.indexOf(item);
+
+      if (isFirstItemInGroup) {
+        const baseAmount = item.instore_category?.base_amount || 0;
+        return sum + baseAmount;
+      }
+      return sum; // Skip other items in the same group
     } else {
       const price = item.menu_item?.price || 0;
       const discountPercentage = item.discount ? item.discount.percentage : 0;
@@ -247,7 +288,19 @@ const OrderEditModal = ({
     }
   }, 0);
 
+  const deductionPercentage =
+    menuType === "Grab" || menuType === "FoodPanda"
+      ? menuTypeData?.deduction_percentage || 0
+      : 0;
+
+  // For payment purposes, we use the full subtotal without any deductions
   const newTotal = newSubtotal;
+
+  // Track deduction separately for reporting only
+  const deductionAmount =
+    menuType === "Grab" || menuType === "FoodPanda"
+      ? newSubtotal * deductionPercentage
+      : 0;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
@@ -270,7 +323,7 @@ const OrderEditModal = ({
           <EditTransactionOrderSummary
             orderDetails={localOrderDetails}
             finalTotal={newTotal}
-            totalAmount={totalAmount}
+            totalAmount={originalPaymentAmount}
             transaction={transaction}
             onCancelUpdate={handleCancel}
             handleEditOrder={handleEditOrder}
@@ -280,11 +333,7 @@ const OrderEditModal = ({
             onQuantityChange={handleQuantityChange}
             onDiscountChange={handleDiscountChange}
             setOpenDropdownId={() => {}}
-            deductionPercentage={
-              menuType === "Grab" || menuType === "FoodPanda"
-                ? menuTypeData?.deduction_percentage || 0
-                : 0
-            }
+            deductionPercentage={deductionPercentage}
             // Pass down the active Unli Wings group and its setter
             activeUnliWingsGroup={activeUnliWingsGroup}
             setActiveUnliWingsGroup={setActiveUnliWingsGroup}
