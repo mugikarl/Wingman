@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import EditTransactionMenu from "../panels/EditTransactionMenu";
 import EditTransactionOrderSummary from "../panels/EditTransactionOrderSummary";
 
 const OrderEditModal = ({
   isOpen,
   onClose, // Called when editing is cancelled (to go back to TransactionModal)
-  transaction, // Original transaction data passed from TransactionModal
+  transaction,
+  totalAmount, // Original transaction data passed from TransactionModal
   menuCategories,
   menuItems,
   discountsData,
   menuTypes,
   onUpdateComplete, // Callback when editing is finished and updated order details should be saved
   unliWingsCategory,
+  employees,
 }) => {
   if (!isOpen) return null;
 
@@ -181,9 +184,51 @@ const OrderEditModal = ({
     });
   };
 
+  // Build and send the PUT request to update the order.
+  const handleEditOrder = async () => {
+    // Convert local order details into the format expected by your backend.
+    const orderDetailsPayload = localOrderDetails.map((detail) => ({
+      menu_id: detail.menu_item.id,
+      quantity: detail.quantity,
+      discount_id: detail.discount?.id || null,
+      instore_category: detail.instore_category
+        ? detail.instore_category.id
+        : null,
+      unli_wings_group: detail.unli_wings_group || null,
+    }));
+
+    const payload = {
+      employee_id: transaction.employee.id,
+      payment_method: transaction.payment_method.id,
+      payment_amount: transaction.payment_amount,
+      reference_id: transaction.reference_id,
+      receipt_image: transaction.receipt_image,
+      order_details: orderDetailsPayload,
+    };
+
+    try {
+      const response = await axios.put(
+        `http://127.0.0.1:8000/edit-order/${transaction.id}/`,
+        payload,
+        { headers: { "Content-Type": "application/json" } }
+      );
+      if (response.status === 200) {
+        onUpdateComplete(response.data);
+        onClose();
+      } else {
+        console.error("Failed to update order:", response.data);
+      }
+    } catch (error) {
+      console.error(
+        "Error updating order:",
+        error.response ? error.response.data : error.message
+      );
+    }
+  };
+
+  // When the user clicks "Save", call our edit function.
   const handleAddOrderDetails = () => {
-    onUpdateComplete(localOrderDetails);
-    onClose(); // Close this modal once update is complete.
+    handleEditOrder();
   };
 
   const handleCancel = () => {
@@ -202,10 +247,7 @@ const OrderEditModal = ({
     }
   }, 0);
 
-  const newTotal =
-    menuType === "Grab" || menuType === "FoodPanda"
-      ? newSubtotal - newSubtotal * (menuTypeData?.deduction_percentage || 0)
-      : newSubtotal;
+  const newTotal = newSubtotal;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
@@ -228,8 +270,10 @@ const OrderEditModal = ({
           <EditTransactionOrderSummary
             orderDetails={localOrderDetails}
             finalTotal={newTotal}
+            totalAmount={totalAmount}
+            transaction={transaction}
             onCancelUpdate={handleCancel}
-            onAddOrderDetails={handleAddOrderDetails}
+            handleEditOrder={handleEditOrder}
             menuType={menuType}
             discounts={discountsData}
             openDropdownId={null}
@@ -248,6 +292,7 @@ const OrderEditModal = ({
               (detail) => detail.instore_category?.id === 1
             )}
             unliWingsCategory={unliWingsCategory}
+            employees={employees}
           />
         </div>
       </div>

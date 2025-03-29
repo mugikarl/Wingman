@@ -1,12 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 import { getItemKey } from "../cards/OrderProductCard";
 import EditableProductCard from "../cards/EditableProductCard";
+import OrderEditPayment from "../popups/OrderEditPayment";
 
 const EditTransactionOrderSummary = ({
   orderDetails,
   finalTotal, // (You might recalc final total later)
   onCancelUpdate,
-  onAddOrderDetails,
+  totalAmount,
+  handleEditOrder, // Passed from OrderEditModal
+  onUpdateComplete,
   menuType,
   discounts,
   onQuantityChange, // Parent callback
@@ -18,7 +21,14 @@ const EditTransactionOrderSummary = ({
   deductionPercentage = 0,
   // unliWingsCategory is passed from the backend.
   unliWingsCategory,
+  // Additional props for payment modal:
+  transaction,
+  paymentMethods,
+  employees,
 }) => {
+  const [openAccordion, setOpenAccordion] = useState({});
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+
   // Compute orders directly from orderDetails prop.
   const alaCarteOrders = orderDetails.filter(
     (detail) => detail.instore_category?.id === 1
@@ -27,7 +37,7 @@ const EditTransactionOrderSummary = ({
     (detail) => detail.instore_category?.id === 2
   );
 
-  // Group the unli wings orders by group.
+  // Group the Unli Wings orders by group.
   const groupedUnliWingsOrders = unliWingsOrders.reduce((acc, detail) => {
     const groupKey = detail.unli_wings_group || "Ungrouped";
     if (!acc[groupKey]) acc[groupKey] = [];
@@ -41,8 +51,6 @@ const EditTransactionOrderSummary = ({
   }
 
   // Helper: get the base amount for Unli Wings.
-  // If there are existing orders in the group, use the first item's base_amount;
-  // otherwise, use unliWingsCategory's base_amount (retrieved from the backend).
   const getUnliWingsBaseAmount = (groupOrders) => {
     if (groupOrders.length > 0) {
       return groupOrders[0]?.instore_category?.base_amount;
@@ -50,7 +58,7 @@ const EditTransactionOrderSummary = ({
     return unliWingsCategory?.base_amount;
   };
 
-  // Calculate subtotal for Ala Carte orders as before.
+  // Calculate subtotal for Ala Carte orders.
   const alaCarteSubtotal = alaCarteOrders.reduce((sum, item) => {
     const price = item.menu_item?.price || 0;
     const quantity = item.quantity || 0;
@@ -58,23 +66,21 @@ const EditTransactionOrderSummary = ({
     return sum + price * quantity * (1 - discountPercentage);
   }, 0);
 
-  // For Unli Wings orders, we only add the base_amount once per unique group.
+  // For Unli Wings orders, add the base_amount once per unique group.
   const uniqueUnliWingsGroups = Array.from(
     new Set(unliWingsOrders.map((item) => item.unli_wings_group))
-  ).filter((g) => g); // filter out falsy values if any
-
+  ).filter((g) => g);
   const unliWingsSubtotal = uniqueUnliWingsGroups.reduce((sum, groupKey) => {
     const groupOrders = groupedUnliWingsOrders[groupKey] || [];
     const baseAmount = getUnliWingsBaseAmount(groupOrders);
     return sum + (baseAmount || 0);
   }, 0);
 
-  // Overall subtotal: sum of ala carte and unli wings (flat fee per group)
+  // Overall subtotal.
   const newSubtotal =
     menuType === "Grab" || menuType === "FoodPanda"
       ? orderDetails.reduce((sum, item) => {
           if (item.instore_category?.id === 2) {
-            // For Unli Wings orders, use the base amount from backend * quantity
             const base = unliWingsCategory?.base_amount || 0;
             return sum + base * (item.quantity || 0);
           } else {
@@ -86,13 +92,8 @@ const EditTransactionOrderSummary = ({
         }, 0)
       : alaCarteSubtotal + unliWingsSubtotal;
 
-  // For delivery menus, you might subtract a deduction percentage.
-  const newTotal =
-    menuType === "Grab" || menuType === "FoodPanda"
-      ? newSubtotal - newSubtotal * deductionPercentage
-      : newSubtotal;
-
-  const [openAccordion, setOpenAccordion] = React.useState({});
+  // For delivery menus, apply deduction if applicable.
+  const newTotal = newSubtotal;
 
   const toggleAccordion = (key) => {
     setOpenAccordion((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -304,13 +305,26 @@ const EditTransactionOrderSummary = ({
             Cancel
           </button>
           <button
-            onClick={() => onAddOrderDetails()}
+            onClick={() => setIsPaymentModalOpen(true)}
             className="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600 whitespace-nowrap"
           >
             Add Order Details
           </button>
         </div>
       </div>
+      <OrderEditPayment
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        transaction={transaction}
+        totalAmount={totalAmount} // initial total (already paid)
+        finalTotal={finalTotal} // full new total for the order
+        onUpdateComplete={(data) => {
+          console.log("Update complete:", data);
+        }}
+        handleEditOrder={handleEditOrder}
+        paymentMethods={paymentMethods}
+        employees={employees}
+      />
     </div>
   );
 };

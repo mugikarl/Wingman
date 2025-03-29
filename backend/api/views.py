@@ -2832,82 +2832,87 @@ def add_order(request):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@api_view(['POST'])
+@api_view(['PUT'])
 @authentication_classes([])  
-@permission_classes([AllowAny])   
-def edit_order(request):
+@permission_classes([AllowAny])
+def edit_order(request, transaction_id):
     try:
-        data = request.data
-        transaction_id = data.get("transaction_id")
         if not transaction_id:
-            return Response({"error": "Transaction ID not provided."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Transaction ID not provided."}, status=400)
         
+        data = request.data
         employee_id = data.get("employee_id")
         payment_method = data.get("payment_method")
-        payment_amount = data.get("payment_amount")  # Updated payment amount
+        payment_amount = data.get("payment_amount")  # New/updated payment amount
         reference_id = data.get("reference_id")
         receipt_image = data.get("receipt_image")
         order_details = data.get("order_details", [])
         
         if not order_details:
-            return Response({"error": "No order details provided."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "No order details provided."}, status=400)
         
         # Validate the existing transaction record
-        existing_transaction = supabase_anon.table("transaction").select("id").eq("id", transaction_id).execute().data
-        if not existing_transaction:
-            return Response({"error": f"Transaction with ID {transaction_id} not found."}, status=status.HTTP_400_BAD_REQUEST)
+        existing_transaction_response = supabase_anon.table("transaction").select("id").eq("id", transaction_id).execute()
+        if not existing_transaction_response.data:
+            return Response({"error": f"Transaction with ID {transaction_id} not found."}, status=400)
         
         # Validate employee
-        employee = supabase_anon.table("employee").select("id").eq("id", employee_id).execute().data
-        if not employee:
-            return Response({"error": f"Employee with ID {employee_id} not found."}, status=status.HTTP_400_BAD_REQUEST)
+        employee_response = supabase_anon.table("employee").select("id").eq("id", employee_id).execute()
+        if not employee_response.data:
+            return Response({"error": f"Employee with ID {employee_id} not found."}, status=400)
         
         # Validate payment method
-        payment_method_data = supabase_anon.table("payment_methods").select("id").eq("id", payment_method).execute().data
-        if not payment_method_data:
-            return Response({"error": f"Payment method with ID {payment_method} not found."}, status=status.HTTP_400_BAD_REQUEST)
+        payment_method_response = supabase_anon.table("payment_methods").select("id").eq("id", payment_method).execute()
+        if not payment_method_response.data:
+            return Response({"error": f"Payment method with ID {payment_method} not found."}, status=400)
         
-        # Batch fetch menu items (including menu_type_id)
+        # Batch fetch menu items (including type_id)
         menu_ids = [order["menu_id"] for order in order_details]
-        menus_data = supabase_anon.table("menu_items").select("id, price, type_id").in_("id", menu_ids).execute().data
-        menus = {menu["id"]: menu for menu in menus_data}
+        menus_response = supabase_anon.table("menu_items").select("id, price, type_id").in_("id", menu_ids).execute()
+        menus = {menu["id"]: menu for menu in menus_response.data}
         missing_menus = [menu_id for menu_id in menu_ids if menu_id not in menus]
         if missing_menus:
-            return Response({"error": f"Menu items with IDs {missing_menus} not found."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": f"Menu items with IDs {missing_menus} not found."}, status=400)
         
-        # For order details that include instore_category, fetch them.
-        instore_orders = [order for order in order_details if "instore_category" in order]
+        # For In‑Store orders, fetch instore categories
+        instore_orders = [order for order in order_details if order.get("instore_category")]
         if instore_orders:
             instore_category_ids = list(set(order["instore_category"] for order in instore_orders))
-            instore_categories_data = supabase_anon.table("instore_category").select("id, name, base_amount").in_("id", instore_category_ids).execute().data
-            instore_categories = {cat["id"]: cat for cat in instore_categories_data}
+            instore_categories_response = supabase_anon.table("instore_category")\
+                .select("id, name, base_amount")\
+                .in_("id", instore_category_ids).execute()
+            instore_categories = {cat["id"]: cat for cat in instore_categories_response.data}
             missing_categories = [cat_id for cat_id in instore_category_ids if cat_id not in instore_categories]
             if missing_categories:
-                return Response({"error": f"In-Store Categories with IDs {missing_categories} not found."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": f"In-Store Categories with IDs {missing_categories} not found."}, status=400)
         else:
             instore_categories = {}
         
         # Batch fetch discounts, if any
         discount_ids = list(set(order.get("discount_id") for order in order_details if order.get("discount_id")))
-        discounts_data = supabase_anon.table("discounts").select("id, percentage").in_("id", discount_ids).execute().data if discount_ids else []
-        discounts = {d["id"]: d["percentage"] for d in discounts_data}
-        missing_discounts = [d_id for d_id in discount_ids if d_id not in discounts]
-        if missing_discounts:
-            return Response({"error": f"Discounts with IDs {missing_discounts} not found."}, status=status.HTTP_400_BAD_REQUEST)
+        if discount_ids:
+            discounts_response = supabase_anon.table("discounts").select("id, percentage").in_("id", discount_ids).execute()
+            discounts = {d["id"]: d["percentage"] for d in discounts_response.data}
+            missing_discounts = [d_id for d_id in discount_ids if d_id not in discounts]
+            if missing_discounts:
+                return Response({"error": f"Discounts with IDs {missing_discounts} not found."}, status=400)
+        else:
+            discounts = {}
         
-        # For Grab and FoodPanda orders (no instore_category), fetch their menu type details.
-        menu_type_ids_needed = [menu["type_id"] for menu in menus_data if menu["type_id"] in [2, 3]]
+        # For Grab and FoodPanda orders, fetch menu type details (deduction_percentage)
+        menu_type_ids_needed = [menu["type_id"] for menu in menus_response.data if menu["type_id"] in [2, 3]]
         if menu_type_ids_needed:
             menu_type_ids = list(set(menu_type_ids_needed))
-            menu_types_data = supabase_anon.table("menu_type").select("id, deduction_percentage").in_("id", menu_type_ids).execute().data
-            menu_types = {mt["id"]: mt for mt in menu_types_data}
+            menu_types_response = supabase_anon.table("menu_type").select("id, deduction_percentage")\
+                .in_("id", menu_type_ids).execute()
+            menu_types = {mt["id"]: mt for mt in menu_types_response.data}
             missing_menu_types = [mt_id for mt_id in menu_type_ids if mt_id not in menu_types]
             if missing_menu_types:
-                return Response({"error": f"Menu types with IDs {missing_menu_types} not found."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": f"Menu types with IDs {missing_menu_types} not found."}, status=400)
         else:
             menu_types = {}
         
-        # Update transaction record (including receipt_image if provided)
+        # Update the transaction record
         transaction_data = {
             "reference_id": reference_id,
             "payment_amount": payment_amount,
@@ -2915,37 +2920,41 @@ def edit_order(request):
             "employee_id": employee_id,
             "receipt_image": receipt_image
         }
-        transaction_update_response = supabase_anon.table("transaction").update(transaction_data).eq("id", transaction_id).execute()
-        if not transaction_update_response.data:
-            return Response({"error": "Failed to update transaction."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        transaction_update_response = supabase_anon.table("transaction")\
+            .update(transaction_data).eq("id", transaction_id).execute()
+        if hasattr(transaction_update_response, "error") and transaction_update_response.error:
+            return Response({"error": "Failed to update transaction."}, status=500)
         
-        total_price = 0  # Running total for transaction
-        order_items = []  # New order items to be inserted
-        calculation_breakdown = []  # Detailed breakdown
+        total_price = 0
+        order_items = []
+        calculation_breakdown = []
         
-        # For grouping Unli Wings orders via unli_wings_group
+        # For grouping Unli Wings orders
         unli_wings_groups = {}
         current_unli_wings_group_counter = 1
         
-        # Process each order detail (similar to add_order)
+        # Process each order detail
         for order in order_details:
             menu_id = order["menu_id"]
             quantity = order["quantity"]
             discount_id = order.get("discount_id")
             menu_item = menus[menu_id]
+            menu_type_id = menu_item.get("type_id")
             
-            if "instore_category" in order:
-                instore_category_id = order["instore_category"]
+            if menu_type_id == 1:
+                # In‑Store orders require an instore_category.
+                instore_category_id = order.get("instore_category")
+                if not instore_category_id:
+                    return Response({"error": f"In-Store order detail for menu_id {menu_id} is missing instore_category."}, status=400)
                 instore_category = instore_categories.get(instore_category_id)
                 if not instore_category:
-                    return Response({"error": f"In-Store Category with ID {instore_category_id} not found."}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": f"In-Store Category with ID {instore_category_id} not found."}, status=400)
                 
                 if instore_category["name"] == "Ala Carte":
                     base_price = menu_item["price"] * quantity
                     price = base_price
-                    discount_percentage = 0
-                    if discount_id:
-                        discount_percentage = discounts.get(discount_id, 0)
+                    discount_percentage = discounts.get(discount_id, 0) if discount_id else 0
+                    if discount_percentage:
                         price = price - (price * discount_percentage)
                     base_price = round(base_price, 2)
                     price = round(price, 2)
@@ -2967,7 +2976,6 @@ def edit_order(request):
                         "unli_wings_group": None
                     })
                 elif instore_category["name"] == "Unli Wings":
-                    # Process Unli Wings with grouping
                     unli_wings_group = order.get("unli_wings_group")
                     if not unli_wings_group:
                         unli_wings_group = str(current_unli_wings_group_counter)
@@ -2991,18 +2999,14 @@ def edit_order(request):
                         "unli_wings_group": unli_wings_group
                     })
                 else:
-                    return Response({"error": "Invalid In-Store Category."}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                # Grab/FoodPanda orders
-                menu_type_id = menu_item.get("type_id")
-                if menu_type_id not in [2, 3]:
-                    return Response({"error": f"Order detail for menu_id {menu_id} is missing instore_category and is not a Grab/FoodPanda type."}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"error": "Invalid In-Store Category."}, status=400)
+            elif menu_type_id in [2, 3]:
+                #For Grab (2) and FoodPanda (3) orders.
                 base_price = menu_item["price"] * quantity
                 deduction_percentage = menu_types.get(menu_type_id, {}).get("deduction_percentage", 0)
                 price = base_price - (base_price * deduction_percentage)
-                discount_percentage = 0
-                if discount_id:
-                    discount_percentage = discounts.get(discount_id, 0)
+                discount_percentage = discounts.get(discount_id, 0) if discount_id else 0
+                if discount_percentage:
                     price = price - (price * discount_percentage)
                 base_price = round(base_price, 2)
                 price = round(price, 2)
@@ -3024,14 +3028,15 @@ def edit_order(request):
                     "instore_category": None,
                     "unli_wings_group": None
                 })
+            else:
+                return Response({"error": f"Unsupported menu type_id {menu_type_id} for menu_id {menu_id}."}, status=400)
         
-        # Process Unli Wings groups pricing (if any)
+        # Process Unli Wings groups pricing
         for group_key, group in unli_wings_groups.items():
             base_price = instore_categories[group["instore_category_id"]]["base_amount"]
             price = base_price
-            discount_percentage = 0
-            if group["discount_id"]:
-                discount_percentage = discounts.get(group["discount_id"], 0)
+            discount_percentage = discounts.get(group["discount_id"], 0) if group["discount_id"] else 0
+            if discount_percentage:
                 price = price - (price * (discount_percentage / 100))
             base_price = round(base_price, 2)
             price = round(price, 2)
@@ -3048,15 +3053,15 @@ def edit_order(request):
         total_price = round(total_price, 2)
         change = round(payment_amount - total_price, 2)
         
-        # Delete previous order details for this transaction.
+        # Delete previous order details.
         delete_response = supabase_anon.table("order_details").delete().eq("transaction_id", transaction_id).execute()
-        if delete_response.error:
-            return Response({"error": "Failed to delete previous order details."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        if (hasattr(delete_response, "error") and delete_response.error):
+            return Response({"error": "Failed to delete previous order details."}, status=500)
         
         # Insert new order details.
         order_details_response = supabase_anon.table("order_details").insert(order_items).execute()
-        if not order_details_response.data:
-            return Response({"error": "Failed to save updated order details."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        if (hasattr(order_details_response, "error") and order_details_response.error):
+            return Response({"error": "Failed to save updated order details."}, status=500)
         
         return Response({
             "message": "Order updated successfully.",
@@ -3064,7 +3069,7 @@ def edit_order(request):
             "total_price": total_price,
             "change": change,
             "calculation_details": calculation_breakdown
-        }, status=status.HTTP_200_OK)
+        }, status=200)
     
     except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"error": str(e)}, status=500)

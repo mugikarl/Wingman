@@ -16,6 +16,7 @@ const TransactionModal = ({
   discountsData,
   menuItems, // Passed from OrderTable
   menuCategories, // Passed from OrderTable
+  employees,
   unliWingsCategory,
 }) => {
   if (!isOpen || !transaction) return null;
@@ -154,10 +155,7 @@ const TransactionModal = ({
   const deductionPercentage = isDelivery
     ? menuTypeData?.deduction_percentage || 0
     : 0;
-  const finalTotal = isDelivery
-    ? totalDeliverySubtotal - totalDeliverySubtotal * deductionPercentage
-    : totalAlaCarte;
-  const totalPrice = isDelivery ? totalDeliverySubtotal : totalAlaCarte;
+  const finalTotal = isDelivery ? totalDeliverySubtotal : totalAlaCarte;
   const paymentAmount = transaction.payment_amount || 0;
   const change = paymentAmount - finalTotal;
 
@@ -482,7 +480,7 @@ const TransactionModal = ({
                   </p>
                   <p>
                     <strong>Total Price:</strong> ₱
-                    {(totalPrice || 0).toFixed(2)}
+                    {(finalTotal || 0).toFixed(2)}
                   </p>
                   <p>
                     <strong>Change:</strong> ₱{(change || 0).toFixed(2)}
@@ -498,11 +496,13 @@ const TransactionModal = ({
             isOpen={isEditModalOpen}
             onClose={() => setIsEditModalOpen(false)}
             transaction={transaction}
+            totalAmount={finalTotal}
             menuCategories={menuCategories}
             menuItems={menuItems}
             discountsData={discountsData}
             menuTypes={menuTypes}
             onUpdateComplete={handleUpdateComplete}
+            employees={employees}
             unliWingsCategory={unliWingsCategory}
           />
         )}
