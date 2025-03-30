@@ -144,12 +144,37 @@ const TransactionModal = ({
     0
   );
 
-  const totalAlaCarte = alaCarteOrders.reduce((sum, detail) => {
+  const totalAlaCarteBeforeDiscount = alaCarteOrders.reduce((sum, detail) => {
+    const quantity = detail?.quantity || 0;
+    const price = detail?.menu_item?.price || 0;
+    return sum + quantity * price;
+  }, 0);
+
+  const totalAlaCarteDiscountAmount = alaCarteOrders.reduce((sum, detail) => {
     const quantity = detail?.quantity || 0;
     const price = detail?.menu_item?.price || 0;
     const discount = detail?.discount?.percentage || 0;
-    return sum + quantity * price * (1 - discount);
+    return sum + quantity * price * discount;
   }, 0);
+
+  const totalAlaCarte =
+    totalAlaCarteBeforeDiscount - totalAlaCarteDiscountAmount;
+
+  const totalUnliWings = unliWingsOrders.reduce((sum, detail) => {
+    const groupKey = detail.unli_wings_group || "Ungrouped";
+    const isFirstItemInGroup =
+      unliWingsOrders.findIndex((d) => d.unli_wings_group === groupKey) ===
+      unliWingsOrders.indexOf(detail);
+
+    if (isFirstItemInGroup) {
+      return sum + (detail.instore_category?.base_amount || 0);
+    }
+    return sum;
+  }, 0);
+
+  const totalBeforeDiscount = totalAlaCarteBeforeDiscount + totalUnliWings;
+  const totalDiscountAmount = totalAlaCarteDiscountAmount;
+  const totalInStore = totalAlaCarte + totalUnliWings;
 
   const deductionPercentage = isDelivery
     ? menuTypeData?.deduction_percentage || 0
@@ -158,11 +183,10 @@ const TransactionModal = ({
   // For delivery, display the deduction but don't apply it to payment amount
   const displayTotal = isDelivery
     ? totalDeliverySubtotal * (1 - deductionPercentage)
-    : totalAlaCarte;
+    : totalInStore;
 
   // The full price should be used for payment purposes
-  const actualTotal = isDelivery ? totalDeliverySubtotal : totalAlaCarte;
-
+  const actualTotal = isDelivery ? totalDeliverySubtotal : totalInStore;
   const paymentAmount = transaction.payment_amount || 0;
   const change = paymentAmount - actualTotal;
 
@@ -220,7 +244,7 @@ const TransactionModal = ({
       <div
         className={`bg-white rounded-lg shadow-lg p-6 ${
           isExpanded ? "w-[1200px] flex" : "w-[500px] flex flex-col"
-        } h-[650px] relative`}
+        } h-[680px] relative`}
       >
         {/* Close Button */}
         <div className="absolute top-2 right-2">
@@ -497,30 +521,53 @@ const TransactionModal = ({
                     <strong>Subtotal:</strong> ₱
                     {(totalDeliverySubtotal || 0).toFixed(2)}
                   </p>
-                  <p className="text-gray-500 text-sm">
+                  <p className="text-gray-500">
                     <strong>
                       Platform Deduction (
                       {(deductionPercentage * 100).toFixed(2)}%):
                     </strong>{" "}
-                    ₱{(totalDeliverySubtotal * deductionPercentage).toFixed(2)}
+                    -₱
+                    {(totalDeliverySubtotal * deductionPercentage).toFixed(2)}
                   </p>
-                  <p>
-                    <strong>Display Total:</strong> ₱
+                  <p className="font-bold mt-1">
+                    <strong>Total Amount:</strong> ₱
                     {(displayTotal || 0).toFixed(2)}
                   </p>
-                  <p className="font-bold">
-                    <strong>Payment Amount:</strong> ₱
+                  <p className="font-bold mt-1">
+                    <strong>Amount Paid:</strong> ₱
                     {(paymentAmount || 0).toFixed(2)}
+                  </p>
+                  <p className="font-bold mt-1">
+                    <strong>Total Sales:</strong> ₱
+                    {(displayTotal || 0).toFixed(2)}
                   </p>
                 </>
               ) : (
                 <>
                   <p>
-                    <strong>Subtotal:</strong> ₱{(actualTotal || 0).toFixed(2)}
+                    <strong>Subtotal:</strong> ₱
+                    {(totalBeforeDiscount || 0).toFixed(2)}
                   </p>
-                  <p className="font-bold">
-                    <strong>Payment Amount:</strong> ₱
+                  <p className="text-gray-500">
+                    <strong>Discount Amount:</strong> -₱
+                    {(totalDiscountAmount || 0).toFixed(2)}
+                  </p>
+                  <p className="font-bold mt-1">
+                    <strong>Total Amount:</strong> ₱
+                    {(totalInStore || 0).toFixed(2)}
+                  </p>
+                  <p className="font-bold mt-1">
+                    <strong>Amount Paid:</strong> ₱
                     {(paymentAmount || 0).toFixed(2)}
+                  </p>
+                  {change > 0 && (
+                    <p className="text-gray-500">
+                      <strong>Change:</strong> ₱{change.toFixed(2)}
+                    </p>
+                  )}
+                  <p className="font-bold mt-1">
+                    <strong>Total Sales:</strong> ₱
+                    {(totalInStore || 0).toFixed(2)}
                   </p>
                 </>
               )}
