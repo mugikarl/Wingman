@@ -7,6 +7,7 @@ import { FaClipboardList } from "react-icons/fa";
 import EditTransactionMenu from "../panels/EditTransactionMenu";
 import EditTransactionOrderSummary from "../panels/EditTransactionOrderSummary";
 import OrderEditModal from "./OrderEditModal";
+import axios from "axios";
 
 const TransactionModal = ({
   isOpen,
@@ -37,7 +38,20 @@ const TransactionModal = ({
   const [alaCarteOverallOpen, setAlaCarteOverallOpen] = useState(true);
 
   // Order status and its dropdown
-  const [orderStatus, setOrderStatus] = useState("Pending");
+  const [orderStatus, setOrderStatus] = useState(() => {
+    // Get initial status from transaction
+    const statusId = transaction.status;
+    switch (statusId) {
+      case 1:
+        return "Pending";
+      case 2:
+        return "Completed";
+      case 3:
+        return "Cancelled";
+      default:
+        return "Pending"; // Default to Pending if status is missing or unknown
+    }
+  });
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
 
   // Dropdown state for OrderProductCard
@@ -209,10 +223,27 @@ const TransactionModal = ({
     console.log("Create new Unli Wings Order Group");
   };
 
-  const updateStatus = (newStatus) => {
+  const updateStatus = async (newStatus) => {
+    // Map status names to their IDs in the database
+    const getStatusId = (statusName) => {
+      switch (statusName) {
+        case "Pending":
+          return 1;
+        case "Completed":
+          return 2;
+        case "Cancelled":
+          return 3;
+        default:
+          return 1;
+      }
+    };
+
     if (newStatus === "Cancelled") {
       if (window.confirm("Switching to Cancelled. Are you sure?")) {
+        // Update local UI state
         setOrderStatus(newStatus);
+        // Call API to update backend
+        updateOrderStatus(transaction.id, getStatusId(newStatus));
       }
     } else if (newStatus === "Completed") {
       if (
@@ -220,10 +251,16 @@ const TransactionModal = ({
           "Switching to Completed. This will deduct the quantity from the inventory. Are you sure?"
         )
       ) {
+        // Update local UI state
         setOrderStatus(newStatus);
+        // Call API to update backend
+        updateOrderStatus(transaction.id, getStatusId(newStatus));
       }
     } else {
+      // For Pending status
       setOrderStatus(newStatus);
+      // Call API to update backend
+      updateOrderStatus(transaction.id, getStatusId(newStatus));
     }
     setIsStatusDropdownOpen(false);
   };
@@ -236,6 +273,39 @@ const TransactionModal = ({
 
   const handleAddOrderDetails = () => {
     console.log("Add Order Details triggered");
+  };
+
+  // API call to update order status in the backend
+  const updateOrderStatus = async (transactionId, statusId) => {
+    try {
+      const response = await axios.put(
+        `http://127.0.0.1:8000/update-order-status/${transactionId}/`,
+        { status_id: statusId }
+      );
+
+      // Handle success
+      console.log("Order status updated:", response.data);
+
+      // Show success message for completed orders
+      if (statusId === 2) {
+        // Completed
+        alert(
+          "Order status updated to Completed. Ingredients have been deducted from inventory."
+        );
+      }
+
+      // Refresh order data
+      fetchOrderData();
+      return true;
+    } catch (error) {
+      // Handle error
+      console.error("Error updating order status:", error);
+      alert(
+        "Failed to update order status: " +
+          (error.response?.data?.error || error.message || "Unknown error")
+      );
+      return false;
+    }
   };
 
   return (
@@ -321,24 +391,24 @@ const TransactionModal = ({
                   {isStatusDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-40 rounded-md shadow-lg z-10">
                       <div className="bg-white rounded-md py-2">
-                        <button
-                          onClick={() => updateStatus("Pending")}
-                          className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
-                        >
-                          Pending
-                        </button>
-                        <button
-                          onClick={() => updateStatus("Completed")}
-                          className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
-                        >
-                          Completed
-                        </button>
-                        <button
-                          onClick={() => updateStatus("Cancelled")}
-                          className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
-                        >
-                          Cancelled
-                        </button>
+                        {(transaction.status === 1 ||
+                          transaction.status === null ||
+                          transaction.status === undefined) && (
+                          <>
+                            <button
+                              onClick={() => updateStatus("Completed")}
+                              className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                            >
+                              Completed
+                            </button>
+                            <button
+                              onClick={() => updateStatus("Cancelled")}
+                              className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                            >
+                              Cancelled
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   )}

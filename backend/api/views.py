@@ -667,7 +667,7 @@ def time_in(request):
       - passcode: the entered 6-digit passcode
     
     Workflow:
-      1. Verify the employee’s credentials.
+      1. Verify the employee's credentials.
       2. Ensure that the provided email matches the email associated with the employee.
       3. Query for existing attendance records for this employee (including joined attendance_time to check time_in).
       4. If a record for today exists and is marked as absent (status = 2), update it to present (status = 1).
@@ -802,7 +802,7 @@ def time_out(request):
 
     Steps:
       1. Validate employee credentials.
-      2. Ensure the provided email matches the employee’s registered email.
+      2. Ensure the provided email matches the employee's registered email.
       3. Authenticate the user using their passcode.
       4. Check if there is an existing time-in record for today.
       5. If time-in exists, update the corresponding attendance_time record with the time-out.
@@ -3073,3 +3073,265 @@ def edit_order(request, transaction_id):
     
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
+
+@api_view(['PUT'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def update_order_status(request, transaction_id):
+    debug_steps = []
+    
+    try:
+        debug_steps.append(f"Starting update process for transaction {transaction_id}")
+        
+        status_id = request.data.get('status_id')
+        if not status_id:
+            return Response({"error": "Status ID is required"}, status=400)
+
+        # Get current transaction
+        transaction_response = supabase_anon.table("transaction").select("*").eq("id", transaction_id).execute()
+        if not transaction_response.data:
+            return Response({"error": f"Transaction {transaction_id} not found"}, status=404)
+        
+        # Update transaction status
+        status_update = supabase_anon.table("transaction").update({
+            "order_status": status_id
+        }).eq("id", transaction_id).execute()
+
+        # Only process ingredient deduction if changing to Completed status
+        if int(status_id) == 2:  # Completed status
+            debug_steps.append("Status is Completed (2), will process ingredient deduction")
+            deducted_ingredients = []
+            
+            # Get order details
+            order_details_response = supabase_anon.table("order_details").select("*,menu_items(*)").eq("transaction_id", transaction_id).execute()
+            if not order_details_response.data:
+                debug_steps.append("No order details found")
+                return Response({
+                    "success": True,
+                    "message": "Order status updated to Completed but no order details found",
+                    "deducted_ingredients": [],
+                    "debug_steps": debug_steps
+                })
+            
+            debug_steps.append(f"Found {len(order_details_response.data)} order details")
+            
+            # Get all unit information upfront
+            all_units_response = supabase_anon.table("unit_of_measurement").select("*").execute()
+            debug_steps.append(f"Units response: {all_units_response.data}")
+            
+            units_by_id = {}
+            if all_units_response.data:
+                for unit in all_units_response.data:
+                    units_by_id[unit.get("id")] = unit
+                debug_steps.append(f"Loaded {len(units_by_id)} unit measurements: {units_by_id}")
+            else:
+                debug_steps.append("No unit measurements found")
+            
+            # Process each order detail
+            for order_idx, order_detail in enumerate(order_details_response.data):
+                menu_item = order_detail.get("menu_items")
+                if not menu_item:
+                    debug_steps.append(f"Order detail #{order_idx+1}: No menu item information")
+                    continue
+                
+                order_quantity = float(order_detail.get("quantity", 0))
+                menu_id = menu_item.get("id")
+                menu_name = menu_item.get("name", "Unknown")
+                
+                debug_steps.append(f"Order detail #{order_idx+1}: Menu item {menu_id} - {menu_name}, Quantity: {order_quantity}")
+                
+                # Get menu ingredients
+                menu_ingredients_response = supabase_anon.table("menu_ingredients").select("*").eq("menu_id", menu_id).execute()
+                
+                if not menu_ingredients_response.data:
+                    debug_steps.append(f"No ingredients found for menu {menu_id}")
+                    continue
+                
+                debug_steps.append(f"Found {len(menu_ingredients_response.data)} ingredients for menu {menu_id}")
+                
+                # Process each ingredient
+                for ing_idx, menu_ingredient in enumerate(menu_ingredients_response.data):
+                    ingredient_debug = []
+                    try:
+                        ingredient_debug.append(f"Menu ingredient data: {menu_ingredient}")
+                        
+                        inventory_id = menu_ingredient.get("inventory_id")
+                        if not inventory_id:
+                            ingredient_debug.append("No inventory ID found, skipping")
+                            continue
+                        
+                        recipe_quantity = float(menu_ingredient.get("quantity", 0))
+                        recipe_unit_id = menu_ingredient.get("unit_id")
+                        
+                        ingredient_debug.append(f"Recipe quantity: {recipe_quantity}, Unit ID: {recipe_unit_id}")
+                        
+                        # Get recipe unit details - Fix 1: Handle missing unit information
+                        recipe_unit_info = units_by_id.get(recipe_unit_id)
+                        recipe_unit = None
+                        unit_category = None
+                        
+                        if recipe_unit_info:
+                            # Try to get unit name from various possible fields
+                            recipe_unit = recipe_unit_info.get("symbol")
+                            unit_category = recipe_unit_info.get("unit_category")
+                            ingredient_debug.append(f"Recipe unit info: {recipe_unit_info}")
+                            ingredient_debug.append(f"Recipe unit: {recipe_unit}, Category: {unit_category}")
+                        else:
+                            ingredient_debug.append(f"Unit info not found for ID {recipe_unit_id}")
+                            
+                            # Fallback: hardcode units based on ID if needed
+                            if recipe_unit_id == 2:
+                                recipe_unit = "g"  # gram
+                                unit_category = 1  # Weight
+                                ingredient_debug.append(f"Using fallback for unit ID 2: {recipe_unit}, category: {unit_category}")
+                            elif recipe_unit_id == 4:
+                                recipe_unit = "ml"  # milliliter
+                                unit_category = 2  # Volume
+                                ingredient_debug.append(f"Using fallback for unit ID 4: {recipe_unit}, category: {unit_category}")
+                        
+                        # Get inventory details
+                        inventory_response = supabase_anon.table("inventory").select("*,item(*)").eq("id", inventory_id).execute()
+                        
+                        if not inventory_response.data:
+                            ingredient_debug.append(f"No inventory found for ID {inventory_id}")
+                            continue
+                        
+                        inventory_item = inventory_response.data[0]
+                        item_data = inventory_item.get("item", {})
+                        
+                        inventory_name = inventory_item.get("name") or item_data.get("name", "Unknown")
+                        inventory_quantity = float(inventory_item.get("quantity", 0))
+                        inventory_unit_id = inventory_item.get("unit_id")
+                        
+                        ingredient_debug.append(f"Inventory: {inventory_name}, Quantity: {inventory_quantity}, Unit ID: {inventory_unit_id}")
+                        
+                        # Fix 2: Handle missing inventory unit by using recipe unit
+                        inventory_unit = None
+                        if inventory_unit_id:
+                            inventory_unit_info = units_by_id.get(inventory_unit_id)
+                            if inventory_unit_info:
+                                inventory_unit = inventory_unit_info.get("unit") or inventory_unit_info.get("name") or inventory_unit_info.get("abbreviation")
+                                ingredient_debug.append(f"Inventory unit from database: {inventory_unit}")
+                        
+                        # If inventory_unit is still None, use recipe_unit as fallback
+                        if not inventory_unit:
+                            inventory_unit = recipe_unit
+                            ingredient_debug.append(f"Using recipe unit for inventory: {inventory_unit}")
+                        
+                        # If unit_category is None, use a reasonable default based on the unit
+                        if not unit_category:
+                            if inventory_unit in ["g", "kg", "mg"]:
+                                unit_category = 1  # Weight
+                            elif inventory_unit in ["l", "ml"]:
+                                unit_category = 2  # Volume
+                            else:
+                                unit_category = 3  # Count/Pieces
+                            ingredient_debug.append(f"Using default category {unit_category} based on unit {inventory_unit}")
+                        
+                        ingredient_debug.append(f"Final units - Recipe: {recipe_unit}, Inventory: {inventory_unit}, Category: {unit_category}")
+                        
+                        # Need both units to continue
+                        if not recipe_unit or not inventory_unit:
+                            ingredient_debug.append("Missing critical unit information, skipping")
+                            debug_steps.append(f"Ingredient #{ing_idx+1} ({inventory_name}): SKIPPED - " + " | ".join(ingredient_debug))
+                            continue
+                        
+                        # Convert units
+                        try:
+                            from api.utils.conversion import convert_value
+                            
+                            category_str = "Weight" if unit_category == 1 else "Volume" if unit_category == 2 else "Count"
+                            ingredient_debug.append(f"Category string: {category_str}")
+                            
+                            if unit_category == 3 or recipe_unit == inventory_unit:  # Count or same units
+                                converted_quantity = recipe_quantity
+                                ingredient_debug.append(f"No conversion needed: {recipe_quantity} {recipe_unit}")
+                            else:
+                                # Fix 3: Handle conversion errors gracefully
+                                try:
+                                    converted_quantity = convert_value(
+                                        recipe_quantity,
+                                        from_unit=recipe_unit,
+                                        to_unit=inventory_unit,
+                                        category=category_str
+                                    )
+                                    ingredient_debug.append(f"Converted {recipe_quantity} {recipe_unit} to {converted_quantity} {inventory_unit}")
+                                except Exception as convert_error:
+                                    # If conversion fails, use a direct approach as fallback
+                                    if category_str == "Weight" and recipe_unit == "g" and inventory_unit == "kg":
+                                        converted_quantity = recipe_quantity / 1000
+                                        ingredient_debug.append(f"Manual conversion g->kg: {recipe_quantity}/1000 = {converted_quantity}")
+                                    elif category_str == "Weight" and recipe_unit == "kg" and inventory_unit == "g":
+                                        converted_quantity = recipe_quantity * 1000
+                                        ingredient_debug.append(f"Manual conversion kg->g: {recipe_quantity}*1000 = {converted_quantity}")
+                                    elif category_str == "Volume" and recipe_unit == "ml" and inventory_unit == "l":
+                                        converted_quantity = recipe_quantity / 1000
+                                        ingredient_debug.append(f"Manual conversion ml->l: {recipe_quantity}/1000 = {converted_quantity}")
+                                    elif category_str == "Volume" and recipe_unit == "l" and inventory_unit == "ml":
+                                        converted_quantity = recipe_quantity * 1000
+                                        ingredient_debug.append(f"Manual conversion l->ml: {recipe_quantity}*1000 = {converted_quantity}")
+                                    else:
+                                        # If all else fails, use direct quantity and log the issue
+                                        converted_quantity = recipe_quantity
+                                        ingredient_debug.append(f"Conversion failed, using direct quantity: {recipe_quantity} (error: {str(convert_error)})")
+                            
+                            total_deduction = converted_quantity * order_quantity
+                            ingredient_debug.append(f"Total deduction: {total_deduction} {inventory_unit}")
+                            
+                            # Check if enough inventory
+                            if inventory_quantity < total_deduction:
+                                ingredient_debug.append(f"Not enough inventory: need {total_deduction}, have {inventory_quantity}")
+                                debug_steps.append(f"Ingredient #{ing_idx+1} ({inventory_name}): INSUFFICIENT - " + " | ".join(ingredient_debug))
+                                continue
+                            
+                            # Update inventory
+                            new_quantity = inventory_quantity - total_deduction
+                            update_result = supabase_anon.table("inventory").update({
+                                "quantity": new_quantity
+                            }).eq("id", inventory_id).execute()
+                            
+                            if update_result.data:
+                                deducted_ingredients.append({
+                                    "id": inventory_id,
+                                    "name": inventory_name,
+                                    "previous_quantity": inventory_quantity,
+                                    "deducted": total_deduction,
+                                    "new_quantity": new_quantity,
+                                    "unit": inventory_unit,
+                                    "menu_item": menu_name
+                                })
+                                ingredient_debug.append(f"Inventory updated successfully: {new_quantity} {inventory_unit}")
+                                debug_steps.append(f"Ingredient #{ing_idx+1} ({inventory_name}): SUCCESS - " + " | ".join(ingredient_debug))
+                            else:
+                                ingredient_debug.append("Database update failed")
+                                debug_steps.append(f"Ingredient #{ing_idx+1} ({inventory_name if inventory_name else 'Unknown'}): UPDATE FAILED - " + " | ".join(ingredient_debug))
+                        
+                        except Exception as e:
+                            ingredient_debug.append(f"Error during conversion: {str(e)}")
+                            debug_steps.append(f"Ingredient #{ing_idx+1} ({inventory_name if inventory_name else 'Unknown'}): ERROR - " + " | ".join(ingredient_debug))
+                    
+                    except Exception as e:
+                        debug_steps.append(f"Error processing ingredient #{ing_idx+1}: {str(e)}")
+            
+            debug_steps.append(f"Processing complete. Deducted ingredients: {len(deducted_ingredients)}")
+            
+            return Response({
+                "success": True,
+                "message": "Order status updated to Completed and ingredients deducted from inventory" if deducted_ingredients else "Order status updated to Completed but no ingredients deducted",
+                "deducted_ingredients": deducted_ingredients,
+                "debug_steps": debug_steps
+            })
+        
+        # For other status changes
+        return Response({
+            "success": True,
+            "message": f"Order status updated to {'Cancelled' if int(status_id) == 3 else 'Pending'}"
+        })
+
+    except Exception as e:
+        debug_steps.append(f"ERROR: {str(e)}")
+        return Response({
+            "error": str(e), 
+            "debug_steps": debug_steps
+        }, status=500)
