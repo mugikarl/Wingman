@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Table from "../../components/tables/Table";
 import { useNavigate } from "react-router-dom";
 import { FaAngleUp, FaAngleDown } from "react-icons/fa6";
@@ -40,7 +40,12 @@ const TransactionModal = ({
   // Order status and its dropdown
   const [orderStatus, setOrderStatus] = useState(() => {
     // Get initial status from transaction
-    const statusId = transaction.status;
+    // First check order_status.name for status, then fall back to numeric status
+    if (transaction.order_status?.name) {
+      return transaction.order_status.name;
+    }
+
+    const statusId = Number(transaction.status);
     switch (statusId) {
       case 1:
         return "Pending";
@@ -49,6 +54,7 @@ const TransactionModal = ({
       case 3:
         return "Cancelled";
       default:
+        console.log("Unknown status ID:", transaction.status);
         return "Pending"; // Default to Pending if status is missing or unknown
     }
   });
@@ -59,6 +65,36 @@ const TransactionModal = ({
 
   // New state to control the editing modal visibility.
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Add this effect to update orderStatus when transaction changes
+  useEffect(() => {
+    if (transaction) {
+      if (transaction.order_status?.name) {
+        setOrderStatus(transaction.order_status.name);
+      } else {
+        const statusId = Number(transaction.status);
+        switch (statusId) {
+          case 1:
+            setOrderStatus("Pending");
+            break;
+          case 2:
+            setOrderStatus("Completed");
+            break;
+          case 3:
+            setOrderStatus("Cancelled");
+            break;
+          default:
+            setOrderStatus("Pending");
+        }
+      }
+      // For debugging
+      console.log("Transaction data:", transaction);
+      console.log(
+        "Status from transaction:",
+        transaction.order_status?.name || transaction.status
+      );
+    }
+  }, [transaction]);
 
   const toggleAccordion = (groupKey) => {
     setOpenAccordion((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
@@ -204,8 +240,14 @@ const TransactionModal = ({
   const paymentAmount = transaction.payment_amount || 0;
   const change = paymentAmount - actualTotal;
 
+  // Check if order is non-editable (Completed or Cancelled)
+  const isOrderNonEditable =
+    orderStatus.toLowerCase() === "completed" ||
+    orderStatus.toLowerCase() === "cancelled";
+
   // When an Update button is clicked:
   const handleUpdateClick = () => {
+    if (isOrderNonEditable) return;
     setIsEditModalOpen(true);
     // Do not call onClose() here so that OrderEditModal (rendered below) remains in the tree.
   };
@@ -326,6 +368,13 @@ const TransactionModal = ({
           </button>
         </div>
 
+        {/* Add an overlay for non-editable orders */}
+        {isOrderNonEditable && (
+          <div className="absolute inset-0 bg-gray-200 bg-opacity-50 z-10 pointer-events-none">
+            {/* This overlay makes the modal appear grayed out */}
+          </div>
+        )}
+
         {/* Left Side: Transaction Details */}
         <div
           className={
@@ -363,12 +412,21 @@ const TransactionModal = ({
                 </p>
                 <div className="relative inline-block text-left">
                   <button
-                    onClick={() =>
-                      setIsStatusDropdownOpen(!isStatusDropdownOpen)
-                    }
+                    onClick={() => {
+                      // Only toggle dropdown if order is not completed or cancelled
+                      if (!isOrderNonEditable) {
+                        setIsStatusDropdownOpen(!isStatusDropdownOpen);
+                      }
+                    }}
+                    // Disable hover effects and pointer events for non-editable orders
                     className={`flex items-center ${getOrderStatusClass(
                       orderStatus
-                    )} rounded-md shadow-md hover:opacity-90 active:scale-95 transition-transform duration-150 w-40 overflow-hidden`}
+                    )} rounded-md shadow-md ${
+                      !isOrderNonEditable
+                        ? "hover:opacity-90 active:scale-95"
+                        : "opacity-90 cursor-default"
+                    } transition-transform duration-150 w-40 overflow-hidden`}
+                    disabled={isOrderNonEditable}
                   >
                     <div
                       className={`flex items-center justify-center ${getStatusLeftBg(
@@ -381,15 +439,17 @@ const TransactionModal = ({
                       {orderStatus}
                     </span>
                     <div className="flex items-center justify-center p-2">
-                      {isStatusDropdownOpen ? (
-                        <FaChevronUp className="w-4 h-4 text-white" />
-                      ) : (
-                        <FaChevronDown className="w-4 h-4 text-white" />
-                      )}
+                      {/* Only show dropdown icon if status is not Completed/Cancelled */}
+                      {!isOrderNonEditable &&
+                        (isStatusDropdownOpen ? (
+                          <FaChevronUp className="w-4 h-4 text-white" />
+                        ) : (
+                          <FaChevronDown className="w-4 h-4 text-white" />
+                        ))}
                     </div>
                   </button>
-                  {isStatusDropdownOpen && (
-                    <div className="absolute right-0 mt-2 w-40 rounded-md shadow-lg z-10">
+                  {isStatusDropdownOpen && !isOrderNonEditable && (
+                    <div className="absolute right-0 mt-2 w-40 rounded-md shadow-lg z-20">
                       <div className="bg-white rounded-md py-2">
                         {(transaction.status === 1 ||
                           transaction.status === null ||
@@ -449,12 +509,14 @@ const TransactionModal = ({
                 </div>
                 {unliOverallOpen && (
                   <div className="w-full max-h-[300px] overflow-y-auto">
-                    <button
-                      onClick={handleAdd}
-                      className="w-full mb-3 px-3 py-2 bg-[#E88504] text-white rounded hover:bg-[#E88504]/70"
-                    >
-                      Add a new Unli Order
-                    </button>
+                    {!isOrderNonEditable && (
+                      <button
+                        onClick={handleAdd}
+                        className="w-full mb-3 px-3 py-2 bg-[#E88504] text-white rounded hover:bg-[#E88504]/70"
+                      >
+                        Add a new Unli Order
+                      </button>
+                    )}
                     {Object.keys(groupedUnliWingsOrders).map((groupKey) => {
                       const groupOrders = groupedUnliWingsOrders[groupKey];
                       const baseAmount =
@@ -487,12 +549,14 @@ const TransactionModal = ({
                                     detail?.quantity || 0,
                                   ])}
                                 />
-                                <button
-                                  onClick={handleUpdateClick}
-                                  className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                                >
-                                  Update
-                                </button>
+                                {!isOrderNonEditable && (
+                                  <button
+                                    onClick={handleUpdateClick}
+                                    className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                                  >
+                                    Update
+                                  </button>
+                                )}
                               </div>
                             </div>
                           )}
@@ -543,12 +607,14 @@ const TransactionModal = ({
                           : [["None", "-", "-", "-", "-"]]
                       }
                     />
-                    <button
-                      onClick={handleUpdateClick}
-                      className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                    >
-                      Update
-                    </button>
+                    {!isOrderNonEditable && (
+                      <button
+                        onClick={handleUpdateClick}
+                        className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                      >
+                        Update
+                      </button>
+                    )}
                   </div>
                 )}
               </>
@@ -572,12 +638,14 @@ const TransactionModal = ({
                         : [["None", "-", "-"]]
                     }
                   />
-                  <button
-                    onClick={handleUpdateClick}
-                    className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                  >
-                    Update
-                  </button>
+                  {!isOrderNonEditable && (
+                    <button
+                      onClick={handleUpdateClick}
+                      className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                    >
+                      Update
+                    </button>
+                  )}
                 </div>
               </>
             ) : null}
