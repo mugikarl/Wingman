@@ -26,6 +26,11 @@ const Menu = () => {
   const [menuTypes, setMenuTypes] = useState([]);
   const [units, setUnits] = useState([]);
 
+  // Add state for tracking availability update status
+  const [isUpdatingAvailability, setIsUpdatingAvailability] = useState(false);
+  const [availabilityMessage, setAvailabilityMessage] = useState("");
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+
   const closeMenuCategoryModal = () => setIsMenuCategoryModalOpen(false);
 
   // Fetch menus when the component mounts
@@ -46,14 +51,82 @@ const Menu = () => {
       setUnits(response.data.units || []);
       setInventory(response.data.inventory || []);
       setMenuItems(response.data.menu_items || []);
+
+      // Mark data as fully loaded only after all state is updated
+      setIsDataLoaded(true);
     } catch (error) {
       console.error("Error fetching menus:", error);
     }
   };
 
+  // Function to update menu availability
+  const updateMenuAvailability = async () => {
+    // Skip if data isn't loaded yet
+    if (!isDataLoaded) return;
+
+    try {
+      setIsUpdatingAvailability(true);
+      setAvailabilityMessage("Updating menu availability...");
+
+      const token = localStorage.getItem("access_token");
+      const response = await axios.post(
+        "http://127.0.0.1:8000/update-menu-availability/",
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // Update UI with results
+      const updatedCount = response.data.updated_items?.length || 0;
+      setAvailabilityMessage(
+        updatedCount > 0
+          ? `Updated availability for ${updatedCount} menu items`
+          : "All menu items are up to date"
+      );
+
+      // Refresh menu items
+      fetchMenus();
+    } catch (error) {
+      console.error("Error updating menu availability:", error);
+      setAvailabilityMessage("Failed to update menu availability");
+    } finally {
+      setIsUpdatingAvailability(false);
+
+      // Auto-hide message after 5 seconds
+      setTimeout(() => {
+        setAvailabilityMessage("");
+      }, 5000);
+    }
+  };
+
+  // Separate effects for initial data fetch and availability updates
   useEffect(() => {
     fetchMenus();
   }, []);
+
+  // Set up availability checking only after data is loaded
+  useEffect(() => {
+    let intervalId = null;
+
+    // Only set up the interval if data is loaded
+    if (isDataLoaded) {
+      // Run once initially after data is loaded
+      updateMenuAvailability();
+
+      // Set up interval for subsequent checks every 2 minutes
+      intervalId = setInterval(updateMenuAvailability, 2 * 60 * 1000);
+    }
+
+    // Clean up function
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [isDataLoaded]); // Only re-run when isDataLoaded changes
 
   // Set default filter to "In Store" once menuTypes are loaded
   useEffect(() => {
@@ -156,8 +229,37 @@ const Menu = () => {
             </div>
             <span className="flex-1 text-left pl-3">New Category</span>
           </button>
+
+          {/* Add manual refresh button */}
+          <button
+            onClick={updateMenuAvailability}
+            disabled={isUpdatingAvailability}
+            className={`flex items-center bg-gradient-to-r from-[#3366cc] to-[#4477dd] text-white rounded-md shadow-md ${
+              isUpdatingAvailability
+                ? "opacity-70"
+                : "hover:from-[#2255bb] hover:to-[#3366cc]"
+            } transition-colors duration-200 w-48 overflow-hidden`}
+          >
+            <div className="flex items-center justify-center bg-[#3366cc] p-3">
+              <img
+                src="/images/refresh.png"
+                alt="Update Availability"
+                className="w-6 h-6"
+              />
+            </div>
+            <span className="flex-1 text-left pl-3">
+              {isUpdatingAvailability ? "Updating..." : "Update Availability"}
+            </span>
+          </button>
         </div>
       </div>
+
+      {/* Status message */}
+      {availabilityMessage && (
+        <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-2 mb-4">
+          <p>{availabilityMessage}</p>
+        </div>
+      )}
 
       {/* Filter Dropdown Button */}
       <div className="relative inline-block text-left mb-4">

@@ -25,6 +25,14 @@ const Order = () => {
   const [inStoreCategories, setInStoreCategories] = useState([]);
   const [employees, setEmployees] = useState([]); // New state for employees
 
+  // Add new state variables for availability tracking
+  const [isUpdatingAvailability, setIsUpdatingAvailability] = useState(false);
+  const [availabilityMessage, setAvailabilityMessage] = useState("");
+  const [isInitialDataFetched, setIsInitialDataFetched] = useState(false);
+
+  // Add new state variables for inventory tracking
+  const [lowInventoryWarnings, setLowInventoryWarnings] = useState({});
+
   const fetchMenuOrders = async () => {
     try {
       const response = await axios.get(
@@ -37,15 +45,79 @@ const Order = () => {
       setDiscounts(response.data.discounts || []);
       setPaymentMethods(response.data.paymentMethods || []);
       setInStoreCategories(response.data.instore_categories || []);
-      setEmployees(response.data.employees || []); // Fetch employees from backend
+      setEmployees(response.data.employees || []);
+      setIsInitialDataFetched(true); // Mark initial data fetch as complete
     } catch (error) {
       console.log("Error fetching menu data: ", error);
     }
   };
 
+  // Function to update menu availability
+  const updateMenuAvailability = async () => {
+    try {
+      setIsUpdatingAvailability(true);
+      setAvailabilityMessage("Checking menu availability...");
+
+      const token = localStorage.getItem("access_token");
+      const response = await axios.post(
+        "http://127.0.0.1:8000/update-menu-availability/",
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // Update UI with results
+      const updatedCount = response.data.updated_items.length;
+      if (updatedCount > 0) {
+        setAvailabilityMessage(
+          `Updated availability for ${updatedCount} menu items`
+        );
+        // Refresh menu items if any updates occurred
+        fetchMenuOrders();
+      } else {
+        setAvailabilityMessage("All menu items are up to date");
+      }
+    } catch (error) {
+      console.error("Error updating menu availability:", error);
+      setAvailabilityMessage("Failed to update menu availability");
+    } finally {
+      setIsUpdatingAvailability(false);
+
+      // Auto-hide message after 3 seconds
+      setTimeout(() => {
+        setAvailabilityMessage("");
+      }, 3000);
+    }
+  };
+
+  // Effect for initial data fetch
   useEffect(() => {
     fetchMenuOrders();
   }, []);
+
+  // Separate effect for menu availability updates
+  useEffect(() => {
+    let intervalId;
+
+    // Only start the interval after initial data is fetched
+    if (isInitialDataFetched) {
+      // Set up interval to check availability every 2 minutes
+      intervalId = setInterval(updateMenuAvailability, 2 * 60 * 1000);
+
+      // Run initial availability check
+      updateMenuAvailability();
+    }
+
+    // Clean up interval on component unmount
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [isInitialDataFetched]); // Depend on isInitialDataFetched
 
   // Set default selected menu type to "In‑Store" immediately
   useEffect(() => {
@@ -129,112 +201,199 @@ const Order = () => {
     }
   };
 
-  // Add item or increment quantity.
-  // For Unli orders, assign a default category "Unli Wings" and include the currentUnliOrderNumber.
+  // Modify the handleAddItem function to check inventory levels
   const handleAddItem = (item) => {
     if (item.status_id === 2) {
       return alert("This item is unavailable!");
     }
 
-    if (selectedMenuType?.id === 1) {
-      let defaultCategory, defaultDiscount;
-      if (activeSection === "unliWings") {
-        // For Unli mode, only allow items in allowed category IDs: 1 (Wings), 4 (Sides), 5 (Drinks)
-        if (
-          item.category_id === 1 ||
-          item.category_id === 5 ||
-          item.category_id === 4
-        ) {
-          if (
-            item.category_id === 4 &&
-            !item.name.toLowerCase().includes("rice")
-          ) {
-            return alert(
-              "Only Rice items can be added for Sides in the Unli section."
+    // Check inventory levels before adding/incrementing item
+    const checkInventoryLevels = async (
+      menuId,
+      currentQuantity = 0,
+      additionalQuantity = 1
+    ) => {
+      try {
+        const response = await axios.get(
+          `http://127.0.0.1:8000/check-menu-inventory/${menuId}?quantity=${
+            currentQuantity + additionalQuantity
+          }`
+        );
+
+        if (response.data.has_sufficient_inventory === false) {
+          // If inventory is insufficient, show warning but still allow adding
+          const warning = response.data.warnings || [];
+
+          if (warning.length > 0) {
+            // Store warnings in state for display
+            setLowInventoryWarnings((prev) => ({
+              ...prev,
+              [menuId]: warning,
+            }));
+
+            // Create warning message
+            const warningItems = warning
+              .map(
+                (w) =>
+                  `${w.inventory_name}: ${w.available_quantity} ${w.unit} available, ${w.required_quantity} ${w.unit} needed`
+              )
+              .join("\n");
+
+            // Show alert but allow adding
+            const proceed = window.confirm(
+              `Warning: Adding this item may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`
+            );
+
+            if (!proceed) {
+              return false;
+            }
+          }
+        }
+        return true;
+      } catch (error) {
+        console.error("Error checking inventory:", error);
+        return true; // Still allow adding if check fails
+      }
+    };
+
+    // Rest of function wrapped in async IIFE to use async/await
+    (async () => {
+      let existingQuantity = 0;
+
+      // Find if item already exists in order and get its quantity
+      if (selectedMenuType?.id === 1) {
+        let defaultCategory =
+          activeSection === "unliWings" ? "Unli Wings" : "Ala Carte";
+        const existingItem = selectedItems.find((i) => {
+          if (activeSection === "unliWings") {
+            return (
+              i.id === item.id &&
+              i.instoreCategory === defaultCategory &&
+              i.orderNumber === currentUnliOrderNumber
             );
           }
-          defaultCategory = "Unli Wings";
-          defaultDiscount = 0;
-        } else {
-          return alert(
-            "Only Wings, Drinks, or Sides items can be added to the Unli section."
-          );
+          return i.id === item.id && i.instoreCategory === defaultCategory;
+        });
+
+        if (existingItem) {
+          existingQuantity = existingItem.quantity;
         }
       } else {
-        // For Ala Carte mode.
-        defaultCategory = "Ala Carte";
-        defaultDiscount = 0;
+        const existingItem = selectedItems.find((i) => i.id === item.id);
+        if (existingItem) {
+          existingQuantity = existingItem.quantity;
+        }
       }
 
-      // Merge if same product, same instoreCategory, same discount, and for unli items, same orderNumber.
-      const existingItem = selectedItems.find((i) => {
+      // Check inventory before proceeding
+      const canProceed = await checkInventoryLevels(
+        item.id,
+        existingQuantity,
+        1
+      );
+      if (!canProceed) return;
+
+      // Original handleAddItem logic
+      if (selectedMenuType?.id === 1) {
+        let defaultCategory, defaultDiscount;
         if (activeSection === "unliWings") {
+          // For Unli mode, only allow items in allowed category IDs: 1 (Wings), 4 (Sides), 5 (Drinks)
+          if (
+            item.category_id === 1 ||
+            item.category_id === 5 ||
+            item.category_id === 4
+          ) {
+            if (
+              item.category_id === 4 &&
+              !item.name.toLowerCase().includes("rice")
+            ) {
+              return alert(
+                "Only Rice items can be added for Sides in the Unli section."
+              );
+            }
+            defaultCategory = "Unli Wings";
+            defaultDiscount = 0;
+          } else {
+            return alert(
+              "Only Wings, Drinks, or Sides items can be added to the Unli section."
+            );
+          }
+        } else {
+          // For Ala Carte mode.
+          defaultCategory = "Ala Carte";
+          defaultDiscount = 0;
+        }
+
+        // Merge if same product, same instoreCategory, same discount, and for unli items, same orderNumber.
+        const existingItem = selectedItems.find((i) => {
+          if (activeSection === "unliWings") {
+            return (
+              i.id === item.id &&
+              i.instoreCategory === defaultCategory &&
+              i.discount === defaultDiscount &&
+              i.orderNumber === currentUnliOrderNumber
+            );
+          }
           return (
             i.id === item.id &&
             i.instoreCategory === defaultCategory &&
-            i.discount === defaultDiscount &&
-            i.orderNumber === currentUnliOrderNumber
+            i.discount === defaultDiscount
           );
-        }
-        return (
-          i.id === item.id &&
-          i.instoreCategory === defaultCategory &&
-          i.discount === defaultDiscount
-        );
-      });
+        });
 
-      if (existingItem) {
-        setSelectedItems(
-          selectedItems.map((i) => {
-            if (activeSection === "unliWings") {
+        if (existingItem) {
+          setSelectedItems(
+            selectedItems.map((i) => {
+              if (activeSection === "unliWings") {
+                return i.id === item.id &&
+                  i.instoreCategory === defaultCategory &&
+                  i.discount === defaultDiscount &&
+                  i.orderNumber === currentUnliOrderNumber
+                  ? { ...i, quantity: i.quantity + 1 }
+                  : i;
+              }
               return i.id === item.id &&
                 i.instoreCategory === defaultCategory &&
-                i.discount === defaultDiscount &&
-                i.orderNumber === currentUnliOrderNumber
+                i.discount === defaultDiscount
                 ? { ...i, quantity: i.quantity + 1 }
                 : i;
-            }
-            return i.id === item.id &&
-              i.instoreCategory === defaultCategory &&
-              i.discount === defaultDiscount
-              ? { ...i, quantity: i.quantity + 1 }
-              : i;
-          })
-        );
+            })
+          );
+        } else {
+          const newItem =
+            activeSection === "unliWings"
+              ? {
+                  ...item,
+                  quantity: 1,
+                  instoreCategory: defaultCategory,
+                  discount: defaultDiscount,
+                  orderNumber: currentUnliOrderNumber,
+                }
+              : {
+                  ...item,
+                  quantity: 1,
+                  instoreCategory: defaultCategory,
+                  discount: defaultDiscount,
+                };
+          setSelectedItems([...selectedItems, newItem]);
+        }
       } else {
-        const newItem =
-          activeSection === "unliWings"
-            ? {
-                ...item,
-                quantity: 1,
-                instoreCategory: defaultCategory,
-                discount: defaultDiscount,
-                orderNumber: currentUnliOrderNumber,
-              }
-            : {
-                ...item,
-                quantity: 1,
-                instoreCategory: defaultCategory,
-                discount: defaultDiscount,
-              };
-        setSelectedItems([...selectedItems, newItem]);
+        // For non‑In‑Store types, use the existing behavior.
+        const existingItem = selectedItems.find((i) => i.id === item.id);
+        if (existingItem) {
+          setSelectedItems(
+            selectedItems.map((i) =>
+              i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+            )
+          );
+        } else {
+          setSelectedItems([
+            ...selectedItems,
+            { ...item, quantity: 1, instoreCategory: "default", discount: 0 },
+          ]);
+        }
       }
-    } else {
-      // For non‑In‑Store types, use the existing behavior.
-      const existingItem = selectedItems.find((i) => i.id === item.id);
-      if (existingItem) {
-        setSelectedItems(
-          selectedItems.map((i) =>
-            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-          )
-        );
-      } else {
-        setSelectedItems([
-          ...selectedItems,
-          { ...item, quantity: 1, instoreCategory: "default", discount: 0 },
-        ]);
-      }
-    }
+    })();
   };
 
   // Prevent adding a new Unli order if the current Unli order is empty.
@@ -267,39 +426,146 @@ const Order = () => {
     );
   };
 
-  const handleQuantityChange = (id, groupIdentifier, discount, newQuantity) => {
-    if (newQuantity <= 0) {
-      setSelectedItems((prevItems) =>
-        prevItems.filter((item) => {
-          if (item.id !== id) return true;
-          if (item.instoreCategory === "Unli Wings") {
+  // Modify handleQuantityChange to also check inventory
+  const handleQuantityChange = async (
+    id,
+    groupIdentifier,
+    discount,
+    newQuantity
+  ) => {
+    // If reducing quantity, no need to check inventory
+    const currentItem = selectedItems.find((item) => {
+      if (item.id !== id) return false;
+      if (item.instoreCategory === "Unli Wings") {
+        return (
+          item.orderNumber === groupIdentifier &&
+          Number(item.discount || 0) === Number(discount)
+        );
+      }
+      return (
+        item.instoreCategory === groupIdentifier &&
+        Number(item.discount || 0) === Number(discount)
+      );
+    });
+
+    const currentQuantity = currentItem?.quantity || 0;
+
+    // If decreasing quantity or removing item, no need to check inventory
+    if (newQuantity <= 0 || newQuantity < currentQuantity) {
+      if (newQuantity <= 0) {
+        setSelectedItems((prevItems) =>
+          prevItems.filter((item) => {
+            if (item.id !== id) return true;
+            if (item.instoreCategory === "Unli Wings") {
+              return !(
+                item.orderNumber === groupIdentifier &&
+                Number(item.discount || 0) === Number(discount)
+              );
+            }
             return !(
-              item.orderNumber === groupIdentifier &&
+              item.instoreCategory === groupIdentifier &&
               Number(item.discount || 0) === Number(discount)
             );
-          }
-          return !(
-            item.instoreCategory === groupIdentifier &&
+          })
+        );
+        return;
+      }
+
+      // Just decrease quantity
+      setSelectedItems((prevItems) =>
+        prevItems.map((item) => {
+          if (
+            item.id === id &&
             Number(item.discount || 0) === Number(discount)
-          );
+          ) {
+            if (item.instoreCategory === "Unli Wings") {
+              if (item.orderNumber === groupIdentifier) {
+                return { ...item, quantity: newQuantity };
+              }
+            } else if (item.instoreCategory === groupIdentifier) {
+              return { ...item, quantity: newQuantity };
+            }
+          }
+          return item;
         })
       );
       return;
     }
-    setSelectedItems((prevItems) =>
-      prevItems.map((item) => {
-        if (item.id === id && Number(item.discount || 0) === Number(discount)) {
-          if (item.instoreCategory === "Unli Wings") {
-            if (item.orderNumber === groupIdentifier) {
-              return { ...item, quantity: newQuantity };
-            }
-          } else if (item.instoreCategory === groupIdentifier) {
-            return { ...item, quantity: newQuantity };
+
+    // Check inventory for increasing quantity
+    try {
+      const response = await axios.get(
+        `http://127.0.0.1:8000/check-menu-inventory/${id}?quantity=${newQuantity}`
+      );
+
+      if (response.data.has_sufficient_inventory === false) {
+        const warning = response.data.warnings || [];
+
+        if (warning.length > 0) {
+          // Store warnings in state
+          setLowInventoryWarnings((prev) => ({
+            ...prev,
+            [id]: warning,
+          }));
+
+          // Create warning message
+          const warningItems = warning
+            .map(
+              (w) =>
+                `${w.inventory_name}: ${w.available_quantity} ${w.unit} available, ${w.required_quantity} ${w.unit} needed`
+            )
+            .join("\n");
+
+          // Show alert but allow changing
+          const proceed = window.confirm(
+            `Warning: This quantity may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`
+          );
+
+          if (!proceed) {
+            return;
           }
         }
-        return item;
-      })
-    );
+      }
+
+      // Update the quantity if inventory check passed or user confirmed
+      setSelectedItems((prevItems) =>
+        prevItems.map((item) => {
+          if (
+            item.id === id &&
+            Number(item.discount || 0) === Number(discount)
+          ) {
+            if (item.instoreCategory === "Unli Wings") {
+              if (item.orderNumber === groupIdentifier) {
+                return { ...item, quantity: newQuantity };
+              }
+            } else if (item.instoreCategory === groupIdentifier) {
+              return { ...item, quantity: newQuantity };
+            }
+          }
+          return item;
+        })
+      );
+    } catch (error) {
+      console.error("Error checking inventory:", error);
+      // Still allow quantity change if check fails
+      setSelectedItems((prevItems) =>
+        prevItems.map((item) => {
+          if (
+            item.id === id &&
+            Number(item.discount || 0) === Number(discount)
+          ) {
+            if (item.instoreCategory === "Unli Wings") {
+              if (item.orderNumber === groupIdentifier) {
+                return { ...item, quantity: newQuantity };
+              }
+            } else if (item.instoreCategory === groupIdentifier) {
+              return { ...item, quantity: newQuantity };
+            }
+          }
+          return item;
+        })
+      );
+    }
   };
 
   // Remove item from the order
@@ -382,6 +648,13 @@ const Order = () => {
         {/* Fixed Header: Search Bar and Filters */}
         <div>
           <div className="flex flex-col space-y-4 mb-4">
+            {/* Add availability message display */}
+            {availabilityMessage && (
+              <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-2">
+                <p>{availabilityMessage}</p>
+              </div>
+            )}
+
             {/* Search Bar */}
             <div className="w-full">
               <div className="flex justify-between items-center w-full space-x-4">
