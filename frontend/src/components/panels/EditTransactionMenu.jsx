@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
+import axios from "axios";
 
 const EditTransactionMenu = ({
   menuCategories,
@@ -10,6 +11,60 @@ const EditTransactionMenu = ({
   filteredMenuItems,
   onItemSelect, // callback when a menu item is selected
 }) => {
+  const [inventoryWarnings, setInventoryWarnings] = useState({});
+
+  // New function to check inventory before adding item
+  const handleItemSelect = async (item) => {
+    try {
+      // First check if this item is already unavailable
+      if (item.status_id === 2) {
+        alert("This item is currently unavailable!");
+        return;
+      }
+
+      // Check inventory levels via API
+      const response = await axios.get(
+        `http://127.0.0.1:8000/check-menu-inventory/${item.id}?quantity=1`
+      );
+
+      if (response.data.has_sufficient_inventory === false) {
+        const warnings = response.data.warnings || [];
+
+        if (warnings.length > 0) {
+          // Format warning message
+          const warningItems = warnings
+            .map(
+              (w) =>
+                `${w.inventory_name}: ${w.available_quantity} ${w.unit} available, ${w.required_quantity} ${w.unit} needed`
+            )
+            .join("\n");
+
+          // Show warning but allow adding
+          const proceed = window.confirm(
+            `Warning: Adding this item may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`
+          );
+
+          if (!proceed) {
+            return;
+          }
+
+          // Store warning for this item
+          setInventoryWarnings((prev) => ({
+            ...prev,
+            [item.id]: warnings,
+          }));
+        }
+      }
+
+      // If we get here, either inventory is sufficient or user confirmed to proceed
+      onItemSelect(item);
+    } catch (error) {
+      console.error("Error checking inventory:", error);
+      // Still allow adding if check fails
+      onItemSelect(item);
+    }
+  };
+
   return (
     <div className="w-400 px-4 flex flex-col h-full">
       <h3 className="font-bold text-xl mb-4">Menu</h3>
@@ -73,8 +128,12 @@ const EditTransactionMenu = ({
           {filteredMenuItems.map((item) => (
             <div
               key={item.id}
-              className="flex items-center border rounded cursor-pointer hover:shadow-md w-full"
-              onClick={() => onItemSelect(item)}
+              className={`flex items-center border rounded cursor-pointer hover:shadow-md w-full ${
+                item.status_id === 2 ? "opacity-50" : ""
+              } ${
+                inventoryWarnings[item.id] ? "border-orange-500 border-2" : ""
+              }`}
+              onClick={() => handleItemSelect(item)}
             >
               {/* Image occupies left side with no extra padding */}
               <img
@@ -89,6 +148,9 @@ const EditTransactionMenu = ({
                     ? item.name.substring(0, 15) + "..."
                     : item.name}
                 </p>
+                {inventoryWarnings[item.id] && (
+                  <p className="text-xs text-orange-500">Low inventory</p>
+                )}
               </div>
               <p className="font-semibold pr-2">₱{item.price.toFixed(2)}</p>
             </div>

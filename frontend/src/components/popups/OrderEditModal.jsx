@@ -35,6 +35,11 @@ const OrderEditModal = ({
   // NEW: state for tracking which Unli Wings group is active for update.
   const [activeUnliWingsGroup, setActiveUnliWingsGroup] = useState(null);
 
+  // Add state for tracking availability update
+  const [isUpdatingAvailability, setIsUpdatingAvailability] = useState(false);
+  const [availabilityMessage, setAvailabilityMessage] = useState("");
+  const [isInitialDataFetched, setIsInitialDataFetched] = useState(false);
+
   // Filter menu items based on the current menu type and selected category.
   const filteredMenuItems = menuItems.filter((item) => {
     const matchesType = menuTypeData ? item.type_id === menuTypeData.id : true;
@@ -297,10 +302,70 @@ const OrderEditModal = ({
       ? newSubtotal * deductionPercentage
       : 0;
 
+  // Function to update menu availability
+  const updateMenuAvailability = async () => {
+    try {
+      setIsUpdatingAvailability(true);
+      setAvailabilityMessage("Checking menu availability...");
+
+      const token = localStorage.getItem("access_token");
+      const response = await axios.post(
+        "http://127.0.0.1:8000/update-menu-availability/",
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // Update UI with results
+      const updatedCount = response.data.updated_items?.length || 0;
+      if (updatedCount > 0) {
+        setAvailabilityMessage(
+          `Updated availability for ${updatedCount} menu items`
+        );
+        // Refresh menu items
+        fetchOrderData();
+      } else {
+        setAvailabilityMessage("All menu items are up to date");
+      }
+    } catch (error) {
+      console.error("Error updating menu availability:", error);
+      setAvailabilityMessage("Failed to update menu availability");
+    } finally {
+      setIsUpdatingAvailability(false);
+
+      // Auto-hide message after 3 seconds
+      setTimeout(() => {
+        setAvailabilityMessage("");
+      }, 3000);
+    }
+  };
+
+  // Modify useEffect to handle initial data loading and menu availability update
+  useEffect(() => {
+    setIsInitialDataFetched(true);
+  }, []);
+
+  // Update availability when data is loaded
+  useEffect(() => {
+    if (isInitialDataFetched) {
+      updateMenuAvailability();
+    }
+  }, [isInitialDataFetched]);
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
       {/* Modal Container */}
       <div className="bg-white rounded-lg shadow-lg p-6 w-[800px] h-[650px] flex">
+        {/* Show availability message if present */}
+        {availabilityMessage && (
+          <div className="absolute top-0 left-0 right-0 bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-2 z-10">
+            <p>{availabilityMessage}</p>
+          </div>
+        )}
+
         {/* Left Panel: Menu */}
         <div className="w-1/2">
           <EditTransactionMenu
@@ -329,7 +394,6 @@ const OrderEditModal = ({
             onDiscountChange={handleDiscountChange}
             setOpenDropdownId={() => {}}
             deductionPercentage={deductionPercentage}
-            // Pass down the active Unli Wings group and its setter
             activeUnliWingsGroup={activeUnliWingsGroup}
             setActiveUnliWingsGroup={setActiveUnliWingsGroup}
             alaCarteOrders={localOrderDetails.filter(

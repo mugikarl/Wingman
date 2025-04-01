@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { getItemKey } from "../cards/OrderProductCard";
 import EditableProductCard from "../cards/EditableProductCard";
 import OrderEditPayment from "../popups/OrderEditPayment";
+import axios from "axios";
 
 const EditTransactionOrderSummary = ({
   orderDetails,
@@ -197,6 +198,52 @@ const EditTransactionOrderSummary = ({
   const requiresPayment =
     hasNewUnliWingsGroup || newTotal > calculateOriginalOrderPrice();
 
+  // Add this new function to check inventory before changing quantity
+  const handleQuantityChange = async (item, newQuantity) => {
+    // No need to check if decreasing quantity
+    if (newQuantity <= 0 || newQuantity < item.quantity) {
+      onQuantityChange(item, newQuantity);
+      return;
+    }
+
+    try {
+      // Check inventory levels via API
+      const response = await axios.get(
+        `http://127.0.0.1:8000/check-menu-inventory/${item.menu_item.id}?quantity=${newQuantity}`
+      );
+
+      if (response.data.has_sufficient_inventory === false) {
+        const warnings = response.data.warnings || [];
+
+        if (warnings.length > 0) {
+          // Format warning message
+          const warningItems = warnings
+            .map(
+              (w) =>
+                `${w.inventory_name}: ${w.available_quantity} ${w.unit} available, ${w.required_quantity} ${w.unit} needed`
+            )
+            .join("\n");
+
+          // Show warning but allow changing
+          const proceed = window.confirm(
+            `Warning: This quantity may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`
+          );
+
+          if (!proceed) {
+            return;
+          }
+        }
+      }
+
+      // If we get here, either inventory is sufficient or user confirmed to proceed
+      onQuantityChange(item, newQuantity);
+    } catch (error) {
+      console.error("Error checking inventory:", error);
+      // Still allow quantity change if check fails
+      onQuantityChange(item, newQuantity);
+    }
+  };
+
   return (
     <div className="relative w-[350px] h-full">
       <div>
@@ -230,7 +277,7 @@ const EditTransactionOrderSummary = ({
                     <EditableProductCard
                       key={getItemKey(item, { id: 1, name: "In-Store" })}
                       item={item}
-                      onQuantityChange={onQuantityChange}
+                      onQuantityChange={handleQuantityChange}
                       discounts={discounts}
                       onDiscountChange={onDiscountChange}
                     />
@@ -311,7 +358,7 @@ const EditTransactionOrderSummary = ({
                         <EditableProductCard
                           key={getItemKey(item, { id: 1, name: "In-Store" })}
                           item={item}
-                          onQuantityChange={onQuantityChange}
+                          onQuantityChange={handleQuantityChange}
                         />
                       ))}
                     </div>
@@ -371,7 +418,7 @@ const EditTransactionOrderSummary = ({
                 <EditableProductCard
                   key={getItemKey(item, { id: 2, name: "Delivery" })}
                   item={item}
-                  onQuantityChange={onQuantityChange}
+                  onQuantityChange={handleQuantityChange}
                 />
               ))
             )}
