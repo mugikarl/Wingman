@@ -3210,9 +3210,14 @@ def update_order_status(request, transaction_id):
                             else:
                                 debug_steps.append(f"Inventory record not found for id {inventory_id}")
         
+        elif int(status_id) == 3:  # Cancelled status
+            debug_steps.append("Status is Cancelled (3), no ingredient deduction needed")
+            # No ingredient deduction for cancelled orders
+
         return Response({
             "message": f"Order status updated to {status_id}",
             "deducted_ingredients": deducted_ingredients if int(status_id) == 2 else [],
+            "status_id": status_id,
             "debug": debug_steps
         }, status=200)
         
