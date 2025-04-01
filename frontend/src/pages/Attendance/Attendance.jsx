@@ -3,27 +3,34 @@ import AttendanceSheet from "../../components/tables/AttendanceSheet";
 import TimeIn from "../../components/popups/TimeIn";
 import TimeOut from "../../components/popups/TimeOut";
 import AttendanceReview from "./AttendanceReview";
+import LoadingScreen from "../../components/popups/LoadingScreen";
 import axios from "axios";
 
 const Attendance = () => {
   const [isTimeInModalOpen, setIsTimeInModalOpen] = useState(false);
   const [isTimeOutModalOpen, setIsTimeOutModalOpen] = useState(false);
   const [attendanceData, setAttendanceData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Function to fetch attendance data; accepts an optional date parameter.
   const fetchAttendanceData = (date = null) => {
+    setLoading(true);
     let url = "http://127.0.0.1:8000/fetch-attendance-data/";
     // If a date is provided, append it as a query parameter.
     if (date) {
       url += `?date=${date}`;
     }
-    axios
+    return axios
       .get(url)
       .then((response) => {
         setAttendanceData(response.data);
+        setLoading(false);
+        return response.data; // Return data for promise chaining
       })
       .catch((error) => {
         console.error("Error fetching attendance data:", error);
+        setLoading(false);
+        throw error; // Re-throw for error handling at call site
       });
   };
 
@@ -31,6 +38,10 @@ const Attendance = () => {
   useEffect(() => {
     fetchAttendanceData();
   }, []);
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   return (
     <div className="flex-grow p-6 bg-[#E2D6D5] min-h-full">

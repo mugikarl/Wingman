@@ -3,6 +3,7 @@ import ItemBox from "../../components/tables/ItemBox";
 import axios from "axios";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
 import OrderSummary from "../../components/panels/OrderSummary";
+import LoadingScreen from "../../components/popups/LoadingScreen";
 
 const Order = () => {
   // Modal and dropdown states
@@ -14,6 +15,8 @@ const Order = () => {
   const [activeSection, setActiveSection] = useState("alaCarte");
   // For Unli orders, track the current order number (starts at 1)
   const [currentUnliOrderNumber, setCurrentUnliOrderNumber] = useState(1);
+  // Loading state
+  const [loading, setLoading] = useState(true);
 
   // Data states
   const [menuItems, setMenuItems] = useState([]);
@@ -26,6 +29,7 @@ const Order = () => {
   const [employees, setEmployees] = useState([]); // New state for employees
 
   const fetchMenuOrders = async () => {
+    setLoading(true);
     try {
       const response = await axios.get(
         "http://127.0.0.1:8000/fetch-order-data/"
@@ -40,6 +44,8 @@ const Order = () => {
       setEmployees(response.data.employees || []); // Fetch employees from backend
     } catch (error) {
       console.log("Error fetching menu data: ", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -63,6 +69,10 @@ const Order = () => {
       setActiveSection("alaCarte");
     }
   }, [selectedMenuType]);
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   // Handle filter selection for type
   const handleTypeFilter = (type) => {

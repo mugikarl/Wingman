@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Datepicker } from "flowbite-react";
+import LoadingScreen from "../../components/popups/LoadingScreen";
 
 // Helper: Converts a Date object to a "YYYY-MM-DD" string in local time.
 const getLocalDateString = (date) => {
@@ -102,6 +103,7 @@ const AttendanceReview = ({ attendanceData, refreshAttendance }) => {
     getLocalDateString(new Date())
   );
   const [showDatepicker, setShowDatepicker] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // Display the selected date in a human-friendly format.
   const displayDate = new Date(selectedDate).toDateString();
@@ -115,7 +117,10 @@ const AttendanceReview = ({ attendanceData, refreshAttendance }) => {
 
   // Refresh attendance data whenever the selected date changes.
   useEffect(() => {
-    refreshAttendance(selectedDate);
+    setLoading(true);
+    refreshAttendance(selectedDate)
+      .then(() => setLoading(false))
+      .catch(() => setLoading(false));
     console.log("Selected date:", selectedDate);
   }, [selectedDate]);
 
@@ -136,6 +141,10 @@ const AttendanceReview = ({ attendanceData, refreshAttendance }) => {
   const sortedAttendanceData = [...attendanceData].sort(
     (a, b) => Number(a.id) - Number(b.id)
   );
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   return (
     <div className="p-4 mx-auto">

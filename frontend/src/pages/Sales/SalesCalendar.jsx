@@ -1,13 +1,26 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import LoadingScreen from "../../components/popups/LoadingScreen";
 
 const SalesCalendar = () => {
   const [month, setMonth] = useState(new Date());
-  const [salesData, setSalesData] = useState([
-    { col2: 10, col3: 20, col4: 30 },
-    { col2: 15, col3: 25, col4: 35 },
-    { col2: 20, col3: 30, col4: 40 },
-  ]);
+  const [salesData, setSalesData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch sales data when month changes
+  useEffect(() => {
+    setLoading(true);
+
+    // Simulate API call
+    setTimeout(() => {
+      setSalesData([
+        { col2: 10, col3: 20, col4: 30 },
+        { col2: 15, col3: 25, col4: 35 },
+        { col2: 20, col3: 30, col4: 40 },
+      ]);
+      setLoading(false);
+    }, 1000);
+  }, [month]);
 
   const daysInMonth = new Date(
     month.getFullYear(),
@@ -15,8 +28,20 @@ const SalesCalendar = () => {
     0
   ).getDate();
 
-  const firstDayOfMonth = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const firstDayOfMonth = new Date(
+    month.getFullYear(),
+    month.getMonth(),
+    1
+  ).getDay();
+  const dayNames = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
 
   const handlePreviousMonth = () => {
     const newMonth = new Date(month);
@@ -49,16 +74,28 @@ const SalesCalendar = () => {
         >
           {isBlank ? null : (
             <>
-              <span className="text-gray-500 text-sm self-start">{dayNumber}</span>
-              <span className="text-green-600 font-bold">{salesData[dayIndex]?.col2}</span>
-              <span className="text-red-600 font-bold">{salesData[dayIndex]?.col3}</span>
-              <span className="text-orange-600 font-bold">{salesData[dayIndex]?.col4}</span>
+              <span className="text-gray-500 text-sm self-start">
+                {dayNumber}
+              </span>
+              <span className="text-green-600 font-bold">
+                {salesData[dayIndex]?.col2}
+              </span>
+              <span className="text-red-600 font-bold">
+                {salesData[dayIndex]?.col3}
+              </span>
+              <span className="text-orange-600 font-bold">
+                {salesData[dayIndex]?.col4}
+              </span>
             </>
           )}
         </div>
       );
     });
   };
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   return (
     <div className="p-4">
@@ -74,7 +111,9 @@ const SalesCalendar = () => {
             CALENDAR
           </button>
         </div>
-        <button className="bg-green-500 text-white px-4 py-2 rounded">Button 3</button>
+        <button className="bg-green-500 text-white px-4 py-2 rounded">
+          Button 3
+        </button>
       </div>
 
       {/* Month Navigation */}

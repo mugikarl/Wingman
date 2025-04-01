@@ -5,6 +5,7 @@ import ChooseOrder from "../../components/popups/ChooseOrder";
 import Table from "../../components/tables/Table";
 import OrderEssentials from "../../components/popups/OrderEssentials";
 import TransactionModal from "../../components/popups/TransactionModal";
+import LoadingScreen from "../../components/popups/LoadingScreen";
 
 const OrderTable = () => {
   const [isOrderEssentialsOpen, setIsOrderEssentialsOpen] = useState(false);
@@ -103,7 +104,7 @@ const OrderTable = () => {
   }, []);
 
   if (loading) {
-    return <div className="p-4">Loading...</div>;
+    return <LoadingScreen />;
   }
 
   if (error) {
@@ -197,71 +198,67 @@ const OrderTable = () => {
         paymentMethods={orderData.payment_methods}
         fetchOrderData={fetchOrderData}
       />
-      {/* Scrollable Table Wrapper */}
-      <div className="max-h-[500px] overflow-y-auto bg-white shadow-md rounded-lg p-2">
-        <Table
-          columns={[
-            "Transaction ID",
-            "Date",
-            "Order Summary",
-            "Total Amount",
-            "Order Status",
-          ]}
-          data={
-            loading
-              ? [["", "", "Loading...", "", ""]]
-              : filteredTransactions.map((order) => {
-                  const orderSummary =
-                    order.order_details?.map(
-                      (order_details) =>
-                        `${order_details.quantity}x - ${order_details.menu_item?.name}`
-                    ) || [];
 
-                  let formattedOrderSummary;
-                  if (orderSummary.length === 1) {
-                    formattedOrderSummary = orderSummary[0];
-                  } else if (orderSummary.length === 2) {
-                    formattedOrderSummary = (
-                      <>
-                        {orderSummary[0]} <br />
-                        {orderSummary[1]}
-                      </>
-                    );
-                  } else if (orderSummary.length > 2) {
-                    formattedOrderSummary = (
-                      <>
-                        {orderSummary[0]} <br />
-                        {orderSummary[1]} ...
-                      </>
-                    );
-                  } else {
-                    formattedOrderSummary = "N/A";
-                  }
+      {/* Table with built-in scrolling */}
+      <Table
+        columns={[
+          "Transaction ID",
+          "Date",
+          "Order Summary",
+          "Total Amount",
+          "Order Status",
+        ]}
+        data={filteredTransactions.map((order) => {
+          const orderSummary =
+            order.order_details?.map(
+              (order_details) =>
+                `${order_details.quantity}x - ${order_details.menu_item?.name}`
+            ) || [];
 
-                  return [
-                    order.id || "N/A",
-                    formatDate(order.date) || "N/A",
-                    formattedOrderSummary,
-                    `₱${
-                      order.order_details
-                        ?.reduce(
-                          (total, order_details) =>
-                            total +
-                            order_details.quantity *
-                              (order_details.menu_item?.price || 0),
-                          0
-                        )
-                        .toFixed(2) || "0.00"
-                    }`,
-                    order.order_status?.name || "N/A",
-                  ];
-                })
+          let formattedOrderSummary;
+          if (orderSummary.length === 1) {
+            formattedOrderSummary = orderSummary[0];
+          } else if (orderSummary.length === 2) {
+            formattedOrderSummary = (
+              <>
+                {orderSummary[0]} <br />
+                {orderSummary[1]}
+              </>
+            );
+          } else if (orderSummary.length > 2) {
+            formattedOrderSummary = (
+              <>
+                {orderSummary[0]} <br />
+                {orderSummary[1]} ...
+              </>
+            );
+          } else {
+            formattedOrderSummary = "N/A";
           }
-          rowOnClick={(rowIndex) =>
-            openTransactionModal(filteredTransactions[rowIndex])
-          }
-        />
-      </div>
+
+          return [
+            order.id || "N/A",
+            formatDate(order.date) || "N/A",
+            formattedOrderSummary,
+            `₱${
+              order.order_details
+                ?.reduce(
+                  (total, order_details) =>
+                    total +
+                    order_details.quantity *
+                      (order_details.menu_item?.price || 0),
+                  0
+                )
+                .toFixed(2) || "0.00"
+            }`,
+            order.order_status?.name || "N/A",
+          ];
+        })}
+        rowOnClick={(rowIndex) =>
+          openTransactionModal(filteredTransactions[rowIndex])
+        }
+        maxHeight="500px"
+      />
 
       <TransactionModal
         isOpen={isTransactionModalOpen}

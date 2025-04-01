@@ -1,0 +1,34 @@
+@keyframes wave {
+  0% {
+    transform: translateY(0px);
+  }
+  25% {
+    transform: translateY(-5px);
+  }
+  50% {
+    transform: translateY(0px);
+  }
+  75% {
+    transform: translateY(5px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.wave-dot {
+  display: inline-block;
+  animation: wave 1s ease-in-out infinite;
+}
+
+.delay-0 {
+  animation-delay: 0s;
+}
+
+.delay-200 {
+  animation-delay: 0.2s;
+}
+
+.delay-400 {
+  animation-delay: 0.4s;
+}

@@ -1,13 +1,16 @@
 import React from "react";
 
-const Table = ({ columns, data, rowOnClick }) => {
+const Table = ({ columns, data, rowOnClick, maxHeight = "700px" }) => {
   return (
-    <div className="table-container border rounded-lg shadow overflow-x-auto">
-      <table className="table-auto w-full text-left">
-        <thead className="bg-[#E88504] text-white h-12 font-bold">
+    <div
+      className="relative overflow-x-auto shadow-md sm:rounded-sm"
+      style={{ maxHeight }}
+    >
+      <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+        <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
           <tr>
             {columns.map((column, index) => (
-              <th key={index} className="p-2">
+              <th key={index} scope="col" className="px-6 py-4 font-medium">
                 {column}
               </th>
             ))}
@@ -18,23 +21,30 @@ const Table = ({ columns, data, rowOnClick }) => {
             data.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className={`${
-                  rowIndex % 2 === 0
-                    ? "bg-white hover:bg-gray-200"
-                    : "bg-white hover:bg-gray-200"
-                } border-b cursor-pointer`}
+                className={`
+                  ${rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"} 
+                  border-b hover:bg-gray-200 group
+                  ${rowOnClick ? "cursor-pointer" : ""}
+                `}
                 onClick={() => rowOnClick && rowOnClick(rowIndex)}
               >
                 {row.map((cell, cellIndex) => (
-                  <td key={cellIndex} className="p-2">
+                  <td
+                    key={cellIndex}
+                    className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900"
+                    scope={cellIndex === 0 ? "row" : undefined}
+                  >
                     {cell}
                   </td>
                 ))}
               </tr>
             ))
           ) : (
-            <tr>
-              <td className="p-2 text-center" colSpan={columns.length}>
+            <tr className="bg-white border-b">
+              <td
+                className="px-6 py-4 text-center font-normal text-gray-500 italic"
+                colSpan={columns.length}
+              >
                 No Data Available
               </td>
             </tr>

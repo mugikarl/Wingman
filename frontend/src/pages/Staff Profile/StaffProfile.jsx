@@ -4,7 +4,11 @@ import { Link } from "react-router-dom";
 import AddProfile from "../../components/popups/AddProfile";
 import EditProfile from "../../components/popups/EditProfile";
 import LoadingScreen from "../../components/popups/LoadingScreen";
-import { FaCalendarDays, FaPersonCirclePlus, FaRegNewspaper } from "react-icons/fa6";
+import {
+  FaCalendarDays,
+  FaPersonCirclePlus,
+  FaRegNewspaper,
+} from "react-icons/fa6";
 
 const StaffProfile = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -133,50 +137,48 @@ const StaffProfile = () => {
       </div>
 
       {/* Table */}
-      <div className="table-container border rounded-lg rounded-tl-none shadow overflow-x-auto">
-        <table className="table-auto w-full text-left">
-          <thead className="bg-[#FFCF03] font-bold">
-            <tr>
-              <th className="p-2">NAME</th>
-              <th className="p-2">ROLE</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
+      {loading ? (
+        <LoadingScreen />
+      ) : (
+        <div className="table-container border rounded-lg rounded-tl-none shadow overflow-x-auto">
+          <table className="table-auto w-full text-left">
+            <thead className="bg-[#FFCF03] font-bold">
               <tr>
-                <td className="p-2 text-center" colSpan="5">
-                  return <LoadingScreen />; 
-                </td>
+                <th className="p-2">NAME</th>
+                <th className="p-2">ROLE</th>
               </tr>
-            ) : sortedEmployees.length > 0 ? (
-              sortedEmployees.map((employee, index) => (
-                <tr
-                  key={employee.id}
-                  className={
-                    index % 2 === 0
-                      ? "bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
-                      : "bg-[#FFFFFF] border-b border-[#FFCF03] cursor-pointer hover:bg-gray-200"
-                  }
-                  onClick={() => openEditModal(employee)}
-                >
-                  <td className="p-2">
-                    {employee.first_name} {employee.last_name}
-                  </td>
-                  <td className="p-2">
-                    {employee.roles.map((role) => role.role_name).join(", ")}
+            </thead>
+            <tbody>
+              {sortedEmployees.length > 0 ? (
+                sortedEmployees.map((employee, index) => (
+                  <tr
+                    key={employee.id}
+                    className={
+                      index % 2 === 0
+                        ? "bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
+                        : "bg-[#FFFFFF] border-b border-[#FFCF03] cursor-pointer hover:bg-gray-200"
+                    }
+                    onClick={() => openEditModal(employee)}
+                  >
+                    <td className="p-2">
+                      {employee.first_name} {employee.last_name}
+                    </td>
+                    <td className="p-2">
+                      {employee.roles.map((role) => role.role_name).join(", ")}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="p-2 text-center" colSpan="5">
+                    No employees found.
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td className="p-2 text-center" colSpan="5">
-                  No employees found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Add Profile Modal */}
       <AddProfile

@@ -50,7 +50,7 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
   };
 
   return (
-    <div className="w-52 bg-[#E88504] flex flex-col h-screen overflow-hidden">
+    <div className="w-52 bg-[#CC5500] flex flex-col h-screen overflow-hidden">
       {/* Logo */}
       <div className="flex items-center justify-center py-4">
         <Link to={isAdmin ? "/dashboard-admin" : "/dashboard"}>

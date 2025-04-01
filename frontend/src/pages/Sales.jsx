@@ -1,12 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import LoadingScreen from "../components/popups/LoadingScreen";
 
 const Sales = () => {
   const [month, setMonth] = useState(new Date());
-  const [data, setData] = useState([
-    { col1: "Item 1", col2: 10, col3: 20, col4: 30 },
-    { col1: "Item 2", col2: 15, col3: 25, col4: 35 },
-    { col1: "Item 3", col2: 20, col3: 30, col4: 40 },
-  ]);
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Simulating data fetching with a loading state
+  useEffect(() => {
+    setLoading(true);
+
+    // Simulate API call
+    setTimeout(() => {
+      setData([
+        { col1: "Item 1", col2: 10, col3: 20, col4: 30 },
+        { col1: "Item 2", col2: 15, col3: 25, col4: 35 },
+        { col1: "Item 3", col2: 20, col3: 30, col4: 40 },
+      ]);
+      setLoading(false);
+    }, 1000);
+  }, [month]);
 
   const totalValues = data.reduce(
     (totals, row) => ({
@@ -33,20 +46,28 @@ const Sales = () => {
     setMonth(new Date(event.target.value));
   };
 
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
   return (
     <div className="p-4">
       {/* Buttons */}
       <div className="flex justify-between mb-4">
         <div className="flex gap-2">
-          <button className="bg-orange-500 text-white px-4 py-2 rounded">DAILY</button>
+          <button className="bg-orange-500 text-white px-4 py-2 rounded">
+            DAILY
+          </button>
           <button
-            onClick={() => window.location.href = '/salescalendar'}
+            onClick={() => (window.location.href = "/salescalendar")}
             className="bg-orange-500 text-white px-4 py-2 rounded"
           >
             CALENDAR
           </button>
         </div>
-        <button className="bg-green-500 text-white px-4 py-2 rounded">Button 3</button>
+        <button className="bg-green-500 text-white px-4 py-2 rounded">
+          Button 3
+        </button>
       </div>
 
       {/* Table */}

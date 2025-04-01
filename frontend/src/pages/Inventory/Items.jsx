@@ -7,7 +7,7 @@ import axios from "axios";
 import EditItem from "../../components/popups/EditItem";
 import NewCategory from "../../components/popups/NewCategory";
 import LoadingScreen from "../../components/popups/LoadingScreen"; // Import the LoadingScreen component
-import { FaBasketShopping, FaRegRectangleList  } from "react-icons/fa6";
+import { FaBasketShopping, FaRegRectangleList } from "react-icons/fa6";
 
 const Items = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -57,10 +57,9 @@ const Items = () => {
   }, []);
 
   return (
-    <div className="min-h-screen w-full bg-[#E2D6D5] flex">
+    <div className="min-h-screen w-full bg-[#fcf4dc] flex">
       <div className="flex-grow p-6">
         <div className="flex flex-col space-y-4 mb-4">
-          
           <div className="w-full">
             <div className="flex justify-between items-center w-full space-x-4">
               <div className="flex w-[400px]">
@@ -70,23 +69,11 @@ const Items = () => {
                   className="flex-grow p-2 border rounded-lg shadow"
                 />
               </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={openModal}
-                  className="flex items-center bg-gradient-to-r from-[#864926] to-[#a95a00] text-white rounded-md shadow-md hover:from-[#864926] hover:to-[#864926] transition-colors duration-200 w-48 overflow-hidden"
-            >
-              {/* Image Side */}
-              <div className="flex items-center justify-center bg-[#864926] p-3">
-                    <FaBasketShopping className="w-5 h-5 text-white" />
-              </div>
-                  <span className="flex-1 text-left pl-3">New Item</span>
-                </button>
-              </div>
             </div>
           </div>
           <div className="w-full">
-            <div className="flex justify-between items-center w-full">
-              <div className="flex space-x-4">
+            <div className="flex justify-start gap-x-2 items-center w-full">
+              {/* <div className="flex space-x-4">
                 <button className="flex items-center justify-center bg-blue-500 text-white p-2 rounded-lg shadow min-w-[12%]">
                   Meat
                 </button>
@@ -99,16 +86,26 @@ const Items = () => {
                 <button className="flex items-center justify-center bg-red-500 text-white p-2 rounded-lg shadow min-w-[11%]">
                   Blabla
                 </button>
-              </div>
+              </div> */}
               {/* New Category button */}
               <button
+                onClick={openModal}
+                className="flex items-center bg-white border text-[#CC5500] shadow-md rounded-md duration-200 w-48 overflow-hidden"
+              >
+                {/* Image Side */}
+                <div className="flex items-center justify-center border-r p-3">
+                  <FaBasketShopping className="w-5 h-5 text-[#CC5500]" />
+                </div>
+                <span className="flex-1 text-left pl-3">New Item</span>
+              </button>
+              <button
                 onClick={() => setIsCategoryModalOpen(true)}
-                className="flex items-center bg-gradient-to-r from-[#864926] to-[#a95a00] text-white rounded-md shadow-md hover:from-[#864926] hover:to-[#864926] transition-colors duration-200 w-48 overflow-hidden"
-            >
-              {/* Image Side */}
-              <div className="flex items-center justify-center bg-[#864926] p-3">
-                 <FaRegRectangleList className="w-5 h-5 text-white" />
-              </div>
+                className="flex items-center bg-white border text-[#CC5500] shadow-md rounded-md duration-200 w-48 overflow-hidden"
+              >
+                {/* Image Side */}
+                <div className="flex items-center justify-center border-r p-3">
+                  <FaRegRectangleList className="w-5 h-5 text-[#CC5500]" />
+                </div>
                 <span className="flex-1 text-left pl-3">New Category</span>
               </button>
             </div>

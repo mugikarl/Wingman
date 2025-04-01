@@ -75,8 +75,10 @@ const StockIn = () => {
     fetchReceipts();
   }, []);
 
+  const calculatedHeight = "calc(100vh - 140px)";
+
   return (
-    <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
+    <div className="h-screen bg-[#F5F5F5] flex flex-col p-6">
       {/* Search Bar and Buttons */}
       <div className="flex justify-between items-center mb-4">
         {/* Search Bar */}
@@ -84,7 +86,7 @@ const StockIn = () => {
           <input
             type="text"
             placeholder="Search..."
-            className="w-full p-2 border rounded-lg shadow"
+            className="w-full p-2 border rounded-sm shadow"
           />
         </div>
 
@@ -93,7 +95,7 @@ const StockIn = () => {
           {/* New Receipt Button */}
           <button
             onClick={openAddStockInModal}
-            className="flex items-center bg-gradient-to-r from-[#864926] to-[#a95a00] text-white rounded-md shadow-md hover:from-[#864926] hover:to-[#864926] transition-colors duration-200 w-48 overflow-hidden"
+            className="flex items-center bg-gradient-to-r from-[#864926] to-[#a95a00] text-white rounded-sm shadow-md hover:from-[#864926] hover:to-[#864926] transition-colors duration-200 w-48 overflow-hidden"
           >
             {/* Image Side */}
             <div className="flex items-center justify-center bg-[#864926] p-3">
@@ -109,7 +111,7 @@ const StockIn = () => {
           {/* New Supplier Button */}
           <button
             onClick={openNewSupplierModal}
-            className="flex items-center bg-gradient-to-r from-[#864926] to-[#a95a00] text-white rounded-md shadow-md hover:from-[#864926] hover:to-[#864926] transition-colors duration-200 w-48 overflow-hidden"
+            className="flex items-center bg-gradient-to-r from-[#864926] to-[#a95a00] text-white rounded-sm shadow-md hover:from-[#864926] hover:to-[#864926] transition-colors duration-200 w-48 overflow-hidden"
           >
             {/* Image Side */}
             <div className="flex items-center justify-center bg-[#864926] p-3">
@@ -126,10 +128,10 @@ const StockIn = () => {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-grow">
+      {/* Main Content - Table container with margin-bottom for padding */}
+      <div className="flex-1" style={{ height: calculatedHeight }}>
         {loading ? (
-          <div className="w-full flex justify-center items-center">
+          <div className="w-full h-full flex justify-center items-center">
             <LoadingScreen /> {/* Display the LoadingScreen component */}
           </div>
         ) : (
@@ -142,6 +144,7 @@ const StockIn = () => {
               return [receipt.receipt_no, supplierObj.name || "", receipt.date];
             })}
             rowOnClick={(rowIndex) => openEditStockInModal(receipts[rowIndex])}
+            maxHeight={calculatedHeight}
           />
         )}
       </div>

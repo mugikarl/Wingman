@@ -6,6 +6,7 @@ import EditMenuModal from "../../components/popups/EditMenuModal"; // Import the
 import ItemBox from "../../components/tables/ItemBox"; // Import the updated ItemBox
 import NewMenuCategory from "../../components/popups/NewMenuCategory";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
+import LoadingScreen from "../../components/popups/LoadingScreen";
 
 const Menu = () => {
   const role = localStorage.getItem("role");
@@ -17,6 +18,7 @@ const Menu = () => {
   const [isMenuCategoryModalOpen, setIsMenuCategoryModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedMenuType, setSelectedMenuType] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Data states
   const [menuItems, setMenuItems] = useState([]);
@@ -30,6 +32,7 @@ const Menu = () => {
 
   // Fetch menus when the component mounts
   const fetchMenus = async () => {
+    setLoading(true);
     try {
       const token = localStorage.getItem("access_token");
       const response = await axios.get(
@@ -48,6 +51,8 @@ const Menu = () => {
       setMenuItems(response.data.menu_items || []);
     } catch (error) {
       console.error("Error fetching menus:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -64,6 +69,10 @@ const Menu = () => {
       setSelectedMenuType(defaultType || menuTypes[0]);
     }
   }, [menuTypes, selectedMenuType]);
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   // Function to add a new menu item
   const addMenuItem = (newItem) => {

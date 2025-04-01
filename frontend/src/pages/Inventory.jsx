@@ -56,7 +56,7 @@ const Inventory = () => {
   });
 
   return (
-    <div className="flex-grow p-6 bg-[#E2D6D5] min-h-full">
+    <div className="flex-grow p-6 bg-[#fcf4dc] min-h-full">
       {/* Search Bar */}
       <div className="flex mb-4 w-[400px]">
         <input
@@ -79,7 +79,9 @@ const Inventory = () => {
           data={filteredInventoryData.map((item) => {
             const unit = units.find((u) => u.id === item.measurement);
             const category = categories.find((c) => c.id === item.category);
-            const quantityWithUnit = `${item.quantity} ${unit ? unit.symbol : ""}`;
+            const quantityWithUnit = `${item.quantity} ${
+              unit ? unit.symbol : ""
+            }`;
 
             return [item.name, category ? category.name : "", quantityWithUnit];
           })}
