@@ -32,8 +32,6 @@ import Items from "./pages/Inventory/Items";
 import EditItem from "./components/popups/EditItem";
 // import EditInventory from "./components/popups/EditInventory";
 import NewCategory from "./components/popups/NewCategory";
-import FPMenu from "./pages/Inventory/FPMenu";
-import GrabMenu from "./pages/Inventory/GrabMenu";
 import NewMenuForm from "./components/popups/NewMenuForm";
 import NewMenuModal from "./components/popups/NewMenuModal";
 import EditMenuModal from "./components/popups/EditMenuModal";

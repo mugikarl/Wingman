@@ -64,13 +64,14 @@ const StaffProfile = () => {
     setSelectedEmployee(null);
   };
 
-  // Filter employees by status and then sort them by id
+  // Filter employees by status
   const filteredEmployees = employees.filter(
     (emp) => emp.status === filterStatus
   );
+  // Sort the filtered employees
   const sortedEmployees = [...filteredEmployees].sort((a, b) => a.id - b.id);
 
-  // Transform employees data for the Table component
+  // Transform for table display
   const transformEmployeesForTable = (employees) => {
     return employees.map((employee) => [
       `${employee.first_name} ${employee.last_name}`,
@@ -80,49 +81,35 @@ const StaffProfile = () => {
 
   // Handle row click for the Table component
   const handleRowClick = (rowIndex) => {
-    openEditModal(filteredEmployees[rowIndex]);
+    openEditModal(sortedEmployees[rowIndex]);
   };
 
   return (
-    <div className="flex-grow p-6 bg-[#EEEEEE] min-h-full">
+    <div className="flex-grow p-6 bg-[#fcf4dc] min-h-full">
       {/* Top Section */}
       <div className="flex items-start mb-4 space-x-4">
-        {/* Attendance Sheet Button */}
+        {/* Attendance Sheet Button 
         <Link to="/attendancereview">
-          <button className="flex items-center bg-gradient-to-r from-[#1c4686] to-[#2a5ca7] text-white rounded-md shadow-md hover:from-[#163a6f] hover:to-[#1c4686] transition-colors duration-200 w-48 overflow-hidden">
-            {/* Darker Left Section for Icon */}
-            <div className="flex items-center justify-center bg-[#1c4686] p-3">
-              <FaRegNewspaper className="w-5 h-5 text-white" />
+          <button className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden">
+            <div className="flex items-center justify-center border-r p-3">
+              <FaRegNewspaper className="w-5 h-5 text-[#CC5500]" />
             </div>
-            {/* Text Aligned Left in Normal Color Section */}
-            <span className="flex-1 text-left pl-3">Attendance Sheet</span>
+            <span className="flex-1 text-left pl-2">Attendance Sheet</span>
           </button>
-        </Link>
+        </Link> */}
 
         {/* Add New Profile Button */}
         <button
           onClick={openAddModal}
-          className="flex items-center bg-gradient-to-r from-[#E88504] to-[#F89A1C] text-white rounded-md shadow-md hover:from-[#D87A03] hover:to-[#E88504] transition-colors duration-200 w-48 overflow-hidden"
+          className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
         >
           {/* Darker Left Section for Icon */}
-          <div className="flex items-center justify-center bg-[#E88504] p-3">
-            <FaPersonCirclePlus className="w-5 h-5 text-white" />
+          <div className="flex items-center justify-center border-r p-3">
+            <FaPersonCirclePlus className="w-5 h-5 text-[#CC5500]" />
           </div>
           {/* Text Aligned Left in Normal Color Section */}
           <span className="flex-1 text-left pl-3">Add New Profile</span>
         </button>
-
-        {/* Schedule Button */}
-        <Link to="/schedule">
-          <button className="flex items-center bg-gradient-to-r from-[#009E2A] to-[#00BA34] text-white rounded-md shadow-md hover:from-[#008C25] hover:to-[#009E2A] transition-colors duration-200 w-48 overflow-hidden">
-            {/* Darker Left Section for Icon */}
-            <div className="flex items-center justify-center bg-[#009E2A] p-3">
-              <FaCalendarDays className="w-5 h-5 text-white" />
-            </div>
-            {/* Text Aligned Left in Normal Color Section */}
-            <span className="flex-1 text-left pl-3">Schedule</span>
-          </button>
-        </Link>
       </div>
 
       {/* Status Filter Buttons and Table Section */}
