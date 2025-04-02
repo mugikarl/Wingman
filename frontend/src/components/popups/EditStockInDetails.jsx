@@ -24,6 +24,8 @@ const EditStockInDetails = ({
     price: "",
   });
   const [isEditing, setIsEditing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
 
   // On mount or when receipt, unitMeasurements, or suppliers change, initialize local state from props.
   useEffect(() => {
@@ -53,20 +55,37 @@ const EditStockInDetails = ({
         setStockInData(formattedStock);
         setEditedStockData(formattedStock);
       }
-      // Ensure the supplier id is a number.
-      const supplierId = receipt.supplier ? Number(receipt.supplier) : "";
-      const supplierObj = suppliers.find((s) => s.id === supplierId) || {};
-      setEditedReceipt({
-        ...receipt,
-        supplier_id: supplierId,
-        supplier_name: supplierObj.name || "",
-      });
+
+      // CHANGE THIS PART - Handle the nested supplier object
+      // Check if receipt.supplier is an object with id and name fields
+      if (
+        receipt.supplier &&
+        typeof receipt.supplier === "object" &&
+        receipt.supplier.id
+      ) {
+        setEditedReceipt({
+          ...receipt,
+          supplier_id: receipt.supplier.id,
+          supplier_name: receipt.supplier.name || "",
+        });
+      }
+      // For backward compatibility, also handle if receipt.supplier is just an ID
+      else {
+        const supplierId = receipt.supplier ? Number(receipt.supplier) : "";
+        const supplierObj = suppliers.find((s) => s.id === supplierId) || {};
+        setEditedReceipt({
+          ...receipt,
+          supplier_id: supplierId,
+          supplier_name: supplierObj.name || "",
+        });
+      }
     }
   }, [receipt, unitMeasurements, suppliers]);
 
   // Toggle editing mode. If canceling, revert local changes.
   const toggleEditMode = () => {
     if (isEditing) {
+      // Restoring original data when canceling edit
       if (receipt.stock_ins) {
         const originalStock = receipt.stock_ins.map((stock) => {
           const measurementSymbol =
@@ -88,7 +107,27 @@ const EditStockInDetails = ({
         });
         setEditedStockData(originalStock);
       }
-      setEditedReceipt({ ...receipt });
+
+      // FIXED: Properly restore the supplier data when canceling edit
+      if (
+        receipt.supplier &&
+        typeof receipt.supplier === "object" &&
+        receipt.supplier.id
+      ) {
+        setEditedReceipt({
+          ...receipt,
+          supplier_id: receipt.supplier.id,
+          supplier_name: receipt.supplier.name || "",
+        });
+      } else {
+        const supplierId = receipt.supplier ? Number(receipt.supplier) : "";
+        const supplierObj = suppliers.find((s) => s.id === supplierId) || {};
+        setEditedReceipt({
+          ...receipt,
+          supplier_id: supplierId,
+          supplier_name: supplierObj.name || "",
+        });
+      }
     }
     setIsEditing(!isEditing);
     setSelectedStock({
@@ -131,57 +170,65 @@ const EditStockInDetails = ({
   };
 
   // For adding new stock entries, update local state.
-  const handleAddStock = () => {
+  const handleAddStock = async () => {
     if (
       selectedStock &&
       selectedStock.name &&
       selectedStock.quantity &&
       selectedStock.price
     ) {
-      const selectedItem = items.find(
-        (item) => item.name === selectedStock.name
-      );
-      if (!selectedItem) {
-        alert("Selected item not found.");
-        return;
-      }
-      let inventoryId = selectedItem.inventory_id;
-      if (!inventoryId && typeof inventory !== "undefined") {
-        const inv = inventory.find(
-          (invRec) => String(invRec.item) === String(selectedItem.id)
+      setIsAdding(true);
+
+      try {
+        const selectedItem = items.find(
+          (item) => item.name === selectedStock.name
         );
-        if (inv) {
-          inventoryId = inv.id;
+        if (!selectedItem) {
+          alert("Selected item not found.");
+          return;
         }
+        let inventoryId = selectedItem.inventory_id;
+        if (!inventoryId && typeof inventory !== "undefined") {
+          const inv = inventory.find(
+            (invRec) => String(invRec.item) === String(selectedItem.id)
+          );
+          if (inv) {
+            inventoryId = inv.id;
+          }
+        }
+        if (!inventoryId) {
+          alert("No inventory id available for the selected item.");
+          return;
+        }
+        const measurementSymbol =
+          unitMeasurements?.find((unit) => unit.id === selectedItem.measurement)
+            ?.symbol || "N/A";
+        const newStock = {
+          id: null,
+          name: selectedStock.name,
+          measurement: measurementSymbol,
+          price: parseFloat(selectedStock.price),
+          quantity: parseInt(selectedStock.quantity, 10),
+          totalCost:
+            parseFloat(selectedStock.price) *
+            parseInt(selectedStock.quantity, 10),
+          old_quantity: 0,
+          inventory_id: inventoryId,
+          item_id: selectedItem.id,
+          to_delete: false,
+        };
+        setEditedStockData((prev) => [...prev, newStock]);
+        setSelectedStock({
+          name: "",
+          measurement: "",
+          quantity: "",
+          price: "",
+        });
+      } catch (error) {
+        console.error("Error adding stock:", error);
+      } finally {
+        setIsAdding(false);
       }
-      if (!inventoryId) {
-        alert("No inventory id available for the selected item.");
-        return;
-      }
-      const measurementSymbol =
-        unitMeasurements?.find((unit) => unit.id === selectedItem.measurement)
-          ?.symbol || "N/A";
-      const newStock = {
-        id: null, // new entry
-        name: selectedStock.name,
-        measurement: measurementSymbol,
-        price: parseFloat(selectedStock.price),
-        quantity: parseInt(selectedStock.quantity, 10),
-        totalCost:
-          parseFloat(selectedStock.price) *
-          parseInt(selectedStock.quantity, 10),
-        old_quantity: 0, // for new entries, original quantity is 0
-        inventory_id: inventoryId,
-        item_id: selectedItem.id,
-        to_delete: false,
-      };
-      setEditedStockData((prev) => [...prev, newStock]);
-      setSelectedStock({
-        name: "",
-        measurement: "",
-        quantity: "",
-        price: "",
-      });
     }
   };
 
@@ -230,9 +277,12 @@ const EditStockInDetails = ({
   const deleteReceiptHandler = async () => {
     if (window.confirm("Are you sure you want to delete this receipt?")) {
       try {
+        setIsSubmitting(true);
+
         const res = await axios.delete(
           `http://127.0.0.1:8000/delete-receipt/${editedReceipt.receipt_id}/`
         );
+
         if (res.status === 200) {
           alert("Receipt deleted successfully!");
           onUpdate();
@@ -241,6 +291,8 @@ const EditStockInDetails = ({
       } catch (error) {
         console.error("Failed to delete receipt:", error);
         alert("An error occurred while deleting the receipt.");
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -248,15 +300,16 @@ const EditStockInDetails = ({
   // On submit, send all changes to the backend.
   const handleSubmit = async () => {
     try {
+      setIsSubmitting(true);
+
       const response = await axios.put(
         `http://127.0.0.1:8000/edit-receipt-stockin-data/${editedReceipt.receipt_id}/`,
         {
           receipt_no: editedReceipt.receipt_no,
-          // Use the supplier id for the update
           supplier: editedReceipt.supplier_id,
           date: editedReceipt.date,
           stock_in_updates: editedStockData.map((stock) => ({
-            id: stock.id || null, // if null, backend treats as new
+            id: stock.id || null,
             old_quantity: stock.old_quantity || 0,
             quantity_in: stock.to_delete ? 0 : stock.quantity,
             price: stock.price,
@@ -266,10 +319,37 @@ const EditStockInDetails = ({
           })),
         }
       );
+
       alert("Changes saved successfully!");
       if (response.data && response.data.receipt) {
         const updatedReceipt = response.data.receipt;
-        setEditedReceipt({ ...updatedReceipt });
+
+        // Add this block to handle nested supplier object
+        let supplierData = {};
+        if (
+          updatedReceipt.supplier &&
+          typeof updatedReceipt.supplier === "object"
+        ) {
+          supplierData = {
+            supplier_id: updatedReceipt.supplier.id,
+            supplier_name: updatedReceipt.supplier.name,
+          };
+        } else {
+          const supplierId = updatedReceipt.supplier
+            ? Number(updatedReceipt.supplier)
+            : "";
+          const supplierObj = suppliers.find((s) => s.id === supplierId) || {};
+          supplierData = {
+            supplier_id: supplierId,
+            supplier_name: supplierObj.name || "",
+          };
+        }
+
+        setEditedReceipt({
+          ...updatedReceipt,
+          ...supplierData,
+        });
+
         if (updatedReceipt.stock_ins) {
           const formattedStock = updatedReceipt.stock_ins.map((stock) => {
             let itemName, measurementSymbol;
@@ -311,6 +391,13 @@ const EditStockInDetails = ({
     } catch (error) {
       console.error("Failed to update receipt:", error);
       alert("An error occurred while saving the changes.");
+    } finally {
+      setIsSubmitting(false);
+      setIsEditing(false);
+      if (typeof onUpdate === "function") {
+        onUpdate();
+      }
+      onClose();
     }
   };
 
@@ -321,18 +408,28 @@ const EditStockInDetails = ({
           {isEditing && (
             <button
               onClick={handleSubmit}
-              className="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600"
+              disabled={isSubmitting}
+              className={`bg-green-500 text-white px-4 py-2 rounded-lg shadow ${
+                isSubmitting
+                  ? "opacity-70 cursor-not-allowed"
+                  : "hover:bg-green-600"
+              }`}
             >
-              Submit
+              {isSubmitting ? "Submitting..." : "Submit"}
             </button>
           )}
           {/* Only show Delete Receipt button when NOT editing */}
           {!isEditing && (
             <button
               onClick={deleteReceiptHandler}
-              className="bg-red-700 text-white px-4 py-2 rounded-lg shadow hover:bg-red-800"
+              disabled={isSubmitting}
+              className={`bg-red-700 text-white px-4 py-2 rounded-lg shadow ${
+                isSubmitting
+                  ? "opacity-70 cursor-not-allowed"
+                  : "hover:bg-red-800"
+              }`}
             >
-              Delete Receipt
+              {isSubmitting ? "Deleting..." : "Delete Receipt"}
             </button>
           )}
           <button
@@ -409,10 +506,10 @@ const EditStockInDetails = ({
         </div>
 
         {/* Table with Editable Rows and Add Row */}
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-200">
-            <thead>
-              <tr className="bg-[#FFCF03]">
+        <div className="relative overflow-x-auto shadow-md sm:rounded-sm">
+          <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+            <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
+              <tr>
                 {[
                   "ID",
                   "ITEM NAME",
@@ -422,65 +519,66 @@ const EditStockInDetails = ({
                   "TOTAL COST",
                   "ACTION",
                 ].map((column, index) => (
-                  <th
-                    key={index}
-                    className="px-4 py-2 border-b border-gray-200 text-left text-sm font-semibold text-gray-700"
-                  >
+                  <th key={index} scope="col" className="px-6 py-4 font-medium">
                     {column}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {editedStockData.map((stock, index) => (
-                <tr
-                  key={index}
-                  className={`hover:bg-yellow-200 ${
-                    index % 2 === 0 ? "bg-[#FFEEA6]" : "bg-[#FFEEA6]"
-                  }`}
-                >
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
-                    {stock.id}
-                  </td>
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
-                    {stock.name}
-                  </td>
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
-                    {stock.measurement}
-                  </td>
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
-                    {isEditing ? (
-                      <input
-                        type="number"
-                        value={stock.price}
-                        onChange={(e) =>
-                          handleStockChange(index, "price", e.target.value)
-                        }
-                        className="p-1 border rounded"
-                      />
-                    ) : (
-                      stock.price
-                    )}
-                  </td>
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
-                    {isEditing ? (
-                      <input
-                        type="number"
-                        value={stock.quantity}
-                        onChange={(e) =>
-                          handleStockChange(index, "quantity", e.target.value)
-                        }
-                        className="p-1 border rounded"
-                      />
-                    ) : (
-                      stock.quantity
-                    )}
-                  </td>
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
-                    {stock.totalCost}
-                  </td>
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
-                    <div>
+              {editedStockData.length > 0 ? (
+                editedStockData.map((stock, index) => (
+                  <tr
+                    key={index}
+                    className={`
+                      ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} 
+                      border-b hover:bg-gray-200 group
+                    `}
+                  >
+                    <td
+                      className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900"
+                      scope="row"
+                    >
+                      {stock.id}
+                    </td>
+                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                      {stock.name}
+                    </td>
+                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                      {stock.measurement}
+                    </td>
+                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={stock.price}
+                          onChange={(e) =>
+                            handleStockChange(index, "price", e.target.value)
+                          }
+                          className="p-1 border rounded w-20"
+                        />
+                      ) : (
+                        stock.price
+                      )}
+                    </td>
+                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={stock.quantity}
+                          onChange={(e) =>
+                            handleStockChange(index, "quantity", e.target.value)
+                          }
+                          className="p-1 border rounded w-20"
+                        />
+                      ) : (
+                        stock.quantity
+                      )}
+                    </td>
+                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                      {stock.totalCost}
+                    </td>
+                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
                       {stock.to_delete ? (
                         <button
                           onClick={(e) => {
@@ -512,19 +610,28 @@ const EditStockInDetails = ({
                           Delete
                         </button>
                       )}
-                    </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr className="bg-white border-b">
+                  <td
+                    className="px-6 py-4 text-center font-normal text-gray-500 italic"
+                    colSpan={7}
+                  >
+                    No Stock Data Available
                   </td>
                 </tr>
-              ))}
+              )}
               {/* Add Row */}
               {isEditing && (
-                <tr className="bg-[#FFEEA6] hover:bg-gray-50">
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                <tr className="bg-white border-b">
+                  <td className="px-6 py-4 font-normal text-gray-700">
                     {/* ID (empty for new entries) */}
                   </td>
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                  <td className="px-6 py-4 font-normal text-gray-700">
                     <select
-                      className="p-1 border rounded"
+                      className="p-1 border rounded w-full"
                       value={selectedStock.name}
                       name="name"
                       onChange={handleStockInputChange}
@@ -537,45 +644,50 @@ const EditStockInDetails = ({
                       ))}
                     </select>
                   </td>
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                  <td className="px-6 py-4 font-normal text-gray-700">
                     <input
                       type="text"
                       placeholder="Unit"
-                      className="p-1 border rounded bg-gray-100"
+                      className="p-1 border rounded bg-gray-100 w-full"
                       name="measurement"
                       value={selectedStock.measurement}
                       disabled
                     />
                   </td>
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                  <td className="px-6 py-4 font-normal text-gray-700">
                     <input
                       type="number"
                       placeholder="Cost/Unit"
-                      className="p-1 border rounded"
+                      className="p-1 border rounded w-full"
                       name="price"
                       value={selectedStock.price}
                       onChange={handleStockInputChange}
                     />
                   </td>
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                  <td className="px-6 py-4 font-normal text-gray-700">
                     <input
                       type="number"
                       placeholder="Quantity"
-                      className="p-1 border rounded"
+                      className="p-1 border rounded w-full"
                       name="quantity"
                       value={selectedStock.quantity}
                       onChange={handleStockInputChange}
                     />
                   </td>
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                  <td className="px-6 py-4 font-normal text-gray-700">
                     {/* Total Cost (calculated after adding) */}
                   </td>
-                  <td className="px-4 py-2 border-b border-gray-200 text-sm text-gray-700">
+                  <td className="px-6 py-4 font-normal text-gray-700">
                     <button
                       onClick={handleAddStock}
-                      className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                      disabled={isAdding}
+                      className={`bg-blue-500 text-white px-2 py-1 rounded ${
+                        isAdding
+                          ? "opacity-70 cursor-not-allowed"
+                          : "hover:bg-blue-600"
+                      }`}
                     >
-                      Add
+                      {isAdding ? "Adding..." : "Add"}
                     </button>
                   </td>
                 </tr>
