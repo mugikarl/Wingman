@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 
 const DisposedInventory = ({
@@ -12,14 +12,18 @@ const DisposedInventory = ({
 }) => {
   if (!isOpen) return null;
 
-  // Get values from selectedInventory (if available)
-  const itemName = selectedInventory ? selectedInventory.name : "";
+  console.log("Selected Inventory:", selectedInventory);
+  console.log("Available Units:", units);
+
+  // Get values from selectedInventory with nested item structure
+  const item = selectedInventory ? selectedInventory.item || {} : {};
+  const itemName = item.name || "";
   const currentQuantity = selectedInventory ? selectedInventory.quantity : "";
-  const currentUnit =
-    selectedInventory &&
-    units.find((unit) => unit.id === selectedInventory.measurement)
-      ? units.find((unit) => unit.id === selectedInventory.measurement).symbol
-      : "";
+
+  // Find the unit based on the item's measurement property
+  const measurementId = item.measurement;
+  const currentUnitObject = units.find((unit) => unit.id === measurementId);
+  const currentUnit = currentUnitObject ? currentUnitObject.symbol : "";
 
   // Local state for form inputs
   const [disposalQuantity, setDisposalQuantity] = useState("");
@@ -28,22 +32,18 @@ const DisposedInventory = ({
   const [selectedDisposer, setSelectedDisposer] = useState("");
   const [otherReason, setOtherReason] = useState("");
 
-  // Get the current unit object based on the selected inventory
-  const currentUnitObject = selectedInventory
-    ? units.find((unit) => unit.id === selectedInventory.measurement)
-    : null;
-
   // Get the category ID of the current unit
   const currentUnitCategory = currentUnitObject
     ? currentUnitObject.unit_category
     : null;
 
   // Filter units to only include those that belong to the same category
-  const filteredUnits = units.filter(
-    (unit) => unit.unit_category === currentUnitCategory
-  );
+  // If unit_category doesn't exist, fall back to showing all units
+  const filteredUnits = currentUnitCategory
+    ? units.filter((unit) => unit.unit_category === currentUnitCategory)
+    : units;
 
-  // Handler to call the dispose_item backend endpoint
+  // Handler for reason change
   const handleReasonChange = (event) => {
     const selectedValue = event.target.value;
     setSelectedReason(selectedValue);

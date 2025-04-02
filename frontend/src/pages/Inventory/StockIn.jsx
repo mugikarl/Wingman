@@ -32,6 +32,15 @@ const StockIn = () => {
     // Find the full receipt object with all details
     if (receipt) {
       console.log("Selected Receipt:", receipt);
+
+      // Make sure we're passing the complete receipt object including stock_ins
+      // If the receipt doesn't have stock_ins array, log a warning
+      if (!receipt.stock_ins) {
+        console.warn("Receipt is missing stock_ins data:", receipt);
+      } else {
+        console.log(`Receipt has ${receipt.stock_ins.length} stock-in items`);
+      }
+
       setSelectedReceipt(receipt);
       setIsEditStockInOpen(true);
     } else {
@@ -61,15 +70,33 @@ const StockIn = () => {
     try {
       setLoading(true);
       const response = await axios.get(
-        "http://127.0.0.1:8000/fetch-item-data/"
+        "http://127.0.0.1:8000/fetch-stockin-page-data/"
       );
 
-      // Examine the exact structure of a sample receipt
+      // Detailed logging for debugging
+      console.log("API Response:", response.data);
+
       if (response.data.receipts && response.data.receipts.length > 0) {
+        const firstReceipt = response.data.receipts[0];
         console.log(
           "First receipt structure:",
-          JSON.stringify(response.data.receipts[0], null, 2)
+          JSON.stringify(firstReceipt, null, 2)
         );
+
+        // Check if stock_ins are present
+        if (firstReceipt.stock_ins) {
+          console.log(
+            `First receipt has ${firstReceipt.stock_ins.length} stock-in items`
+          );
+          if (firstReceipt.stock_ins.length > 0) {
+            console.log(
+              "First stock-in item:",
+              JSON.stringify(firstReceipt.stock_ins[0], null, 2)
+            );
+          }
+        } else {
+          console.warn("Receipt is missing stock_ins data");
+        }
       }
 
       setReceipts(response.data.receipts || []);
@@ -187,7 +214,7 @@ const StockIn = () => {
   });
 
   return (
-    <div className="h-screen bg-[#fcf4dc] flex flex-col p-6">
+    <div className="h-screen bg-[#eeeeee] flex flex-col p-6">
       {/* Search Bar and Buttons */}
       <div className="flex justify-between items-center mb-4">
         {/* Search Bar */}

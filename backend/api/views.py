@@ -1157,6 +1157,224 @@ def fetch_item_data(request):
     except Exception as e:
         return Response({"error": str(e)}, status=500)
 
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def fetch_items_page_data(request):
+    """Specialized endpoint for Items.jsx"""
+    try:
+        # Use supabase_anon for data retrieval
+        items = supabase_anon.table('items').select('*').execute()
+        categories = supabase_anon.table('item_category').select('*').execute()
+        units = supabase_anon.table('unit_of_measurement').select('*').execute()
+        
+        # Process data into the expected format
+        items_data = items.data
+        categories_data = categories.data
+        units_data = units.data
+        
+        return Response({
+            'items': items_data,
+            'categories': categories_data,
+            'units': units_data,
+        })
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def fetch_inventory_page_data(request):
+    """Specialized endpoint for Inventory.jsx"""
+    try:
+        # Use the correct foreign key relationship in the query
+        # 'item' is the foreign key column in inventory that references 'items' table
+        inventory = supabase_anon.table('inventory').select('*, item:items(*)').execute()
+        categories = supabase_anon.table('item_category').select('*').execute()
+        units = supabase_anon.table('unit_of_measurement').select('*').execute()
+        employees = supabase_anon.table('employee').select('*').execute()
+        disposal_reasons = supabase_anon.table('reason_of_disposal').select('*').execute()
+        
+        # Extract data from the response
+        inventory_data = inventory.data
+        categories_data = categories.data
+        units_data = units.data
+        employees_data = employees.data
+        reasons_data = disposal_reasons.data
+        
+        return Response({
+            'inventory': inventory_data,
+            'categories': categories_data,
+            'units': units_data,
+            'employees': employees_data,
+            'disposalreason': reasons_data,
+        })
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def fetch_stockin_page_data(request):
+    """Specialized endpoint for StockIn.jsx"""
+    try:
+        # Use supabase_anon for data retrieval with foreign keys
+        receipts = supabase_anon.table('receipts').select('*').execute()
+        stockin_items = supabase_anon.table('stockin').select('*').execute()
+        suppliers = supabase_anon.table('supplier').select('*').execute()
+        items = supabase_anon.table('items').select('*').execute()
+        inventory = supabase_anon.table('inventory').select('*, item:items(*)').execute()
+        units = supabase_anon.table('unit_of_measurement').select('*').execute()
+        
+        # Extract data
+        receipts_data = receipts.data
+        stockin_items_data = stockin_items.data
+        suppliers_data = suppliers.data
+        inventory_data = inventory.data
+        items_data = items.data
+        
+        # Get all items indexed by ID for quick lookup
+        items_lookup = {item['id']: item for item in items_data}
+        
+        # Get all inventory items indexed by ID
+        inventory_lookup = {inv['id']: inv for inv in inventory_data}
+        
+        # Enrich receipts with supplier information
+        for receipt in receipts_data:
+            supplier_id = receipt.get('supplier')
+            if supplier_id:
+                # Find the supplier and add as nested object
+                supplier = next((s for s in suppliers_data if s.get('id') == supplier_id), None)
+                if supplier:
+                    receipt['supplier'] = supplier
+        
+        # Process stock-in items and organize by receipt_id
+        stock_ins_by_receipt = {}
+        for stock_in in stockin_items_data:
+            receipt_id = stock_in.get('receipt_id')
+            if receipt_id not in stock_ins_by_receipt:
+                stock_ins_by_receipt[receipt_id] = []
+            
+            # Get inventory details
+            inventory_id = stock_in.get('inventory_id')
+            inventory_item = inventory_lookup.get(inventory_id, {})
+            
+            # Get item details from inventory or directly
+            item_id = stock_in.get('item_id')
+            if not item_id and inventory_item and 'item' in inventory_item:
+                if isinstance(inventory_item['item'], dict):
+                    item_details = inventory_item['item']
+                else:
+                    item_id = inventory_item.get('item')
+                    item_details = items_lookup.get(item_id, {})
+            else:
+                item_details = items_lookup.get(item_id, {})
+            
+            # Build a complete stock-in object with nested inventory and item data
+            enriched_stock_in = {
+                **stock_in,
+                'inventory': {
+                    'id': inventory_id,
+                    'item': item_details
+                }
+            }
+            
+            stock_ins_by_receipt[receipt_id].append(enriched_stock_in)
+        
+        # Add stock-in items to each receipt
+        for receipt in receipts_data:
+            receipt_id = receipt.get('id')
+            receipt['stock_ins'] = stock_ins_by_receipt.get(receipt_id, [])
+        
+        # Log the first receipt with stock-ins for debugging
+        if receipts_data and len(receipts_data) > 0:
+            first_receipt = receipts_data[0]
+            stock_ins = first_receipt.get('stock_ins', [])
+            print(f"First receipt has {len(stock_ins)} stock-in items")
+            if stock_ins:
+                print("First stock-in item structure:", stock_ins[0])
+        
+        return Response({
+            'receipts': receipts_data,
+            'supplier': suppliers_data,
+            'items': items_data,
+            'inventory': inventory_data,
+            'units': units.data,
+        })
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return Response({'error': str(e)}, status=500)
+
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def fetch_stockout_page_data(request):
+    """Specialized endpoint for StockOut.jsx"""
+    try:
+        # Use properly nested query to get all related data in one call
+        disposed_inventory = supabase_anon.table('disposed_inventory').select('''
+            *,
+            inventory_id:inventory (
+                *,
+                item:items (
+                    *,
+                    measurement:unit_of_measurement (*)
+                )
+            ),
+            disposer:employee (*),
+            reason_id:reason_of_disposal (*)
+        ''').execute()
+        
+        # Get the raw data
+        disposed_data = disposed_inventory.data
+        
+        # Process disposed inventory to include nested relationships directly in each item
+        processed_disposed = []
+        for item in disposed_data:
+            # Get inventory and item data
+            inventory = item.get('inventory', {})
+            item_data = inventory.get('item', {}) if inventory else {}
+            
+            # Get unit data
+            unit_data = item_data.get('unit', {}) if item_data else {}
+            unit_symbol = unit_data.get('symbol', '') if unit_data else ''
+            
+            # Get employee (disposer) data
+            employee_data = item.get('employee', {})
+            disposer_name = f"{employee_data.get('first_name', '')} {employee_data.get('last_name', '')}".strip() if employee_data else ''
+            
+            # Get reason data
+            reason_data = item.get('reason', {})
+            reason_name = reason_data.get('name', '') if reason_data else ''
+            
+            # Build processed item with all needed information
+            processed_item = {
+                **item,
+                "item_name": item_data.get('name', 'Unknown Item'),
+                "disposer_name": disposer_name or f"ID: {item.get('disposer', 'Unknown')}",
+                "disposed_unit": unit_symbol,
+                "reason_name": reason_name or f"ID: {item.get('reason_of_disposal', 'Unknown')}"
+            }
+            
+            processed_disposed.append(processed_item)
+        
+        return Response({
+            'disposed_inventory': processed_disposed
+        })
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return Response({'error': str(e)}, status=500)
+    
+
 @api_view(['POST'])
 @authentication_classes([SupabaseAuthentication])
 @permission_classes([SupabaseIsAdmin])
@@ -3633,3 +3851,158 @@ def check_menu_inventory(request, menu_id):
         return Response({
             "error": str(e)
         }, status=500)
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def fetch_stockin_page_data(request):
+    """Specialized endpoint for StockIn.jsx"""
+    try:
+        # Use supabase_anon for data retrieval with foreign keys
+        receipts = supabase_anon.table('receipts').select('*').execute()
+        stockin_items = supabase_anon.table('stockin').select('*').execute()
+        suppliers = supabase_anon.table('supplier').select('*').execute()
+        items = supabase_anon.table('items').select('*').execute()
+        inventory = supabase_anon.table('inventory').select('*, item:items(*)').execute()
+        units = supabase_anon.table('unit_of_measurement').select('*').execute()
+        
+        # Extract data
+        receipts_data = receipts.data
+        stockin_items_data = stockin_items.data
+        suppliers_data = suppliers.data
+        inventory_data = inventory.data
+        items_data = items.data
+        
+        # Get all items indexed by ID for quick lookup
+        items_lookup = {item['id']: item for item in items_data}
+        
+        # Get all inventory items indexed by ID
+        inventory_lookup = {inv['id']: inv for inv in inventory_data}
+        
+        # Enrich receipts with supplier information
+        for receipt in receipts_data:
+            supplier_id = receipt.get('supplier')
+            if supplier_id:
+                # Find the supplier and add as nested object
+                supplier = next((s for s in suppliers_data if s.get('id') == supplier_id), None)
+                if supplier:
+                    receipt['supplier'] = supplier
+        
+        # Process stock-in items and organize by receipt_id
+        stock_ins_by_receipt = {}
+        for stock_in in stockin_items_data:
+            receipt_id = stock_in.get('receipt_id')
+            if receipt_id not in stock_ins_by_receipt:
+                stock_ins_by_receipt[receipt_id] = []
+            
+            # Get inventory details
+            inventory_id = stock_in.get('inventory_id')
+            inventory_item = inventory_lookup.get(inventory_id, {})
+            
+            # Get item details from inventory or directly
+            item_id = stock_in.get('item_id')
+            if not item_id and inventory_item and 'item' in inventory_item:
+                if isinstance(inventory_item['item'], dict):
+                    item_details = inventory_item['item']
+                else:
+                    item_id = inventory_item.get('item')
+                    item_details = items_lookup.get(item_id, {})
+            else:
+                item_details = items_lookup.get(item_id, {})
+            
+            # Build a complete stock-in object with nested inventory and item data
+            enriched_stock_in = {
+                **stock_in,
+                'inventory': {
+                    'id': inventory_id,
+                    'item': item_details
+                }
+            }
+            
+            stock_ins_by_receipt[receipt_id].append(enriched_stock_in)
+        
+        # Add stock-in items to each receipt
+        for receipt in receipts_data:
+            receipt_id = receipt.get('id')
+            receipt['stock_ins'] = stock_ins_by_receipt.get(receipt_id, [])
+        
+        # Log the first receipt with stock-ins for debugging
+        if receipts_data and len(receipts_data) > 0:
+            first_receipt = receipts_data[0]
+            stock_ins = first_receipt.get('stock_ins', [])
+            print(f"First receipt has {len(stock_ins)} stock-in items")
+            if stock_ins:
+                print("First stock-in item structure:", stock_ins[0])
+        
+        return Response({
+            'receipts': receipts_data,
+            'supplier': suppliers_data,
+            'items': items_data,
+            'inventory': inventory_data,
+            'units': units.data,
+        })
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def fetch_stockout_page_data(request):
+    """Specialized endpoint for StockOut.jsx"""
+    try:
+        # Use properly nested query to get all related data in one call
+        disposed_inventory = supabase_anon.table('disposed_inventory').select('''
+            *,
+            inventory:inventory_id (
+                *,
+                item:item (
+                    *,
+                    unit:measurement (*)
+                )
+            ),
+            employee:disposer (*),
+            reason:reason_of_disposal (*)
+        ''').execute()
+        
+        # Get the raw data
+        disposed_data = disposed_inventory.data
+        
+        # Process disposed inventory to include nested relationships directly in each item
+        processed_disposed = []
+        for item in disposed_data:
+            # Get inventory and item data
+            inventory = item.get('inventory', {})
+            item_data = inventory.get('item', {}) if inventory else {}
+            
+            # Get unit data
+            unit_data = item_data.get('unit', {}) if item_data else {}
+            unit_symbol = unit_data.get('symbol', '') if unit_data else ''
+            
+            # Get employee (disposer) data
+            employee_data = item.get('employee', {})
+            disposer_name = f"{employee_data.get('first_name', '')} {employee_data.get('last_name', '')}".strip() if employee_data else ''
+            
+            # Get reason data
+            reason_data = item.get('reason', {})
+            reason_name = reason_data.get('name', '') if reason_data else ''
+            
+            # Build processed item with all needed information
+            processed_item = {
+                **item,
+                "item_name": item_data.get('name', 'Unknown Item'),
+                "disposer_name": disposer_name or f"ID: {item.get('disposer', 'Unknown')}",
+                "disposed_unit": unit_symbol,
+                "reason_name": reason_name or f"ID: {item.get('reason_of_disposal', 'Unknown')}"
+            }
+            
+            processed_disposed.append(processed_item)
+        
+        return Response({
+            'disposed_inventory': processed_disposed
+        })
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return Response({'error': str(e)}, status=500)

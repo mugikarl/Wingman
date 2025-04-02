@@ -26,7 +26,7 @@ const Inventory = () => {
   const fetchInventoryData = async () => {
     try {
       const response = await axios.get(
-        "http://127.0.0.1:8000/fetch-item-data/"
+        "http://127.0.0.1:8000/fetch-inventory-page-data/"
       );
       setInventoryData(response.data.inventory);
       setUnits(response.data.units || []);
@@ -44,19 +44,32 @@ const Inventory = () => {
     fetchInventoryData();
   }, []);
 
-  const filteredInventoryData = inventoryData.filter((item) => {
+  const filteredInventoryData = inventoryData.filter((inventoryItem) => {
+    if (!searchQuery) return true;
+
     const searchLower = searchQuery.toLowerCase();
+
+    // Access nested item data correctly
+    const item = inventoryItem.item || {};
+    const itemName = item.name || "";
+    const itemId = (inventoryItem.id || "").toString();
+
+    // Find category safely
+    let categoryName = "";
+    if (item.category) {
+      const category = categories.find((c) => c.id === item.category);
+      categoryName = category ? category.name : "";
+    }
+
     return (
-      item.name.toLowerCase().includes(searchLower) ||
-      item.id.toString().includes(searchLower) ||
-      (categories.find((c) => c.id === item.category)?.name || "")
-        .toLowerCase()
-        .includes(searchLower)
+      itemName.toLowerCase().includes(searchLower) ||
+      itemId.includes(searchLower) ||
+      categoryName.toLowerCase().includes(searchLower)
     );
   });
 
   return (
-    <div className="flex-grow p-6 bg-[#fcf4dc] min-h-full">
+    <div className="flex-grow p-6 bg-[#eeeeee] min-h-full">
       {/* Search Bar */}
       <div className="flex mb-4 w-[400px]">
         <input
@@ -76,14 +89,22 @@ const Inventory = () => {
       ) : (
         <Table
           columns={["NAME", "CATEGORY", "QUANTITY"]}
-          data={filteredInventoryData.map((item) => {
+          data={filteredInventoryData.map((inventoryItem) => {
+            const item = inventoryItem.item || {};
+
+            // Find unit and category
             const unit = units.find((u) => u.id === item.measurement);
             const category = categories.find((c) => c.id === item.category);
-            const quantityWithUnit = `${item.quantity} ${
+
+            const quantityWithUnit = `${inventoryItem.quantity || 0} ${
               unit ? unit.symbol : ""
             }`;
 
-            return [item.name, category ? category.name : "", quantityWithUnit];
+            return [
+              item.name || "N/A",
+              category ? category.name : "",
+              quantityWithUnit,
+            ];
           })}
           rowOnClick={(rowIndex) =>
             openDisposedModal(filteredInventoryData[rowIndex])

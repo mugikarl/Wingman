@@ -30,34 +30,84 @@ const EditStockInDetails = ({
   // On mount or when receipt, unitMeasurements, or suppliers change, initialize local state from props.
   useEffect(() => {
     if (receipt) {
+      console.log("Receipt data:", receipt);
+
+      // Ensure we capture the receipt ID correctly
+      const receiptId = receipt.id || receipt.receipt_id;
+
       // Format stock entries if available.
-      if (receipt.stock_ins) {
+      if (receipt.stock_ins && Array.isArray(receipt.stock_ins)) {
+        console.log("Stock-ins data:", receipt.stock_ins);
+
         const formattedStock = receipt.stock_ins.map((stock) => {
-          const measurementSymbol =
-            unitMeasurements?.find(
-              (unit) => unit.id === stock.inventory?.item?.measurement
-            )?.symbol || "N/A";
+          console.log("Processing stock item:", stock);
+
+          // Handle different possible data structures
+          let itemName = "Unknown Item";
+          let itemId = null;
+          let measurementId = null;
+          let measurementSymbol = "N/A";
+          let inventoryId = stock.inventory_id || null;
+
+          // Try to get item details from the nested structure
+          if (stock.inventory && stock.inventory.item) {
+            const item = stock.inventory.item;
+            itemName = item.name || "Unknown Item";
+            itemId = item.id || null;
+            measurementId = item.measurement || null;
+
+            // Find the unit measurement
+            if (measurementId && unitMeasurements) {
+              const unit = unitMeasurements.find((u) => u.id === measurementId);
+              measurementSymbol = unit ? unit.symbol : "N/A";
+            }
+          }
+          // If no nested item, try to find from the items prop
+          else if (stock.item_id) {
+            const item = items.find((i) => i.id === stock.item_id);
+            if (item) {
+              itemName = item.name;
+              itemId = item.id;
+              measurementId = item.measurement;
+
+              // Find the unit measurement
+              if (measurementId && unitMeasurements) {
+                const unit = unitMeasurements.find(
+                  (u) => u.id === measurementId
+                );
+                measurementSymbol = unit ? unit.symbol : "N/A";
+              }
+            }
+          }
+
+          console.log(`Item: ${itemName}, Unit: ${measurementSymbol}`);
+
           return {
             id: stock.id,
-            name: stock.inventory?.item?.name || "Unknown Item",
+            name: itemName,
             measurement: measurementSymbol,
-            price: stock.price,
-            quantity: stock.quantity_in,
-            totalCost: stock.price * stock.quantity_in,
+            price: stock.price || 0,
+            quantity: stock.quantity_in || 0,
+            totalCost: (stock.price || 0) * (stock.quantity_in || 0),
             // Save original quantity and IDs for backend calculations.
-            old_quantity: stock.quantity_in,
-            inventory_id: stock.inventory?.id || null,
-            item_id: stock.inventory?.item?.id || null,
+            old_quantity: stock.quantity_in || 0,
+            inventory_id: inventoryId,
+            item_id: itemId,
             // Flag for deferred deletion.
             to_delete: false,
           };
         });
+
+        console.log("Formatted stock data:", formattedStock);
         setStockInData(formattedStock);
         setEditedStockData(formattedStock);
+      } else {
+        console.warn("No stock_ins array found in receipt:", receipt);
+        setStockInData([]);
+        setEditedStockData([]);
       }
 
-      // CHANGE THIS PART - Handle the nested supplier object
-      // Check if receipt.supplier is an object with id and name fields
+      // Handle the nested supplier object
       if (
         receipt.supplier &&
         typeof receipt.supplier === "object" &&
@@ -65,22 +115,22 @@ const EditStockInDetails = ({
       ) {
         setEditedReceipt({
           ...receipt,
+          id: receiptId, // Ensure we have the ID
           supplier_id: receipt.supplier.id,
           supplier_name: receipt.supplier.name || "",
         });
-      }
-      // For backward compatibility, also handle if receipt.supplier is just an ID
-      else {
+      } else {
         const supplierId = receipt.supplier ? Number(receipt.supplier) : "";
         const supplierObj = suppliers.find((s) => s.id === supplierId) || {};
         setEditedReceipt({
           ...receipt,
+          id: receiptId, // Ensure we have the ID
           supplier_id: supplierId,
           supplier_name: supplierObj.name || "",
         });
       }
     }
-  }, [receipt, unitMeasurements, suppliers]);
+  }, [receipt, unitMeasurements, suppliers, items]);
 
   // Toggle editing mode. If canceling, revert local changes.
   const toggleEditMode = () => {
@@ -180,6 +230,7 @@ const EditStockInDetails = ({
       setIsAdding(true);
 
       try {
+        // Find the selected item by name
         const selectedItem = items.find(
           (item) => item.name === selectedStock.name
         );
@@ -187,22 +238,64 @@ const EditStockInDetails = ({
           alert("Selected item not found.");
           return;
         }
-        let inventoryId = selectedItem.inventory_id;
-        if (!inventoryId && typeof inventory !== "undefined") {
-          const inv = inventory.find(
-            (invRec) => String(invRec.item) === String(selectedItem.id)
-          );
-          if (inv) {
-            inventoryId = inv.id;
+
+        console.log("Selected item:", selectedItem);
+        console.log("Available inventory:", inventory);
+
+        // Find the inventory record for this item
+        // Try multiple ways to match inventory to item
+        let inventoryId = null;
+        let foundInventory = null;
+
+        // Loop through all inventory items to find a match
+        if (inventory && inventory.length > 0) {
+          for (const inv of inventory) {
+            // Check if inventory has a direct item property
+            if (inv.item !== undefined) {
+              // Case 1: item is an ID that matches the selected item's ID
+              if (
+                inv.item === selectedItem.id ||
+                String(inv.item) === String(selectedItem.id)
+              ) {
+                inventoryId = inv.id;
+                foundInventory = inv;
+                console.log("Found inventory by direct ID match:", inv);
+                break;
+              }
+
+              // Case 2: item is a nested object
+              if (typeof inv.item === "object" && inv.item !== null) {
+                if (
+                  inv.item.id === selectedItem.id ||
+                  String(inv.item.id) === String(selectedItem.id)
+                ) {
+                  inventoryId = inv.id;
+                  foundInventory = inv;
+                  console.log(
+                    "Found inventory by nested object ID match:",
+                    inv
+                  );
+                  break;
+                }
+              }
+            }
           }
         }
+
+        // If we still don't have an inventory ID, create a temporary one for display
         if (!inventoryId) {
-          alert("No inventory id available for the selected item.");
-          return;
+          console.warn("Could not find inventory for item:", selectedItem.id);
+          // This is just for display; the backend will handle the actual creation
+          inventoryId = `temp_${selectedItem.id}`;
+          console.log("Using temporary inventory ID:", inventoryId);
         }
+
+        // Get the measurement symbol
         const measurementSymbol =
           unitMeasurements?.find((unit) => unit.id === selectedItem.measurement)
             ?.symbol || "N/A";
+
+        // Create the new stock-in entry
         const newStock = {
           id: null,
           name: selectedStock.name,
@@ -217,7 +310,11 @@ const EditStockInDetails = ({
           item_id: selectedItem.id,
           to_delete: false,
         };
+
+        console.log("Adding new stock-in entry:", newStock);
         setEditedStockData((prev) => [...prev, newStock]);
+
+        // Reset the form
         setSelectedStock({
           name: "",
           measurement: "",
@@ -226,27 +323,42 @@ const EditStockInDetails = ({
         });
       } catch (error) {
         console.error("Error adding stock:", error);
+        alert(`Error adding stock: ${error.message}`);
       } finally {
         setIsAdding(false);
       }
+    } else {
+      alert("Please fill in all fields for the new stock entry.");
     }
   };
 
-  // Update local selectedStock from inputs.
+  // Updated handleStockInputChange function for EditStockInDetails.jsx
   const handleStockInputChange = (e) => {
     const { name, value } = e.target;
     if (name === "name") {
       const selectedItem = items.find((item) => item.name === value);
       if (selectedItem) {
-        const measurementSymbol =
-          unitMeasurements?.find((unit) => unit.id === selectedItem.measurement)
-            ?.symbol || "N/A";
+        console.log("Selected item for new entry:", selectedItem);
+
+        // Find the measurement unit
+        let measurementSymbol = "N/A";
+        if (selectedItem.measurement && unitMeasurements) {
+          const unit = unitMeasurements.find(
+            (u) => u.id === selectedItem.measurement
+          );
+          if (unit) {
+            measurementSymbol = unit.symbol;
+          }
+        }
+
+        console.log(`Unit for ${selectedItem.name}: ${measurementSymbol}`);
+
+        // Update the selected stock state with item info
         setSelectedStock({
           name: value,
           measurement: measurementSymbol,
           quantity: "",
           price: "",
-          inventory_id: selectedItem.inventory_id,
           item_id: selectedItem.id,
         });
       }
@@ -279,8 +391,17 @@ const EditStockInDetails = ({
       try {
         setIsSubmitting(true);
 
+        // Use editedReceipt.id instead of editedReceipt.receipt_id
+        const receiptId = editedReceipt.id || editedReceipt.receipt_id;
+
+        if (!receiptId) {
+          console.error("No receipt ID found:", editedReceipt);
+          alert("Error: Cannot delete receipt - receipt ID is missing");
+          return;
+        }
+
         const res = await axios.delete(
-          `http://127.0.0.1:8000/delete-receipt/${editedReceipt.receipt_id}/`
+          `http://127.0.0.1:8000/delete-receipt/${receiptId}/`
         );
 
         if (res.status === 200) {
@@ -302,8 +423,20 @@ const EditStockInDetails = ({
     try {
       setIsSubmitting(true);
 
+      // Log the receipt details to help debug
+      console.log("Submitting changes for receipt:", editedReceipt);
+
+      // Use editedReceipt.id instead of editedReceipt.receipt_id
+      const receiptId = editedReceipt.id || editedReceipt.receipt_id;
+
+      if (!receiptId) {
+        console.error("No receipt ID found:", editedReceipt);
+        alert("Error: Cannot update receipt - receipt ID is missing");
+        return;
+      }
+
       const response = await axios.put(
-        `http://127.0.0.1:8000/edit-receipt-stockin-data/${editedReceipt.receipt_id}/`,
+        `http://127.0.0.1:8000/edit-receipt-stockin-data/${receiptId}/`,
         {
           receipt_no: editedReceipt.receipt_no,
           supplier: editedReceipt.supplier_id,
