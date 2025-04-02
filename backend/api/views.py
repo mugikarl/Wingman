@@ -1319,55 +1319,81 @@ def fetch_stockin_page_data(request):
 def fetch_stockout_page_data(request):
     """Specialized endpoint for StockOut.jsx"""
     try:
-        # Use properly nested query to get all related data in one call
-        disposed_inventory = supabase_anon.table('disposed_inventory').select('''
-            *,
-            inventory_id:inventory (
-                *,
-                item:items (
-                    *,
-                    measurement:unit_of_measurement (*)
-                )
-            ),
-            disposer:employee (*),
-            reason_id:reason_of_disposal (*)
-        ''').execute()
-        
-        # Get the raw data
-        disposed_data = disposed_inventory.data
-        
-        # Process disposed inventory to include nested relationships directly in each item
-        processed_disposed = []
-        for item in disposed_data:
-            # Get inventory and item data
-            inventory = item.get('inventory', {})
-            item_data = inventory.get('item', {}) if inventory else {}
+        # Fetch disposed inventory with better joins to ensure we get all related data
+        disposed_inventory_response = supabase_anon.table("disposed_inventory") \
+            .select("id, inventory_id, disposed_quantity, reason_id, disposer, disposal_datetime, other_reason, "
+                    "disposed_unit:unit_of_measurement(id, symbol), "
+                    "reason:reason_id(id, name), "
+                    "employee:disposer(id, first_name, last_name), "
+                    "inventory:inventory_id(id, item, items(id, name, measurement))") \
+            .execute()
+
+        disposed_inventory = disposed_inventory_response.data if disposed_inventory_response.data else []
+
+        # Format the data like in fetch_item_data
+        formatted_disposed_inventory = []
+        for disposal in disposed_inventory:
+            # Carefully extract nested data, with fallbacks for missing values
+            # Get item name from inventory's nested items
+            inventory = disposal.get("inventory", {})
+            item_data = inventory.get("items", {}) if inventory else {}
+            item_name = item_data.get("name", "Unknown Item")
             
-            # Get unit data
-            unit_data = item_data.get('unit', {}) if item_data else {}
-            unit_symbol = unit_data.get('symbol', '') if unit_data else ''
+            # Get disposer's full name
+            disposer_data = disposal.get("employee", {})
+            disposer_name = ""
+            if disposer_data:
+                first_name = disposer_data.get("first_name", "")
+                last_name = disposer_data.get("last_name", "")
+                disposer_name = f"{first_name} {last_name}".strip()
             
-            # Get employee (disposer) data
-            employee_data = item.get('employee', {})
-            disposer_name = f"{employee_data.get('first_name', '')} {employee_data.get('last_name', '')}".strip() if employee_data else ''
+            # Get unit symbol
+            unit_data = disposal.get("disposed_unit", {})
+            unit_symbol = unit_data.get("symbol", "") if unit_data else ""
             
-            # Get reason data
-            reason_data = item.get('reason', {})
-            reason_name = reason_data.get('name', '') if reason_data else ''
+            # Get reason name
+            reason_data = disposal.get("reason", {})
+            reason_name = reason_data.get("name", "") if reason_data else ""
             
-            # Build processed item with all needed information
-            processed_item = {
-                **item,
-                "item_name": item_data.get('name', 'Unknown Item'),
-                "disposer_name": disposer_name or f"ID: {item.get('disposer', 'Unknown')}",
+            formatted_disposed_inventory.append({
+                "id": disposal.get("id"),
+                "inventory_id": disposal.get("inventory_id"),
+                "item_name": item_name,
+                "disposed_quantity": disposal.get("disposed_quantity", 0),
                 "disposed_unit": unit_symbol,
-                "reason_name": reason_name or f"ID: {item.get('reason_of_disposal', 'Unknown')}"
-            }
-            
-            processed_disposed.append(processed_item)
+                "reason": reason_name,
+                "reason_name": reason_name,  # Added for clarity and consistency
+                "disposer": disposer_name or disposal.get("disposer", "Unknown"),
+                "disposer_name": disposer_name,  # Added for clarity and consistency
+                "disposal_datetime": disposal.get("disposal_datetime"),
+                "other_reason": disposal.get("other_reason", "")
+            })
+        
+        # Log the first item for debugging
+        if formatted_disposed_inventory and len(formatted_disposed_inventory) > 0:
+            print("First disposed item:", formatted_disposed_inventory[0])
+        
+        # Fetch additional data needed for the DisposedInventory modal
+        employees_response = supabase_anon.table("employee") \
+            .select("id, first_name, last_name") \
+            .execute()
+        employees = employees_response.data if employees_response.data else []
+        
+        units_response = supabase_anon.table("unit_of_measurement") \
+            .select("*") \
+            .execute()
+        units = units_response.data if units_response.data else []
+        
+        reason_disposal_response = supabase_anon.table("reason_of_disposal") \
+            .select("id, name") \
+            .execute()
+        reason_disposal = reason_disposal_response.data if reason_disposal_response.data else []
         
         return Response({
-            'disposed_inventory': processed_disposed
+            'disposed_inventory': formatted_disposed_inventory,
+            'employees': employees,
+            'units': units,
+            'disposalreason': reason_disposal
         })
     except Exception as e:
         import traceback
@@ -3952,55 +3978,81 @@ def fetch_stockin_page_data(request):
 def fetch_stockout_page_data(request):
     """Specialized endpoint for StockOut.jsx"""
     try:
-        # Use properly nested query to get all related data in one call
-        disposed_inventory = supabase_anon.table('disposed_inventory').select('''
-            *,
-            inventory:inventory_id (
-                *,
-                item:item (
-                    *,
-                    unit:measurement (*)
-                )
-            ),
-            employee:disposer (*),
-            reason:reason_of_disposal (*)
-        ''').execute()
-        
-        # Get the raw data
-        disposed_data = disposed_inventory.data
-        
-        # Process disposed inventory to include nested relationships directly in each item
-        processed_disposed = []
-        for item in disposed_data:
-            # Get inventory and item data
-            inventory = item.get('inventory', {})
-            item_data = inventory.get('item', {}) if inventory else {}
+        # Fetch disposed inventory with better joins to ensure we get all related data
+        disposed_inventory_response = supabase_anon.table("disposed_inventory") \
+            .select("id, inventory_id, disposed_quantity, reason_id, disposer, disposal_datetime, other_reason, "
+                    "disposed_unit:unit_of_measurement(id, symbol), "
+                    "reason:reason_id(id, name), "
+                    "employee:disposer(id, first_name, last_name), "
+                    "inventory:inventory_id(id, item, items(id, name, measurement))") \
+            .execute()
+
+        disposed_inventory = disposed_inventory_response.data if disposed_inventory_response.data else []
+
+        # Format the data like in fetch_item_data
+        formatted_disposed_inventory = []
+        for disposal in disposed_inventory:
+            # Carefully extract nested data, with fallbacks for missing values
+            # Get item name from inventory's nested items
+            inventory = disposal.get("inventory", {})
+            item_data = inventory.get("items", {}) if inventory else {}
+            item_name = item_data.get("name", "Unknown Item")
             
-            # Get unit data
-            unit_data = item_data.get('unit', {}) if item_data else {}
-            unit_symbol = unit_data.get('symbol', '') if unit_data else ''
+            # Get disposer's full name
+            disposer_data = disposal.get("employee", {})
+            disposer_name = ""
+            if disposer_data:
+                first_name = disposer_data.get("first_name", "")
+                last_name = disposer_data.get("last_name", "")
+                disposer_name = f"{first_name} {last_name}".strip()
             
-            # Get employee (disposer) data
-            employee_data = item.get('employee', {})
-            disposer_name = f"{employee_data.get('first_name', '')} {employee_data.get('last_name', '')}".strip() if employee_data else ''
+            # Get unit symbol
+            unit_data = disposal.get("disposed_unit", {})
+            unit_symbol = unit_data.get("symbol", "") if unit_data else ""
             
-            # Get reason data
-            reason_data = item.get('reason', {})
-            reason_name = reason_data.get('name', '') if reason_data else ''
+            # Get reason name
+            reason_data = disposal.get("reason", {})
+            reason_name = reason_data.get("name", "") if reason_data else ""
             
-            # Build processed item with all needed information
-            processed_item = {
-                **item,
-                "item_name": item_data.get('name', 'Unknown Item'),
-                "disposer_name": disposer_name or f"ID: {item.get('disposer', 'Unknown')}",
+            formatted_disposed_inventory.append({
+                "id": disposal.get("id"),
+                "inventory_id": disposal.get("inventory_id"),
+                "item_name": item_name,
+                "disposed_quantity": disposal.get("disposed_quantity", 0),
                 "disposed_unit": unit_symbol,
-                "reason_name": reason_name or f"ID: {item.get('reason_of_disposal', 'Unknown')}"
-            }
-            
-            processed_disposed.append(processed_item)
+                "reason": reason_name,
+                "reason_name": reason_name,  # Added for clarity and consistency
+                "disposer": disposer_name or disposal.get("disposer", "Unknown"),
+                "disposer_name": disposer_name,  # Added for clarity and consistency
+                "disposal_datetime": disposal.get("disposal_datetime"),
+                "other_reason": disposal.get("other_reason", "")
+            })
+        
+        # Log the first item for debugging
+        if formatted_disposed_inventory and len(formatted_disposed_inventory) > 0:
+            print("First disposed item:", formatted_disposed_inventory[0])
+        
+        # Fetch additional data needed for the DisposedInventory modal
+        employees_response = supabase_anon.table("employee") \
+            .select("id, first_name, last_name") \
+            .execute()
+        employees = employees_response.data if employees_response.data else []
+        
+        units_response = supabase_anon.table("unit_of_measurement") \
+            .select("*") \
+            .execute()
+        units = units_response.data if units_response.data else []
+        
+        reason_disposal_response = supabase_anon.table("reason_of_disposal") \
+            .select("id, name") \
+            .execute()
+        reason_disposal = reason_disposal_response.data if reason_disposal_response.data else []
         
         return Response({
-            'disposed_inventory': processed_disposed
+            'disposed_inventory': formatted_disposed_inventory,
+            'employees': employees,
+            'units': units,
+            'disposalreason': reason_disposal
         })
     except Exception as e:
         import traceback
