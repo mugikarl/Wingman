@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import AddProfile from "../../components/popups/AddProfile";
 import EditProfile from "../../components/popups/EditProfile";
 import LoadingScreen from "../../components/popups/LoadingScreen";
+import Table from "../../components/tables/Table";
 import {
   FaCalendarDays,
   FaPersonCirclePlus,
@@ -69,8 +70,21 @@ const StaffProfile = () => {
   );
   const sortedEmployees = [...filteredEmployees].sort((a, b) => a.id - b.id);
 
+  // Transform employees data for the Table component
+  const transformEmployeesForTable = (employees) => {
+    return employees.map((employee) => [
+      `${employee.first_name} ${employee.last_name}`,
+      employee.roles.map((role) => role.role_name).join(", "),
+    ]);
+  };
+
+  // Handle row click for the Table component
+  const handleRowClick = (rowIndex) => {
+    openEditModal(filteredEmployees[rowIndex]);
+  };
+
   return (
-    <div className="flex-grow p-6 bg-[#] min-h-full">
+    <div className="flex-grow p-6 bg-[#EEEEEE] min-h-full">
       {/* Top Section */}
       <div className="flex items-start mb-4 space-x-4">
         {/* Attendance Sheet Button */}
@@ -110,75 +124,48 @@ const StaffProfile = () => {
           </button>
         </Link>
       </div>
-      <div className="flex space">
-        {/* Active Button */}
-        <button
-          className={`flex items-center justify-center p-2 transition-colors duration-200 w-48 ${
-            filterStatus === 1
-              ? "bg-[#FFCF03] text-black" // Active state (same as table header)
-              : "bg-[#bf9e0b] text-black opacity-70" // Inactive state (same as even rows)
-          }`}
-          onClick={() => setFilterStatus(1)}
-        >
-          Active
-        </button>
 
-        {/* Inactive Button */}
-        <button
-          className={`flex items-center justify-center transition-colors duration-200 w-48 ${
-            filterStatus === 2
-              ? "bg-[#FFCF03] text-black" // Active state (same as table header)
-              : "bg-[#bf9e0b] text-black opacity-70" // Inactive state (same as odd rows)
-          }`}
-          onClick={() => setFilterStatus(2)}
-        >
-          Inactive
-        </button>
-      </div>
+      {/* Status Filter Buttons and Table Section */}
+      <div className="flex flex-col">
+        {/* Status Filter Buttons */}
+        <div className="flex">
+          <button
+            className={`flex items-center justify-center p-2 transition-colors duration-200 w-48 rounded-tl-sm ${
+              filterStatus === 1
+                ? "bg-[#CC5500] text-white"
+                : "bg-[#CC5500]/70 text-white"
+            }`}
+            onClick={() => setFilterStatus(1)}
+          >
+            Active
+          </button>
 
-      {/* Table */}
-      {loading ? (
-        <LoadingScreen />
-      ) : (
-        <div className="table-container border rounded-lg rounded-tl-none shadow overflow-x-auto">
-          <table className="table-auto w-full text-left">
-            <thead className="bg-[#FFCF03] font-bold">
-              <tr>
-                <th className="p-2">NAME</th>
-                <th className="p-2">ROLE</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedEmployees.length > 0 ? (
-                sortedEmployees.map((employee, index) => (
-                  <tr
-                    key={employee.id}
-                    className={
-                      index % 2 === 0
-                        ? "bg-[#FFEEA6] border-b cursor-pointer hover:bg-yellow-200"
-                        : "bg-[#FFFFFF] border-b border-[#FFCF03] cursor-pointer hover:bg-gray-200"
-                    }
-                    onClick={() => openEditModal(employee)}
-                  >
-                    <td className="p-2">
-                      {employee.first_name} {employee.last_name}
-                    </td>
-                    <td className="p-2">
-                      {employee.roles.map((role) => role.role_name).join(", ")}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className="p-2 text-center" colSpan="5">
-                    No employees found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+          <button
+            className={`flex items-center justify-center p-2 transition-colors duration-200 w-48 rounded-tr-sm ${
+              filterStatus === 2
+                ? "bg-[#CC5500] text-white"
+                : "bg-[#CC5500]/70 text-white"
+            }`}
+            onClick={() => setFilterStatus(2)}
+          >
+            Inactive
+          </button>
         </div>
-      )}
+
+        {/* Table Section */}
+        {loading ? (
+          <LoadingScreen />
+        ) : (
+          <div className="rounded-tr-lg">
+            <Table
+              columns={["NAME", "ROLE"]}
+              data={transformEmployeesForTable(sortedEmployees)}
+              rowOnClick={handleRowClick}
+              maxHeight="700px"
+            />
+          </div>
+        )}
+      </div>
 
       {/* Add Profile Modal */}
       <AddProfile

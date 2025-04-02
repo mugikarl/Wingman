@@ -13,7 +13,9 @@ const EditProfile = ({
   const [isEditMode, setIsEditMode] = useState(false);
   const [firstName, setFirstName] = useState(employee?.first_name || "");
   const [lastName, setLastName] = useState(employee?.last_name || "");
-  const [middleInitial, setMiddleInitial] = useState(employee?.middle_initial || "");
+  const [middleInitial, setMiddleInitial] = useState(
+    employee?.middle_initial || ""
+  );
   const [username, setUsername] = useState(employee?.username || "");
   const [email, setEmail] = useState(employee?.email || "");
   const [contactNumber, setContactNumber] = useState(employee?.contact || "");
@@ -69,7 +71,7 @@ const EditProfile = ({
           },
         }
       );
-      alert("Employee has been updated!")
+      alert("Employee has been updated!");
       fetchEmployees();
       setIsEditMode(false);
       closeModal();
@@ -103,13 +105,21 @@ const EditProfile = ({
     isOpen && (
       <div className="fixed inset-0 flex justify-center items-center bg-gray-500 bg-opacity-50 p-4">
         <div className="bg-white rounded-lg p-6 w-8/10 space-y-4">
-          <button onClick={closeModal} className="text-gray-500 hover:text-gray-800">
-            &times;
-          </button>
+          <div className="flex justify-end">
+            <button
+              onClick={closeModal}
+              className="p-1 rounded hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
+            >
+              &times;
+            </button>
+          </div>
           <div className="flex justify-between">
             <h2 className="text-2xl font-bold">Edit Staff Profile</h2>
             <div className="space-x-2">
-              <button onClick={handleDelete} className="bg-red-500 text-white p-2 rounded-lg">
+              <button
+                onClick={handleDelete}
+                className="bg-red-500 text-white p-2 rounded-lg"
+              >
                 Delete
               </button>
               <button

@@ -7,7 +7,7 @@ const Table = ({ columns, data, rowOnClick, maxHeight = "700px" }) => {
       style={{ maxHeight }}
     >
       <table className="w-full text-sm text-left rtl:text-right text-gray-500">
-        <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
+        <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
           <tr>
             {columns.map((column, index) => (
               <th key={index} scope="col" className="px-6 py-4 font-medium">
