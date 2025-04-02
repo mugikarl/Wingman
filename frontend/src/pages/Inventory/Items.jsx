@@ -40,13 +40,13 @@ const Items = () => {
   const fetchItemData = async () => {
     try {
       const response = await axios.get(
-        "http://127.0.0.1:8000/fetch-item-data/"
+        "http://127.0.0.1:8000/fetch-items-page-data/"
       );
-      setItems(response.data.items); // ✅ Correctly access items
+      setItems(response.data.items);
       setCategories(response.data.categories || []);
       setUnits(response.data.units || []);
     } catch (error) {
-      console.error("Error fetching inventory data:", error);
+      console.error("Error fetching item data:", error);
     } finally {
       setLoading(false);
     }
@@ -57,7 +57,7 @@ const Items = () => {
   }, []);
 
   return (
-    <div className="min-h-screen w-full bg-[#fcf4dc] flex">
+    <div className="min-h-screen w-full bg-[#eeeeee] flex">
       <div className="flex-grow p-6">
         <div className="flex flex-col space-y-4 mb-4">
           <div className="w-full">

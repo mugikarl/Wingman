@@ -110,8 +110,12 @@ const StockOut = () => {
   const fetchDisposedInventory = async () => {
     try {
       const response = await axios.get(
-        "http://127.0.0.1:8000/fetch-item-data/"
+        "http://127.0.0.1:8000/fetch-stockout-page-data/"
       );
+
+      // Debug logging to see the data structure
+      console.log("Disposed inventory data:", response.data.disposed_inventory);
+
       setDisposedInventory(response.data.disposed_inventory || []);
     } catch (error) {
       console.error("Error fetching disposed inventory:", error);
@@ -145,7 +149,7 @@ const StockOut = () => {
   };
 
   return (
-    <div className="h-screen bg-[#fcf4dc] flex flex-col p-6">
+    <div className="h-screen bg-[#eeeeee] flex flex-col p-6">
       {/* Top navigation: arrows and current date */}
       <div className="relative bg-[#cc5500] text-lg font-semibold w-full rounded-t-sm flex justify-between items-center">
         <button
@@ -195,14 +199,17 @@ const StockOut = () => {
       ) : (
         <Table
           columns={["ITEM NAME", "DISPOSER", "DISPOSED", "REASON"]}
-          data={filteredDisposedData.map((item) => [
-            item.item_name,
-            item.disposer,
-            `${item.disposed_quantity} ${item.disposed_unit}`,
-            item.reason === "Other"
-              ? `Other - ${item.other_reason}`
-              : item.reason,
-          ])}
+          data={filteredDisposedData.map((item) => {
+            // Use the processed fields from the backend
+            return [
+              item.item_name || "Unknown Item",
+              item.disposer_name || item.disposer || "Unknown",
+              `${item.disposed_quantity || 0} ${item.disposed_unit || ""}`,
+              item.reason === "Other" || item.reason_name === "Other"
+                ? `Other - ${item.other_reason || ""}`
+                : item.reason_name || item.reason || "Unknown",
+            ];
+          })}
         />
       )}
     </div>

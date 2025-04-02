@@ -69,25 +69,35 @@ const AddStockInDetails = ({
       return;
     }
 
-    const selectedInventory = inventory.find(
-      (inv) => Number(inv.item) === Number(newEntry.item_id)
-    );
+    // Convert item_id to number for proper comparison
+    const itemId = Number(newEntry.item_id);
+
+    // Find matching inventory item
+    const selectedInventory = inventory.find((inv) => {
+      // Get the item_id, which might be directly on the inventory object
+      // or nested in the item property
+      const invItemId = inv.item
+        ? Number(inv.item.id)
+        : Number(inv.item_id || inv.item);
+      return invItemId === itemId;
+    });
 
     if (!selectedInventory) {
+      console.error("No inventory found for item ID:", itemId);
+      console.log("Available inventory items:", inventory);
       alert("No inventory record found for the selected item.");
       return;
     }
 
     const entryPayload = {
       inventory_id: selectedInventory.id,
-      item_id: newEntry.item_id,
+      item_id: itemId,
       quantity_in: parseFloat(newEntry.quantity),
       price: parseFloat(newEntry.cost),
     };
 
     const itemName =
-      items.find((item) => Number(item.id) === Number(newEntry.item_id))
-        ?.name || "Unknown Item";
+      items.find((item) => Number(item.id) === itemId)?.name || "Unknown Item";
     const totalCost = parseFloat(newEntry.quantity) * parseFloat(newEntry.cost);
     const displayRow = [
       stockInPayload.length + 1,
