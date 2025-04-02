@@ -7,6 +7,9 @@ import ItemBox from "../../components/tables/ItemBox"; // Import the updated Ite
 import NewMenuCategory from "../../components/popups/NewMenuCategory";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
 import LoadingScreen from "../../components/popups/LoadingScreen";
+import { PiBowlSteam } from "react-icons/pi";
+import { PiGridFour } from "react-icons/pi";
+import { LiaUtensilSpoonSolid } from "react-icons/lia";
 
 const Menu = () => {
   const role = localStorage.getItem("role");
@@ -171,33 +174,6 @@ const Menu = () => {
     setIsDropdownOpen(false);
   };
 
-  // Helper to return unique button styles based on type id for the main filter button
-  const getTypeButtonStyles = (type) => {
-    switch (type.id) {
-      case 1:
-        return "bg-[#E88504] text-white";
-      case 2:
-        return "bg-green-500 text-white";
-      case 3:
-        return "bg-pink-500 text-white";
-      default:
-        return "bg-[#E88504] text-white";
-    }
-  };
-
-  const getLeftContainerBg = (type) => {
-    switch (type.id) {
-      case 1:
-        return "bg-[#D87A03]";
-      case 2:
-        return "bg-green-600";
-      case 3:
-        return "bg-pink-600";
-      default:
-        return "bg-[#D87A03]";
-    }
-  };
-
   return (
     <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
       {/* Top section with search and action buttons */}
@@ -210,56 +186,48 @@ const Menu = () => {
           />
         </div>
         <div className="flex gap-4">
-          {/* New Menu Button */}
+          {/* New Menu Button - Updated with PiBowlSteam icon */}
           <button
-            className="flex items-center bg-gradient-to-r from-[#D87A03] to-[#E88504] text-white rounded-md shadow-md hover:from-[#C66E02] hover:to-[#D87A03] transition-colors duration-200 w-48 overflow-hidden"
+            className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
             onClick={() => setIsModalOpen(true)}
           >
-            <div className="flex items-center justify-center bg-[#D87A03] p-3">
-              <img
-                src="/images/menu (2).png"
-                alt="New Menu"
-                className="w-6 h-6"
-              />
+            <div className="flex items-center justify-center border-r p-3">
+              <PiBowlSteam className="w-5 h-5 text-[#CC5500]" />
             </div>
-            <span className="text-left pl-3">New Menu</span>
+            <span className="flex-1 text-left pl-3">New Menu</span>
           </button>
-          {/* New Category Button */}
+
+          {/* New Category Button - Updated with PiGridFour icon */}
           <button
             onClick={() => setIsMenuCategoryModalOpen(true)}
-            className="flex items-center bg-gradient-to-r from-[#5930b2] to-[#6b3dcc] text-white rounded-md shadow-md hover:from-[#4a2699] hover:to-[#5930b2] transition-colors duration-200 w-48 overflow-hidden"
+            className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
           >
-            <div className="flex items-center justify-center bg-[#5930b2] p-3">
-              <img
-                src="/images/category.png"
-                alt="New Category"
-                className="w-6 h-6"
-              />
+            <div className="flex items-center justify-center border-r p-3">
+              <PiGridFour className="w-5 h-5 text-[#CC5500]" />
             </div>
             <span className="flex-1 text-left pl-3">New Category</span>
           </button>
 
-          {/* Add manual refresh button */}
+          {/* Update Availability button - Commented out as requested 
           <button
             onClick={updateMenuAvailability}
             disabled={isUpdatingAvailability}
-            className={`flex items-center bg-gradient-to-r from-[#3366cc] to-[#4477dd] text-white rounded-md shadow-md ${
-              isUpdatingAvailability
-                ? "opacity-70"
-                : "hover:from-[#2255bb] hover:to-[#3366cc]"
-            } transition-colors duration-200 w-48 overflow-hidden`}
+            className={`flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden ${
+              isUpdatingAvailability ? "opacity-70 cursor-not-allowed" : ""
+            }`}
           >
-            <div className="flex items-center justify-center bg-[#3366cc] p-3">
+            <div className="flex items-center justify-center border-r p-3">
               <img
                 src="/images/refresh.png"
                 alt="Update Availability"
-                className="w-6 h-6"
+                className="w-5 h-5"
               />
             </div>
             <span className="flex-1 text-left pl-3">
               {isUpdatingAvailability ? "Updating..." : "Update Availability"}
             </span>
           </button>
+          */}
         </div>
       </div>
 
@@ -270,44 +238,32 @@ const Menu = () => {
         </div>
       )}
 
-      {/* Filter Dropdown Button */}
+      {/* Filter Dropdown Button - Updated with LiaUtensilSpoonSolid icon */}
       <div className="relative inline-block text-left mb-4">
         <button
           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className={`flex items-center ${
-            selectedMenuType
-              ? getTypeButtonStyles(selectedMenuType)
-              : "bg-gradient-to-r from-[#D87A03] to-[#E88504]"
-          } rounded-md shadow-md hover:opacity-90 transition-colors duration-200 w-48 overflow-hidden`}
+          className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
         >
           {/* Left Icon Container*/}
-          <div
-            className={`flex items-center justify-center ${
-              selectedMenuType
-                ? getLeftContainerBg(selectedMenuType)
-                : "bg-[#D87A03]"
-            } p-3`}
-          >
-            <img
-              src="/images/stockout/menu.png"
-              alt="Menu"
-              className="w-6 h-6"
-            />
+          <div className="flex items-center justify-center border-r p-3">
+            <LiaUtensilSpoonSolid className="w-5 h-5 text-[#CC5500]" />
           </div>
+
           {/* Text */}
-          <span className="flex-1 text-left px-3 text-white">
+          <span className="flex-1 text-left pl-3">
             {selectedMenuType ? selectedMenuType.name : "Filter Items"}
           </span>
 
           {/* Arrow Icon */}
-          <div className="flex items-center justify-center p-3">
+          <div className="p-2">
             {isDropdownOpen ? (
-              <FaChevronUp className="h-6 text-white" />
+              <FaChevronUp className="w-4 h-4 text-[#CC5500]" />
             ) : (
-              <FaChevronDown className="h-6 text-white" />
+              <FaChevronDown className="w-4 h-4 text-[#CC5500]" />
             )}
           </div>
         </button>
+
         {isDropdownOpen && (
           <div className="absolute left-0 mt-2 w-48 rounded-md shadow-lg z-10">
             <div className="bg-white rounded-md py-2">

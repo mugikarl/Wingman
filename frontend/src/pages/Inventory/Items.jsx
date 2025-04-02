@@ -73,21 +73,6 @@ const Items = () => {
           </div>
           <div className="w-full">
             <div className="flex justify-start gap-x-2 items-center w-full">
-              {/* <div className="flex space-x-4">
-                <button className="flex items-center justify-center bg-blue-500 text-white p-2 rounded-lg shadow min-w-[12%]">
-                  Meat
-                </button>
-                <button className="flex items-center justify-center bg-green-500 text-white p-2 rounded-lg shadow min-w-[12%]">
-                  Beverages
-                </button>
-                <button className="flex items-center justify-center bg-yellow-500 text-white p-2 rounded-lg shadow min-w-[11%]">
-                  Spices
-                </button>
-                <button className="flex items-center justify-center bg-red-500 text-white p-2 rounded-lg shadow min-w-[11%]">
-                  Blabla
-                </button>
-              </div> */}
-              {/* New Category button */}
               <button
                 onClick={openModal}
                 className="flex items-center bg-white border text-[#CC5500] shadow-md rounded-md duration-200 w-48 overflow-hidden"
