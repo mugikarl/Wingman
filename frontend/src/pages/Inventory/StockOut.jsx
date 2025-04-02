@@ -145,30 +145,29 @@ const StockOut = () => {
   };
 
   return (
-    <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
-      
+    <div className="h-screen bg-[#fcf4dc] flex flex-col p-6">
       {/* Top navigation: arrows and current date */}
-      <div className="relative bg-[#c27100] text-lg font-semibold w-full rounded flex justify-between items-center">
+      <div className="relative bg-[#cc5500] text-lg font-semibold w-full rounded-t-sm flex justify-between items-center">
         <button
-          className="px-4 py-2 text-white hover:bg-white hover:text-[#c27100] border-r border-white"
+          className="px-4 py-2 text-white hover:bg-white hover:text-[#cc5500] border-r border-white"
           onClick={decrementDate}
         >
           &lt;
         </button>
         <div
-          className="absolute left-1/2 transform -translate-x-1/2 cursor-pointer px-2 bg-[#c27100] text-white"
+          className="absolute left-1/2 transform -translate-x-1/2 cursor-pointer px-2 bg-[#cc5500] text-white"
           onClick={() => setShowDatepicker(!showDatepicker)}
         >
           {displayDate}
         </div>
         <button
-          className="px-4 py-2 text-white hover:bg-white hover:text-[#c27100] border-l border-white"
+          className="px-4 py-2 text-white hover:bg-white hover:text-[#cc5500] border-l border-white"
           onClick={incrementDate}
         >
           &gt;
         </button>
         {showDatepicker && (
-          <div className="absolute top-10 left-1/2 transform -translate-x-1/2 mt-2 z-10 bg-white shadow-lg rounded-lg">
+          <div className="absolute top-10 left-1/2 transform -translate-x-1/2 mt-2 z-10 bg-white shadow-lg ">
             <Datepicker
               inline
               value={new Date(selectedDate)}

@@ -5,9 +5,12 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
   const [supplierName, setSupplierName] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddSupplier = async () => {
     if (!supplierName.trim()) return;
+
+    setIsSubmitting(true);
     try {
       const token = localStorage.getItem("access_token");
       const response = await axios.post(
@@ -23,6 +26,8 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
       setSupplierName("");
     } catch (error) {
       console.error("Error adding supplier:", error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -31,11 +36,14 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
 
     if (!supplierName.trim() || selectedIndex === null) return;
 
+    setIsSubmitting(true);
+
     const supplierId = suppliers[selectedIndex]?.id; // Get the actual ID
     console.log("Editing supplier ID:", supplierId); // ✅ Debugging log
 
     if (!supplierId) {
       console.error("Error: No supplier ID found!");
+      setIsSubmitting(false);
       return;
     }
 
@@ -68,6 +76,8 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
     } catch (error) {
       console.error("Error updating supplier:", error);
       alert("Failed to update supplier.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -76,6 +86,7 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
     if (!confirmDelete) return;
 
     try {
+      setIsSubmitting(true);
       const token = localStorage.getItem("access_token");
       await axios.delete(
         `http://127.0.0.1:8000/delete-supplier/${suppliers[index].id}/`,
@@ -93,6 +104,8 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
       }
     } catch (error) {
       console.error("Error deleting supplier:", error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -121,35 +134,50 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
           {!isEditing ? (
             <button
               onClick={handleAddSupplier}
-              className="bg-blue-500 text-white px-3 py-2 rounded-lg"
+              disabled={isSubmitting}
+              className={`bg-blue-500 text-white px-3 py-2 rounded-lg ${
+                isSubmitting
+                  ? "opacity-70 cursor-not-allowed"
+                  : "hover:bg-blue-600"
+              }`}
             >
-              Add
+              {isSubmitting ? "Adding..." : "Add"}
             </button>
           ) : (
             <>
               <button
                 onClick={() => setIsEditing(false)}
-                className="bg-gray-500 text-white px-3 py-2 rounded-lg"
+                disabled={isSubmitting}
+                className="bg-gray-500 text-white px-3 py-2 rounded-lg hover:bg-gray-600"
               >
                 Cancel
               </button>
               <button
                 onClick={handleEditSupplier}
-                className="bg-green-500 text-white px-3 py-2 rounded-lg"
+                disabled={isSubmitting}
+                className={`bg-green-500 text-white px-3 py-2 rounded-lg ${
+                  isSubmitting
+                    ? "opacity-70 cursor-not-allowed"
+                    : "hover:bg-green-600"
+                }`}
               >
-                Update
+                {isSubmitting ? "Updating..." : "Update"}
               </button>
             </>
           )}
         </div>
 
-        {/* Scrollable Table */}
-        <div className="max-h-60 overflow-y-auto border rounded-lg">
-          <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 bg-gray-200">
+        {/* Updated Table with new design */}
+        <div className="relative overflow-x-auto shadow-md sm:rounded-sm max-h-60">
+          <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+            <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
               <tr>
-                <th className="p-2">Supplier</th>
-                <th className="p-2">Actions</th>
+                <th scope="col" className="px-6 py-3 font-medium">
+                  Supplier
+                </th>
+                <th scope="col" className="px-6 py-3 font-medium">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -157,20 +185,32 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
                 suppliers.map((supplier, index) => (
                   <tr
                     key={index}
-                    className="border-b cursor-pointer hover:bg-gray-100"
+                    className={`${
+                      index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                    } border-b hover:bg-gray-200 group cursor-pointer`}
                     onClick={() => {
-                      console.log("Clicked supplier:", supplier); // Debugging log
+                      console.log("Clicked supplier:", supplier);
                       console.log("supplier ID:", supplier.id);
                       setSupplierName(supplier.name);
                       setSelectedIndex(index);
                       setIsEditing(true);
                     }}
                   >
-                    <td className="p-2">{supplier.name}</td>
-                    <td className="p-2">
+                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                      {supplier.name}
+                    </td>
+                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
                       <button
-                        onClick={() => handleDeleteSupplier(index)}
-                        className="bg-red-500 text-white px-2 py-1 rounded"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteSupplier(index);
+                        }}
+                        disabled={isSubmitting}
+                        className={`bg-red-500 text-white px-2 py-1 rounded ${
+                          isSubmitting
+                            ? "opacity-70 cursor-not-allowed"
+                            : "hover:bg-red-600"
+                        }`}
                       >
                         Delete
                       </button>
@@ -178,8 +218,11 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td colSpan="2" className="p-2 text-center">
+                <tr className="bg-white border-b">
+                  <td
+                    colSpan="2"
+                    className="px-6 py-4 text-center font-normal text-gray-500 italic"
+                  >
                     No Suppliers Available
                   </td>
                 </tr>

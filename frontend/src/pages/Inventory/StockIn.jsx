@@ -6,6 +6,8 @@ import AddStockInDetails from "../../components/popups/AddStockInDetails";
 import EditStockInDetails from "../../components/popups/EditStockInDetails";
 import NewSupplier from "../../components/popups/NewSupplier"; // Updated import
 import LoadingScreen from "../../components/popups/LoadingScreen"; // Import the LoadingScreen component
+import { FaBoxOpen, FaRegFileLines } from "react-icons/fa6";
+import { FaSearch } from "react-icons/fa";
 
 const StockIn = () => {
   const [isAddStockInOpen, setIsAddStockInOpen] = useState(false);
@@ -18,6 +20,8 @@ const StockIn = () => {
   const [selectedReceipt, setSelectedReceipt] = useState(null);
   const [unitMeasurements, setUnitMeasurements] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Add search state
+  const [searchTerm, setSearchTerm] = useState("");
 
   const openAddStockInModal = () => {
     setSelectedReceipt(null);
@@ -25,9 +29,14 @@ const StockIn = () => {
   };
 
   const openEditStockInModal = (receipt) => {
-    console.log("Selected Receipt ID:", receipt.receipt_id);
-    setSelectedReceipt(receipt);
-    setIsEditStockInOpen(true);
+    // Find the full receipt object with all details
+    if (receipt) {
+      console.log("Selected Receipt:", receipt);
+      setSelectedReceipt(receipt);
+      setIsEditStockInOpen(true);
+    } else {
+      console.error("No receipt data found for this row");
+    }
   };
 
   // New Supplier modal functions
@@ -54,6 +63,15 @@ const StockIn = () => {
       const response = await axios.get(
         "http://127.0.0.1:8000/fetch-item-data/"
       );
+
+      // Examine the exact structure of a sample receipt
+      if (response.data.receipts && response.data.receipts.length > 0) {
+        console.log(
+          "First receipt structure:",
+          JSON.stringify(response.data.receipts[0], null, 2)
+        );
+      }
+
       setReceipts(response.data.receipts || []);
       setUnitMeasurements(response.data.units || []);
       setItems(response.data.items || []);
@@ -69,25 +87,131 @@ const StockIn = () => {
     }
   };
 
-  const role = localStorage.getItem("role");
-
   useEffect(() => {
     fetchReceipts();
   }, []);
 
+  // For debugging: display the relationship between receipts and suppliers
+  useEffect(() => {
+    if (receipts.length > 0 && suppliers.length > 0) {
+      console.log("Receipt-Supplier Mapping:");
+      receipts.forEach((receipt) => {
+        const supplierObj = suppliers.find(
+          (s) =>
+            // Compare as strings to handle potential type mismatches
+            String(s.id) === String(receipt.supplier)
+        );
+        console.log(
+          `Receipt ${receipt.receipt_no}: Supplier ID=${receipt.supplier}, Found Supplier:`,
+          supplierObj
+        );
+      });
+    }
+  }, [receipts, suppliers]);
+
   const calculatedHeight = "calc(100vh - 140px)";
 
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value.toLowerCase());
+  };
+
+  // Filter the receipts based on search term
+  const filteredReceipts = receipts.filter((receipt) => {
+    if (!searchTerm) return true;
+
+    // Get supplier name from the nested supplier object
+    const supplierName =
+      receipt.supplier && receipt.supplier.name
+        ? receipt.supplier.name
+        : "Unknown Supplier";
+
+    // Format date for searching
+    let formattedDate = receipt.date;
+    try {
+      if (receipt.date) {
+        const dateObj = new Date(receipt.date);
+        formattedDate = dateObj.toLocaleDateString();
+      }
+    } catch (e) {
+      console.error("Error formatting date:", e);
+    }
+
+    // Check if search term is in receipt number, supplier name, or date
+    return (
+      (receipt.receipt_no &&
+        receipt.receipt_no.toLowerCase().includes(searchTerm)) ||
+      supplierName.toLowerCase().includes(searchTerm) ||
+      (formattedDate && formattedDate.toLowerCase().includes(searchTerm))
+    );
+  });
+
+  // Add this function to sort receipts by date in descending order
+  const sortByDateDescending = (a, b) => {
+    // Convert dates to timestamps for comparison
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+
+    // Handle invalid dates (sort to bottom)
+    if (isNaN(dateA)) return 1;
+    if (isNaN(dateB)) return -1;
+
+    // Sort in descending order (newest first)
+    return dateB - dateA;
+  };
+
+  // Apply sorting to filteredReceipts before mapping to tableData
+  const sortedReceipts = [...filteredReceipts].sort(sortByDateDescending);
+
+  // Update the tableData mapping to use sortedReceipts
+  const tableData = sortedReceipts.map((receipt) => {
+    // Get supplier info from the nested supplier object
+    const supplierName =
+      receipt.supplier && receipt.supplier.name
+        ? receipt.supplier.name
+        : "Unknown Supplier";
+
+    // Format the date - assuming it's in ISO format
+    let formattedDate = receipt.date;
+    try {
+      // Try to convert to a nicer format if possible
+      if (receipt.date) {
+        const dateObj = new Date(receipt.date);
+        formattedDate = dateObj.toLocaleDateString();
+      }
+    } catch (e) {
+      console.error("Error formatting date:", e);
+    }
+
+    return [receipt.receipt_no || "N/A", supplierName, formattedDate || "N/A"];
+  });
+
   return (
-    <div className="h-screen bg-[#F5F5F5] flex flex-col p-6">
+    <div className="h-screen bg-[#fcf4dc] flex flex-col p-6">
       {/* Search Bar and Buttons */}
       <div className="flex justify-between items-center mb-4">
         {/* Search Bar */}
-        <div className="w-[400px]">
+        <div className="w-[400px] relative border rounded-sm shadow-md">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <FaSearch className="h-5 w-5 text-gray-400" />
+          </div>
           <input
             type="text"
-            placeholder="Search..."
-            className="w-full p-2 border rounded-sm shadow"
+            placeholder="Search by Receipt No., Supplier, or Date..."
+            className="w-full p-2 pl-10 border rounded-sm shadow"
+            value={searchTerm}
+            onChange={handleSearchChange}
           />
+          {searchTerm && (
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+              <button
+                onClick={() => setSearchTerm("")}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Buttons */}
@@ -95,15 +219,16 @@ const StockIn = () => {
           {/* New Receipt Button */}
           <button
             onClick={openAddStockInModal}
-            className="flex items-center bg-gradient-to-r from-[#864926] to-[#a95a00] text-white rounded-sm shadow-md hover:from-[#864926] hover:to-[#864926] transition-colors duration-200 w-48 overflow-hidden"
+            className="flex items-center bg-white border text-[#CC5500] shadow-md rounded-sm duration-200 w-48 overflow-hidden"
           >
             {/* Image Side */}
-            <div className="flex items-center justify-center bg-[#864926] p-3">
-              <img
+            <div className="flex items-center justify-center border-r p-3">
+              {/* <img
                 src="/images/bill.png"
                 alt="New Receipt"
-                className="w-6 h-6"
-              />
+                className="w-5 h-5 text-[#CC5500]"
+              /> */}
+              <FaRegFileLines className="w-5 h-5 text-[#CC5500]" />
             </div>
             <span className="flex-1 text-left pl-3">New Receipt</span>
           </button>
@@ -111,15 +236,16 @@ const StockIn = () => {
           {/* New Supplier Button */}
           <button
             onClick={openNewSupplierModal}
-            className="flex items-center bg-gradient-to-r from-[#864926] to-[#a95a00] text-white rounded-sm shadow-md hover:from-[#864926] hover:to-[#864926] transition-colors duration-200 w-48 overflow-hidden"
+            className="flex items-center bg-white border text-[#CC5500] shadow-md rounded-sm duration-200 w-48 overflow-hidden"
           >
             {/* Image Side */}
-            <div className="flex items-center justify-center bg-[#864926] p-3">
-              <img
+            <div className="flex items-center justify-center border-r p-3">
+              {/* <img
                 src="/images/delivery-box.png"
                 alt="New Supplier"
-                className="w-6 h-6"
-              />
+                className="w-5 h-5 text-[#CC5500]"
+              /> */}
+              <FaBoxOpen className="w-5 h-5 text-[#CC5500]" />
             </div>
 
             {/* Text Side */}
@@ -127,6 +253,14 @@ const StockIn = () => {
           </button>
         </div>
       </div>
+
+      {/* Search Results Info */}
+      {searchTerm && (
+        <div className="mb-2 text-sm text-gray-600">
+          Showing {sortedReceipts.length} of {receipts.length} receipts for "
+          {searchTerm}"
+        </div>
+      )}
 
       {/* Main Content - Table container with margin-bottom for padding */}
       <div className="flex-1" style={{ height: calculatedHeight }}>
@@ -137,13 +271,12 @@ const StockIn = () => {
         ) : (
           <Table
             columns={["RECEIPT NO.", "SUPPLIER NAME", "DATE"]}
-            data={receipts.map((receipt) => {
-              // Find the supplier object from the suppliers array based on receipt.supplier (the supplier id)
-              const supplierObj =
-                suppliers.find((s) => s.id === receipt.supplier) || {};
-              return [receipt.receipt_no, supplierObj.name || "", receipt.date];
-            })}
-            rowOnClick={(rowIndex) => openEditStockInModal(receipts[rowIndex])}
+            data={tableData}
+            rowOnClick={(rowIndex) => {
+              if (sortedReceipts[rowIndex]) {
+                openEditStockInModal(sortedReceipts[rowIndex]);
+              }
+            }}
             maxHeight={calculatedHeight}
           />
         )}
