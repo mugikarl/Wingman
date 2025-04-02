@@ -127,10 +127,9 @@ const OrderTable = () => {
   };
 
   return (
-    <div className="h-screen p-4 bg-[#D3DBDD]">
+    <div className="h-screen p-4 bg-[#fcf4dc]">
       <div className="flex justify-between items-start mb-4">
         <div>
-          <h2 className="text-xl font-semibold text-[#E88504]">Order List</h2>
           <div className="flex space-x-2 mt-2">
             {["All", "Pending", "Completed", "Cancelled"].map((status) => (
               <button

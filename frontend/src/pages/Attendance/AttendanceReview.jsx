@@ -2,12 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Datepicker } from "flowbite-react";
 import LoadingScreen from "../../components/popups/LoadingScreen";
 
-// Helper: Converts a Date object to a "YYYY-MM-DD" string in local time.
 const getLocalDateString = (date) => {
   return date.toLocaleDateString("en-CA");
 };
 
-// Custom theme object for Flowbite React Datepicker.
 const customTheme = {
   root: {
     base: "relative",
