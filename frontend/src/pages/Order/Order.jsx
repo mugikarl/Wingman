@@ -2,10 +2,14 @@ import React, { useState, useEffect } from "react";
 import ItemBox from "../../components/tables/ItemBox";
 import axios from "axios";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
+import { PiMagnifyingGlass, PiBasket } from "react-icons/pi";
 import OrderSummary from "../../components/panels/OrderSummary";
 import LoadingScreen from "../../components/popups/LoadingScreen";
+import { useNavigate } from "react-router-dom";
 
 const Order = () => {
+  const navigate = useNavigate();
+
   // Modal and dropdown states
   const [selectedItems, setSelectedItems] = useState([]);
   const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
@@ -32,13 +36,19 @@ const Order = () => {
   const [isUpdatingAvailability, setIsUpdatingAvailability] = useState(false);
   const [availabilityMessage, setAvailabilityMessage] = useState("");
   const [isInitialDataFetched, setIsInitialDataFetched] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Add new state variables for inventory tracking
   const [lowInventoryWarnings, setLowInventoryWarnings] = useState({});
 
+  // Add to state variables at the top
+  const [isCheckingMenuAvailability, setIsCheckingMenuAvailability] =
+    useState(false);
+
   const fetchMenuOrders = async () => {
     setLoading(true);
     try {
+      // First fetch the initial data
       const response = await axios.get(
         "http://127.0.0.1:8000/fetch-order-data/"
       );
@@ -50,11 +60,47 @@ const Order = () => {
       setPaymentMethods(response.data.paymentMethods || []);
       setInStoreCategories(response.data.instore_categories || []);
       setEmployees(response.data.employees || []);
-      setIsInitialDataFetched(true); // Mark initial data fetch as complete
+
+      // Then update menu availability
+      setAvailabilityMessage("Checking menu availability...");
+      const token = localStorage.getItem("access_token");
+      const availabilityResponse = await axios.post(
+        "http://127.0.0.1:8000/update-menu-availability/",
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // Update UI with results
+      const updatedCount = availabilityResponse.data.updated_items.length;
+      if (updatedCount > 0) {
+        setAvailabilityMessage(
+          `Updated availability for ${updatedCount} menu items`
+        );
+
+        // Re-fetch menu items if any updates occurred
+        const refreshResponse = await axios.get(
+          "http://127.0.0.1:8000/fetch-order-data/"
+        );
+        setMenuItems(refreshResponse.data.menu_items || []);
+      } else {
+        setAvailabilityMessage("All menu items are up to date");
+      }
+
+      setIsInitialDataFetched(true);
     } catch (error) {
       console.log("Error fetching menu data: ", error);
+      setAvailabilityMessage("Failed to update menu availability");
     } finally {
       setLoading(false);
+
+      // Auto-hide message after 3 seconds
+      setTimeout(() => {
+        setAvailabilityMessage("");
+      }, 3000);
     }
   };
 
@@ -62,6 +108,7 @@ const Order = () => {
   const updateMenuAvailability = async () => {
     try {
       setIsUpdatingAvailability(true);
+      setIsCheckingMenuAvailability(true); // Add gray overlay
       setAvailabilityMessage("Checking menu availability...");
 
       const token = localStorage.getItem("access_token");
@@ -91,6 +138,7 @@ const Order = () => {
       setAvailabilityMessage("Failed to update menu availability");
     } finally {
       setIsUpdatingAvailability(false);
+      setIsCheckingMenuAvailability(false); // Remove gray overlay
 
       // Auto-hide message after 3 seconds
       setTimeout(() => {
@@ -104,17 +152,16 @@ const Order = () => {
     fetchMenuOrders();
   }, []);
 
-  // Separate effect for menu availability updates
+  // Modify the useEffect for menu availability updates
+  // Remove the initial check since it's now done during fetchMenuOrders
   useEffect(() => {
     let intervalId;
 
     // Only start the interval after initial data is fetched
     if (isInitialDataFetched) {
-      // Set up interval to check availability every 2 minutes
-      intervalId = setInterval(updateMenuAvailability, 2 * 60 * 1000);
-
-      // Run initial availability check
-      updateMenuAvailability();
+      // Set up interval to check availability every 10 minutes
+      intervalId = setInterval(updateMenuAvailability, 10 * 60 * 1000);
+      // No need to run initial check here anymore
     }
 
     // Clean up interval on component unmount
@@ -123,7 +170,7 @@ const Order = () => {
         clearInterval(intervalId);
       }
     };
-  }, [isInitialDataFetched]); // Depend on isInitialDataFetched
+  }, [isInitialDataFetched]);
 
   // Set default selected menu type to "In‑Store" immediately
   useEffect(() => {
@@ -143,7 +190,7 @@ const Order = () => {
   }, [selectedMenuType]);
 
   if (loading) {
-    return <LoadingScreen />;
+    return <LoadingScreen message="Checking menu availability" />;
   }
 
   // Handle filter selection for type
@@ -165,6 +212,10 @@ const Order = () => {
     }
   };
 
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
+  };
+
   // Filter items based on selected type and category
   const filteredMenuItems = menuItems.filter((item) => {
     const matchesType = selectedMenuType
@@ -174,7 +225,12 @@ const Order = () => {
       selectedMenuCategory && selectedMenuCategory.id !== 0
         ? item.category_id === selectedMenuCategory.id
         : true;
-    return matchesType && matchesCategory;
+    const matchesSearch =
+      !searchQuery ||
+      (item.name &&
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    return matchesType && matchesCategory && matchesSearch;
   });
 
   // Sort items so that available (status_id === 1) come first
@@ -211,199 +267,112 @@ const Order = () => {
     }
   };
 
-  // Modify the handleAddItem function to check inventory levels
+  // Modify the handleAddItem function to skip inventory checking
   const handleAddItem = (item) => {
     if (item.status_id === 2) {
       return alert("This item is unavailable!");
     }
 
-    // Check inventory levels before adding/incrementing item
-    const checkInventoryLevels = async (
-      menuId,
-      currentQuantity = 0,
-      additionalQuantity = 1
-    ) => {
-      try {
-        const response = await axios.get(
-          `http://127.0.0.1:8000/check-menu-inventory/${menuId}?quantity=${
-            currentQuantity + additionalQuantity
-          }`
-        );
-
-        if (response.data.has_sufficient_inventory === false) {
-          // If inventory is insufficient, show warning but still allow adding
-          const warning = response.data.warnings || [];
-
-          if (warning.length > 0) {
-            // Store warnings in state for display
-            setLowInventoryWarnings((prev) => ({
-              ...prev,
-              [menuId]: warning,
-            }));
-
-            // Create warning message
-            const warningItems = warning
-              .map(
-                (w) =>
-                  `${w.inventory_name}: ${w.available_quantity} ${w.unit} available, ${w.required_quantity} ${w.unit} needed`
-              )
-              .join("\n");
-
-            // Show alert but allow adding
-            const proceed = window.confirm(
-              `Warning: Adding this item may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`
-            );
-
-            if (!proceed) {
-              return false;
-            }
-          }
-        }
-        return true;
-      } catch (error) {
-        console.error("Error checking inventory:", error);
-        return true; // Still allow adding if check fails
-      }
-    };
-
-    // Rest of function wrapped in async IIFE to use async/await
-    (async () => {
-      let existingQuantity = 0;
-
-      // Find if item already exists in order and get its quantity
-      if (selectedMenuType?.id === 1) {
-        let defaultCategory =
-          activeSection === "unliWings" ? "Unli Wings" : "Ala Carte";
-        const existingItem = selectedItems.find((i) => {
-          if (activeSection === "unliWings") {
-            return (
-              i.id === item.id &&
-              i.instoreCategory === defaultCategory &&
-              i.orderNumber === currentUnliOrderNumber
+    // Original handleAddItem logic without inventory checking
+    if (selectedMenuType?.id === 1) {
+      let defaultCategory, defaultDiscount;
+      if (activeSection === "unliWings") {
+        // For Unli mode, only allow items in allowed category IDs: 1 (Wings), 4 (Sides), 5 (Drinks)
+        if (
+          item.category_id === 1 ||
+          item.category_id === 5 ||
+          item.category_id === 4
+        ) {
+          if (
+            item.category_id === 4 &&
+            !item.name.toLowerCase().includes("rice")
+          ) {
+            return alert(
+              "Only Rice items can be added for Sides in the Unli section."
             );
           }
-          return i.id === item.id && i.instoreCategory === defaultCategory;
-        });
-
-        if (existingItem) {
-          existingQuantity = existingItem.quantity;
+          defaultCategory = "Unli Wings";
+          defaultDiscount = 0;
+        } else {
+          return alert(
+            "Only Wings, Drinks, or Sides items can be added to the Unli section."
+          );
         }
       } else {
-        const existingItem = selectedItems.find((i) => i.id === item.id);
-        if (existingItem) {
-          existingQuantity = existingItem.quantity;
-        }
+        // For Ala Carte mode.
+        defaultCategory = "Ala Carte";
+        defaultDiscount = 0;
       }
 
-      // Check inventory before proceeding
-      const canProceed = await checkInventoryLevels(
-        item.id,
-        existingQuantity,
-        1
-      );
-      if (!canProceed) return;
-
-      // Original handleAddItem logic
-      if (selectedMenuType?.id === 1) {
-        let defaultCategory, defaultDiscount;
+      // Merge if same product, same instoreCategory, same discount, and for unli items, same orderNumber.
+      const existingItem = selectedItems.find((i) => {
         if (activeSection === "unliWings") {
-          // For Unli mode, only allow items in allowed category IDs: 1 (Wings), 4 (Sides), 5 (Drinks)
-          if (
-            item.category_id === 1 ||
-            item.category_id === 5 ||
-            item.category_id === 4
-          ) {
-            if (
-              item.category_id === 4 &&
-              !item.name.toLowerCase().includes("rice")
-            ) {
-              return alert(
-                "Only Rice items can be added for Sides in the Unli section."
-              );
-            }
-            defaultCategory = "Unli Wings";
-            defaultDiscount = 0;
-          } else {
-            return alert(
-              "Only Wings, Drinks, or Sides items can be added to the Unli section."
-            );
-          }
-        } else {
-          // For Ala Carte mode.
-          defaultCategory = "Ala Carte";
-          defaultDiscount = 0;
-        }
-
-        // Merge if same product, same instoreCategory, same discount, and for unli items, same orderNumber.
-        const existingItem = selectedItems.find((i) => {
-          if (activeSection === "unliWings") {
-            return (
-              i.id === item.id &&
-              i.instoreCategory === defaultCategory &&
-              i.discount === defaultDiscount &&
-              i.orderNumber === currentUnliOrderNumber
-            );
-          }
           return (
             i.id === item.id &&
             i.instoreCategory === defaultCategory &&
-            i.discount === defaultDiscount
+            i.discount === defaultDiscount &&
+            i.orderNumber === currentUnliOrderNumber
           );
-        });
+        }
+        return (
+          i.id === item.id &&
+          i.instoreCategory === defaultCategory &&
+          i.discount === defaultDiscount
+        );
+      });
 
-        if (existingItem) {
-          setSelectedItems(
-            selectedItems.map((i) => {
-              if (activeSection === "unliWings") {
-                return i.id === item.id &&
-                  i.instoreCategory === defaultCategory &&
-                  i.discount === defaultDiscount &&
-                  i.orderNumber === currentUnliOrderNumber
-                  ? { ...i, quantity: i.quantity + 1 }
-                  : i;
-              }
+      if (existingItem) {
+        setSelectedItems(
+          selectedItems.map((i) => {
+            if (activeSection === "unliWings") {
               return i.id === item.id &&
                 i.instoreCategory === defaultCategory &&
-                i.discount === defaultDiscount
+                i.discount === defaultDiscount &&
+                i.orderNumber === currentUnliOrderNumber
                 ? { ...i, quantity: i.quantity + 1 }
                 : i;
-            })
-          );
-        } else {
-          const newItem =
-            activeSection === "unliWings"
-              ? {
-                  ...item,
-                  quantity: 1,
-                  instoreCategory: defaultCategory,
-                  discount: defaultDiscount,
-                  orderNumber: currentUnliOrderNumber,
-                }
-              : {
-                  ...item,
-                  quantity: 1,
-                  instoreCategory: defaultCategory,
-                  discount: defaultDiscount,
-                };
-          setSelectedItems([...selectedItems, newItem]);
-        }
+            }
+            return i.id === item.id &&
+              i.instoreCategory === defaultCategory &&
+              i.discount === defaultDiscount
+              ? { ...i, quantity: i.quantity + 1 }
+              : i;
+          })
+        );
       } else {
-        // For non‑In‑Store types, use the existing behavior.
-        const existingItem = selectedItems.find((i) => i.id === item.id);
-        if (existingItem) {
-          setSelectedItems(
-            selectedItems.map((i) =>
-              i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-            )
-          );
-        } else {
-          setSelectedItems([
-            ...selectedItems,
-            { ...item, quantity: 1, instoreCategory: "default", discount: 0 },
-          ]);
-        }
+        const newItem =
+          activeSection === "unliWings"
+            ? {
+                ...item,
+                quantity: 1,
+                instoreCategory: defaultCategory,
+                discount: defaultDiscount,
+                orderNumber: currentUnliOrderNumber,
+              }
+            : {
+                ...item,
+                quantity: 1,
+                instoreCategory: defaultCategory,
+                discount: defaultDiscount,
+              };
+        setSelectedItems([...selectedItems, newItem]);
       }
-    })();
+    } else {
+      // For non‑In‑Store types, use the existing behavior.
+      const existingItem = selectedItems.find((i) => i.id === item.id);
+      if (existingItem) {
+        setSelectedItems(
+          selectedItems.map((i) =>
+            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+          )
+        );
+      } else {
+        setSelectedItems([
+          ...selectedItems,
+          { ...item, quantity: 1, instoreCategory: "default", discount: 0 },
+        ]);
+      }
+    }
   };
 
   // Prevent adding a new Unli order if the current Unli order is empty.
@@ -436,146 +405,42 @@ const Order = () => {
     );
   };
 
-  // Modify handleQuantityChange to also check inventory
-  const handleQuantityChange = async (
-    id,
-    groupIdentifier,
-    discount,
-    newQuantity
-  ) => {
-    // If reducing quantity, no need to check inventory
-    const currentItem = selectedItems.find((item) => {
-      if (item.id !== id) return false;
-      if (item.instoreCategory === "Unli Wings") {
-        return (
-          item.orderNumber === groupIdentifier &&
-          Number(item.discount || 0) === Number(discount)
-        );
-      }
-      return (
-        item.instoreCategory === groupIdentifier &&
-        Number(item.discount || 0) === Number(discount)
-      );
-    });
-
-    const currentQuantity = currentItem?.quantity || 0;
-
-    // If decreasing quantity or removing item, no need to check inventory
-    if (newQuantity <= 0 || newQuantity < currentQuantity) {
-      if (newQuantity <= 0) {
-        setSelectedItems((prevItems) =>
-          prevItems.filter((item) => {
-            if (item.id !== id) return true;
-            if (item.instoreCategory === "Unli Wings") {
-              return !(
-                item.orderNumber === groupIdentifier &&
-                Number(item.discount || 0) === Number(discount)
-              );
-            }
+  // Similarly, simplify the handleQuantityChange function to skip inventory checking
+  const handleQuantityChange = (id, groupIdentifier, discount, newQuantity) => {
+    if (newQuantity <= 0) {
+      setSelectedItems((prevItems) =>
+        prevItems.filter((item) => {
+          if (item.id !== id) return true;
+          if (item.instoreCategory === "Unli Wings") {
             return !(
-              item.instoreCategory === groupIdentifier &&
+              item.orderNumber === groupIdentifier &&
               Number(item.discount || 0) === Number(discount)
             );
-          })
-        );
-        return;
-      }
-
-      // Just decrease quantity
-      setSelectedItems((prevItems) =>
-        prevItems.map((item) => {
-          if (
-            item.id === id &&
-            Number(item.discount || 0) === Number(discount)
-          ) {
-            if (item.instoreCategory === "Unli Wings") {
-              if (item.orderNumber === groupIdentifier) {
-                return { ...item, quantity: newQuantity };
-              }
-            } else if (item.instoreCategory === groupIdentifier) {
-              return { ...item, quantity: newQuantity };
-            }
           }
-          return item;
+          return !(
+            item.instoreCategory === groupIdentifier &&
+            Number(item.discount || 0) === Number(discount)
+          );
         })
       );
       return;
     }
 
-    // Check inventory for increasing quantity
-    try {
-      const response = await axios.get(
-        `http://127.0.0.1:8000/check-menu-inventory/${id}?quantity=${newQuantity}`
-      );
-
-      if (response.data.has_sufficient_inventory === false) {
-        const warning = response.data.warnings || [];
-
-        if (warning.length > 0) {
-          // Store warnings in state
-          setLowInventoryWarnings((prev) => ({
-            ...prev,
-            [id]: warning,
-          }));
-
-          // Create warning message
-          const warningItems = warning
-            .map(
-              (w) =>
-                `${w.inventory_name}: ${w.available_quantity} ${w.unit} available, ${w.required_quantity} ${w.unit} needed`
-            )
-            .join("\n");
-
-          // Show alert but allow changing
-          const proceed = window.confirm(
-            `Warning: This quantity may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`
-          );
-
-          if (!proceed) {
-            return;
+    // Just update quantity without checking inventory
+    setSelectedItems((prevItems) =>
+      prevItems.map((item) => {
+        if (item.id === id && Number(item.discount || 0) === Number(discount)) {
+          if (item.instoreCategory === "Unli Wings") {
+            if (item.orderNumber === groupIdentifier) {
+              return { ...item, quantity: newQuantity };
+            }
+          } else if (item.instoreCategory === groupIdentifier) {
+            return { ...item, quantity: newQuantity };
           }
         }
-      }
-
-      // Update the quantity if inventory check passed or user confirmed
-      setSelectedItems((prevItems) =>
-        prevItems.map((item) => {
-          if (
-            item.id === id &&
-            Number(item.discount || 0) === Number(discount)
-          ) {
-            if (item.instoreCategory === "Unli Wings") {
-              if (item.orderNumber === groupIdentifier) {
-                return { ...item, quantity: newQuantity };
-              }
-            } else if (item.instoreCategory === groupIdentifier) {
-              return { ...item, quantity: newQuantity };
-            }
-          }
-          return item;
-        })
-      );
-    } catch (error) {
-      console.error("Error checking inventory:", error);
-      // Still allow quantity change if check fails
-      setSelectedItems((prevItems) =>
-        prevItems.map((item) => {
-          if (
-            item.id === id &&
-            Number(item.discount || 0) === Number(discount)
-          ) {
-            if (item.instoreCategory === "Unli Wings") {
-              if (item.orderNumber === groupIdentifier) {
-                return { ...item, quantity: newQuantity };
-              }
-            } else if (item.instoreCategory === groupIdentifier) {
-              return { ...item, quantity: newQuantity };
-            }
-          }
-          return item;
-        })
-      );
-    }
+        return item;
+      })
+    );
   };
 
   // Remove item from the order
@@ -641,8 +506,12 @@ const Order = () => {
         }
       );
       console.log("Order placed successfully:", response.data);
-      // Optionally clear order state or show confirmation
+
+      // Clear selected items after placing the order
       setSelectedItems([]);
+
+      // Navigate to OrderTable with refresh flag
+      navigate("/ordertable", { state: { refresh: true } });
     } catch (error) {
       console.error(
         "Error placing order:",
@@ -652,7 +521,19 @@ const Order = () => {
   };
 
   return (
-    <div className="h-screen w-full flex bg-[#E2D6D5]">
+    <div className="h-screen w-full flex bg-[#fcf4dc] relative">
+      {/* Disabled overlay for menu availability check */}
+      {isCheckingMenuAvailability && (
+        <div className="absolute inset-0 bg-gray-500 bg-opacity-50 z-10 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-sm shadow-md flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#CC5500] mb-3"></div>
+            <p className="text-gray-700 font-medium text-center">
+              Checking menu availability...
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="flex-grow p-6 flex flex-col">
         {/* Fixed Header: Search Bar and Filters */}
@@ -665,74 +546,72 @@ const Order = () => {
               </div>
             )}
 
-            {/* Search Bar */}
-            <div className="w-full">
-              <div className="flex justify-between items-center w-full space-x-4">
-                <div className="flex w-[430px]">
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    className="flex-grow p-2 border rounded-lg shadow"
-                  />
+            {/* Search Bar - Updated to match OrderTable style */}
+            <div className="flex w-[400px]">
+              <div className="relative flex-grow">
+                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                  <PiMagnifyingGlass className="w-5 h-5 text-gray-500" />
                 </div>
+                <div className="absolute inset-y-0 left-10 flex items-center pointer-events-none">
+                  <span className="text-gray-400">|</span>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search by menu items..."
+                  className="w-full pl-14 p-2 border rounded-lg shadow"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                />
               </div>
             </div>
+
             {/* Filters Section */}
             <div className="flex flex-col space-y-4">
-              {/* Menu Type Buttons */}
-              <div className="flex gap-4">
-                {menuTypes.map((type) => (
-                  <button
-                    key={type.id}
-                    onClick={() => handleTypeFilter(type)}
-                    className={`flex items-center ${getMenuTypeButtonStyles(
-                      type
-                    )} ${
-                      selectedMenuType && selectedMenuType.id === type.id
-                        ? "filter brightness-90"
-                        : ""
-                    } rounded-md shadow-md hover:opacity-90 active:scale-95 transition-transform duration-150 w-56 overflow-hidden`}
-                  >
-                    <div
-                      className={`flex items-center justify-center ${getMenuLeftContainerBg(
-                        type
-                      )} p-3`}
+              {/* Menu Type Buttons - Updated to match OrderTable style */}
+              <div className="flex gap-2">
+                {menuTypes.map((type) => {
+                  let color = "bg-white hover:bg-gray-200";
+                  if (type.id === 1) {
+                    color = "bg-[#CC5500] hover:bg-[#B34A00]";
+                  } else if (type.id === 2) {
+                    color = "bg-green-500 hover:bg-green-600";
+                  } else if (type.id === 3) {
+                    color = "bg-pink-500 hover:bg-pink-600";
+                  }
+
+                  return (
+                    <button
+                      key={type.id}
+                      onClick={() => handleTypeFilter(type)}
+                      className={`px-3 py-1 rounded-md transition-colors w-28 text-center border border-gray-300 shadow-sm ${
+                        selectedMenuType && selectedMenuType.id === type.id
+                          ? `${color} text-white`
+                          : "bg-white hover:bg-gray-200"
+                      }`}
                     >
-                      <img
-                        src="/images/stockout/menu.png"
-                        alt="Menu"
-                        className="w-6 h-6"
-                      />
-                    </div>
-                    <span className="flex-1 text-left px-3 text-white">
                       {type.name}
-                    </span>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
+
               {/* Select Category Dropdown */}
               <div className="relative inline-block text-left">
                 <button
                   onClick={() => setIsCatDropdownOpen(!isCatDropdownOpen)}
-                  className="flex items-center bg-[#E88504] rounded-md shadow-md hover:opacity-90 active:scale-95 transition-transform duration-150 w-56 overflow-hidden"
+                  className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
                 >
-                  <div className="flex items-center justify-center bg-[#D87A03] p-3">
-                    <img
-                      src="/images/groceries.png"
-                      alt="Menu"
-                      className="w-6 h-6"
-                    />
+                  <div className="flex items-center justify-center border-r p-3">
+                    <PiBasket className="w-5 h-5 text-[#CC5500]" />
                   </div>
-                  <span className="flex-1 text-left px-3 text-white">
-                    {selectedMenuCategory
-                      ? selectedMenuCategory.name
-                      : "Select Category"}
+                  <span className="flex-1 text-left pl-3">
+                    {selectedMenuCategory ? selectedMenuCategory.name : "All"}
                   </span>
-                  <div className="flex items-center justify-center p-3">
+                  <div className="flex items-center justify-center pr-3">
                     {isCatDropdownOpen ? (
-                      <FaChevronUp className="h-6 text-white" />
+                      <FaChevronUp className="h-4 w-4 text-[#CC5500]" />
                     ) : (
-                      <FaChevronDown className="h-6 text-white" />
+                      <FaChevronDown className="h-4 w-4 text-[#CC5500]" />
                     )}
                   </div>
                 </button>
@@ -740,12 +619,13 @@ const Order = () => {
                   <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg z-10">
                     <div className="bg-white rounded-md py-2">
                       <button
-                        onClick={() =>
-                          setSelectedMenuCategory({ id: 0, name: "Overall" })
-                        }
+                        onClick={() => {
+                          setSelectedMenuCategory({ id: 0, name: "All" });
+                          setIsCatDropdownOpen(false);
+                        }}
                         className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
                       >
-                        Overall
+                        All
                       </button>
                       {menuCategories.map((cat) => (
                         <button
@@ -790,18 +670,18 @@ const Order = () => {
         selectedItems={selectedItems}
         handleQuantityChange={handleQuantityChange}
         handleRemoveItem={handleRemoveItem}
-        menuType={selectedMenuType} // pass current menu type
+        menuType={selectedMenuType}
         handleInstoreCategoryChange={handleInstoreCategoryChange}
         handleDiscountChange={handleDiscountChange}
         activeSection={activeSection}
         setActiveSection={setActiveSection}
         handleAddNewUnliOrder={handleAddNewUnliOrder}
-        currentUnliOrderNumber={currentUnliOrderNumber} // Pass current order number
+        currentUnliOrderNumber={currentUnliOrderNumber}
         discounts={discounts}
         paymentMethods={paymentMethods}
         inStoreCategories={inStoreCategories}
-        employees={employees} // Pass employees to OrderSummary
-        onPlaceOrder={handlePlaceOrder} // Pass our new onPlaceOrder function
+        employees={employees}
+        onPlaceOrder={handlePlaceOrder}
       />
     </div>
   );

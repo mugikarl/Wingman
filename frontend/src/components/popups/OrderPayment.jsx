@@ -69,7 +69,6 @@ const OrderPayment = ({
       }
       setIsProcessing(true);
       setTimeout(() => {
-        // Use selectedPaymentMethod.id instead of the name
         onPlaceOrder(
           selectedEmployee.id,
           selectedPaymentMethod.id,
@@ -77,6 +76,7 @@ const OrderPayment = ({
         );
         setIsProcessing(false);
         onClose();
+        onOrderPlaced(); // Call the callback after order is placed
       }, 1000);
     } else if (selectedPaymentMethod.name.toLowerCase() === "gcash") {
       if (!gcashReferenceNo) {
