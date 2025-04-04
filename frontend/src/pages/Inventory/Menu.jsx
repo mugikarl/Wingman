@@ -2,14 +2,17 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import NewMenuModal from "../../components/popups/NewMenuModal";
-import EditMenuModal from "../../components/popups/EditMenuModal"; // Import the EditMenuModal
-import ItemBox from "../../components/tables/ItemBox"; // Import the updated ItemBox
+import EditMenuModal from "../../components/popups/EditMenuModal";
+import ItemBox from "../../components/tables/ItemBox";
 import NewMenuCategory from "../../components/popups/NewMenuCategory";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa6";
 import LoadingScreen from "../../components/popups/LoadingScreen";
-import { PiBowlSteam } from "react-icons/pi";
-import { PiGridFour } from "react-icons/pi";
-import { LiaUtensilSpoonSolid } from "react-icons/lia";
+import {
+  PiBowlSteam,
+  PiGridFour,
+  PiBasket,
+  PiMagnifyingGlass,
+} from "react-icons/pi";
 
 const Menu = () => {
   const role = localStorage.getItem("role");
@@ -19,9 +22,11 @@ const Menu = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [isMenuCategoryModalOpen, setIsMenuCategoryModalOpen] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
   const [selectedMenuType, setSelectedMenuType] = useState(null);
+  const [selectedMenuCategory, setSelectedMenuCategory] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Data states
   const [menuItems, setMenuItems] = useState([]);
@@ -44,7 +49,7 @@ const Menu = () => {
     try {
       const token = localStorage.getItem("access_token");
       const response = await axios.get(
-        "http://127.0.0.1:8000/fetch-item-data/",
+        "http://127.0.0.1:8000/fetch-menu-data/",
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -65,6 +70,10 @@ const Menu = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
   };
 
   // Function to update menu availability
@@ -139,10 +148,10 @@ const Menu = () => {
   // Set default filter to "In Store" once menuTypes are loaded
   useEffect(() => {
     if (menuTypes.length > 0 && !selectedMenuType) {
-      const defaultType = menuTypes.find(
+      const inStoreType = menuTypes.find(
         (type) => type.name.toLowerCase() === "in store"
       );
-      setSelectedMenuType(defaultType || menuTypes[0]);
+      setSelectedMenuType(inStoreType || menuTypes[0]);
     }
   }, [menuTypes, selectedMenuType]);
 
@@ -163,144 +172,204 @@ const Menu = () => {
     setMenuItems(updatedItems);
   };
 
-  // Filter the menu items based on the selected menu type
-  const filteredMenuItems = selectedMenuType
-    ? menuItems.filter((item) => item.type_id === selectedMenuType.id)
-    : menuItems;
+  // Filter items based on selected type, category, and search query
+  const filteredMenuItems = menuItems.filter((item) => {
+    const matchesType = selectedMenuType
+      ? item.type_id === selectedMenuType.id
+      : true;
+    const matchesCategory =
+      selectedMenuCategory && selectedMenuCategory.id !== 0
+        ? item.category_id === selectedMenuCategory.id
+        : true;
+    const matchesSearch =
+      !searchQuery ||
+      (item.name &&
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  // Handle filter selection
-  const handleFilter = (type) => {
+    return matchesType && matchesCategory && matchesSearch;
+  });
+
+  // Sort items so that available (status_id === 1) come first
+  const sortedFilteredMenuItems = filteredMenuItems.slice().sort((a, b) => {
+    if (a.status_id === 1 && b.status_id !== 1) return -1;
+    if (a.status_id !== 1 && b.status_id === 1) return 1;
+    return 0;
+  });
+
+  // Handle type filter button click
+  const handleTypeFilter = (type) => {
     setSelectedMenuType(type);
-    setIsDropdownOpen(false);
   };
 
   return (
-    <div className="h-screen bg-[#E2D6D5] flex flex-col p-6">
-      {/* Top section with search and action buttons */}
-      <div className="flex justify-between items-start mb-2">
-        <div className="w-[400px]">
-          <input
-            type="text"
-            placeholder="Search "
-            className="w-full p-2 border rounded-lg shadow"
-          />
-        </div>
-        <div className="flex gap-4">
-          {/* New Menu Button - Updated with PiBowlSteam icon */}
-          <button
-            className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
-            onClick={() => setIsModalOpen(true)}
-          >
-            <div className="flex items-center justify-center border-r p-3">
-              <PiBowlSteam className="w-5 h-5 text-[#CC5500]" />
-            </div>
-            <span className="flex-1 text-left pl-3">New Menu</span>
-          </button>
-
-          {/* New Category Button - Updated with PiGridFour icon */}
-          <button
-            onClick={() => setIsMenuCategoryModalOpen(true)}
-            className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
-          >
-            <div className="flex items-center justify-center border-r p-3">
-              <PiGridFour className="w-5 h-5 text-[#CC5500]" />
-            </div>
-            <span className="flex-1 text-left pl-3">New Category</span>
-          </button>
-
-          {/* Update Availability button - Commented out as requested 
-          <button
-            onClick={updateMenuAvailability}
-            disabled={isUpdatingAvailability}
-            className={`flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden ${
-              isUpdatingAvailability ? "opacity-70 cursor-not-allowed" : ""
-            }`}
-          >
-            <div className="flex items-center justify-center border-r p-3">
-              <img
-                src="/images/refresh.png"
-                alt="Update Availability"
-                className="w-5 h-5"
+    <div className="h-screen bg-[#fcf4dc] flex flex-col p-6">
+      {/* Fixed Header Section */}
+      <div className="flex flex-col space-y-4">
+        {/* Top section with search and action buttons */}
+        <div className="flex justify-between items-start mb-2">
+          {/* Search Bar - Updated to match OrderTable style */}
+          <div className="w-[400px]">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <PiMagnifyingGlass className="w-5 h-5 text-gray-500" />
+              </div>
+              <div className="absolute inset-y-0 left-10 flex items-center pointer-events-none">
+                <span className="text-gray-400">|</span>
+              </div>
+              <input
+                type="text"
+                placeholder="Search by menu items..."
+                className="w-full pl-14 p-2 border rounded-lg shadow"
+                value={searchQuery}
+                onChange={handleSearchChange}
               />
             </div>
-            <span className="flex-1 text-left pl-3">
-              {isUpdatingAvailability ? "Updating..." : "Update Availability"}
-            </span>
-          </button>
-          */}
-        </div>
-      </div>
-
-      {/* Status message */}
-      {availabilityMessage && (
-        <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-2 mb-4">
-          <p>{availabilityMessage}</p>
-        </div>
-      )}
-
-      {/* Filter Dropdown Button - Updated with LiaUtensilSpoonSolid icon */}
-      <div className="relative inline-block text-left mb-4">
-        <button
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
-        >
-          {/* Left Icon Container*/}
-          <div className="flex items-center justify-center border-r p-3">
-            <LiaUtensilSpoonSolid className="w-5 h-5 text-[#CC5500]" />
           </div>
 
-          {/* Text */}
-          <span className="flex-1 text-left pl-3">
-            {selectedMenuType ? selectedMenuType.name : "Filter Items"}
-          </span>
+          <div className="flex gap-4">
+            {/* New Menu Button */}
+            <button
+              className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
+              onClick={() => setIsModalOpen(true)}
+            >
+              <div className="flex items-center justify-center border-r p-3">
+                <PiBowlSteam className="w-5 h-5 text-[#CC5500]" />
+              </div>
+              <span className="flex-1 text-left pl-3">New Menu</span>
+            </button>
 
-          {/* Arrow Icon */}
-          <div className="p-2">
-            {isDropdownOpen ? (
-              <FaChevronUp className="w-4 h-4 text-[#CC5500]" />
-            ) : (
-              <FaChevronDown className="w-4 h-4 text-[#CC5500]" />
-            )}
+            {/* New Category Button */}
+            <button
+              onClick={() => setIsMenuCategoryModalOpen(true)}
+              className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
+            >
+              <div className="flex items-center justify-center border-r p-3">
+                <PiGridFour className="w-5 h-5 text-[#CC5500]" />
+              </div>
+              <span className="flex-1 text-left pl-3">New Category</span>
+            </button>
           </div>
-        </button>
+        </div>
 
-        {isDropdownOpen && (
-          <div className="absolute left-0 mt-2 w-48 rounded-md shadow-lg z-10">
-            <div className="bg-white rounded-md py-2">
-              {menuTypes.map((type) => (
+        {/* Filters Section */}
+        <div className="flex flex-col space-y-4 mb-4">
+          {/* Menu Type Buttons */}
+          <div className="flex gap-2">
+            {menuTypes.map((type) => {
+              let color = "bg-white hover:bg-gray-200";
+              if (type.id === 1) {
+                color = "bg-[#CC5500] hover:bg-[#B34A00]";
+              } else if (type.id === 2) {
+                color = "bg-green-500 hover:bg-green-600";
+              } else if (type.id === 3) {
+                color = "bg-pink-500 hover:bg-pink-600";
+              }
+
+              return (
                 <button
                   key={type.id}
-                  onClick={() => handleFilter(type)}
-                  className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                  onClick={() => handleTypeFilter(type)}
+                  className={`px-3 py-1 rounded-md transition-colors w-28 text-center border border-gray-300 shadow-sm ${
+                    selectedMenuType && selectedMenuType.id === type.id
+                      ? `${color} text-white`
+                      : "bg-white hover:bg-gray-200"
+                  }`}
                 >
                   {type.name}
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        )}
+
+          {/* Category Dropdown */}
+          <div className="relative text-left flex gap-2">
+            <button
+              onClick={() => setIsCatDropdownOpen(!isCatDropdownOpen)}
+              className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
+            >
+              <div className="flex items-center justify-center border-r p-3">
+                <PiBasket className="w-5 h-5 text-[#CC5500]" />
+              </div>
+              <span className="flex-1 text-left pl-3">
+                {selectedMenuCategory
+                  ? selectedMenuCategory.name
+                  : "All Categories"}
+              </span>
+              <div className="flex items-center justify-center pr-3">
+                {isCatDropdownOpen ? (
+                  <FaChevronUp className="h-4 w-4 text-[#CC5500]" />
+                ) : (
+                  <FaChevronDown className="h-4 w-4 text-[#CC5500]" />
+                )}
+              </div>
+            </button>
+            {isCatDropdownOpen && (
+              <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg z-10">
+                <div className="bg-white rounded-md py-2">
+                  <button
+                    onClick={() => {
+                      setSelectedMenuCategory({
+                        id: 0,
+                        name: "All Categories",
+                      });
+                      setIsCatDropdownOpen(false);
+                    }}
+                    className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                  >
+                    All Categories
+                  </button>
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        setSelectedMenuCategory(cat);
+                        setIsCatDropdownOpen(false);
+                      }}
+                      className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Status message */}
+            {availabilityMessage && (
+              <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-3">
+                <p>{availabilityMessage}</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Grid Layout for Filtered Menu Items */}
-      <div className="grid grid-cols-5 gap-x-2 gap-y-4 pt-1">
-        {filteredMenuItems.map((item) => (
-          <ItemBox
-            key={item.id}
-            item={item}
-            image={item.image || "/placeholder.svg"}
-            name={item.name}
-            price={item.price}
-            currency="₱"
-            status={item.status_id}
-            onClick={() => {
-              setSelectedItem(item);
-              setIsEditModalOpen(true);
-            }}
-          />
-        ))}
+      {/* Scrollable Menu Items Grid */}
+      <div
+        className="overflow-y-auto flex-1 mt-4"
+        style={{ height: "calc(100vh - 240px)" }}
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {sortedFilteredMenuItems.map((item) => (
+            <div key={item.id} className="min-w-[200px]">
+              <ItemBox
+                item={item}
+                image={item.image || "/placeholder.svg"}
+                name={item.name}
+                price={item.price}
+                currency="₱"
+                status={item.status_id}
+                onClick={() => {
+                  setSelectedItem(item);
+                  setIsEditModalOpen(true);
+                }}
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* New Menu Modal */}
+      {/* Modals */}
       {isModalOpen && (
         <NewMenuModal
           onClose={() => setIsModalOpen(false)}
@@ -313,7 +382,6 @@ const Menu = () => {
         />
       )}
 
-      {/* Edit Menu Modal */}
       {isEditModalOpen && (
         <EditMenuModal
           item={selectedItem}

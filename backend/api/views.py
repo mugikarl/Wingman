@@ -1316,6 +1316,129 @@ def fetch_stockin_page_data(request):
 @api_view(['GET'])
 @authentication_classes([])
 @permission_classes([AllowAny])
+def fetch_menu_data(request):
+    """
+    Specialized endpoint for Menu.jsx that fetches only menu-related data
+    to optimize performance.
+    """
+    try:
+        # Fetch menu categories (needed by all menu components)
+        menu_categories_response = supabase_anon.table("menu_category") \
+            .select("id, name") \
+            .execute()
+        menu_categories = menu_categories_response.data if menu_categories_response.data else []
+
+        # Fetch menu statuses (needed for showing availability)
+        menu_statuses_response = supabase_anon.table("menu_status") \
+            .select("id, name") \
+            .execute()
+        menu_statuses = menu_statuses_response.data if menu_statuses_response.data else []
+
+        # Fetch menu types (needed for filtering in Menu.jsx)
+        menu_types_response = supabase_anon.table("menu_type") \
+            .select("id, name") \
+            .execute()
+        menu_types = menu_types_response.data if menu_types_response.data else []
+
+        # Fetch measurement units (needed for recipes)
+        units_response = supabase_anon.table("unit_of_measurement") \
+            .select("id, symbol, unit_category") \
+            .execute()
+        units = units_response.data if units_response.data else []
+
+        # Fetch inventory for recipe selection
+        # Only fetch relevant fields needed for recipe creation/editing
+        inventory_response = supabase_anon.table("inventory") \
+            .select("id, item, quantity, items(id, name)") \
+            .execute()
+        
+        inventory_data = inventory_response.data if inventory_response.data else []
+        
+        # Format inventory with item details for easier frontend usage
+        formatted_inventory = []
+        for inventory in inventory_data:
+            item_data = inventory.get("items", {})
+            if item_data:
+                formatted_inventory.append({
+                    "id": inventory.get("id"),
+                    "item": item_data.get("id"),
+                    "name": item_data.get("name", "Unknown Item"),
+                    "quantity": inventory.get("quantity", 0)
+                })
+
+        # Fetch menus with their ingredients
+        menus_response = supabase_anon.table("menu_items") \
+            .select("id, name, type_id, price, image, status_id, category_id") \
+            .execute()
+        menus = menus_response.data if menus_response.data else []
+
+        # Get menu ingredients for each menu item
+        formatted_menus = []
+        for menu in menus:
+            # Generate public URL for the image
+            image_url = None
+            if menu["image"]:
+                try:
+                    image_url = supabase_anon.storage.from_("menu-images").get_public_url(menu["image"])
+                except Exception as e:
+                    print(f"Error generating URL for image {menu['image']}: {e}")
+
+            # Fetch this menu's ingredients
+            menu_ingredients_response = supabase_anon.table("menu_ingredients") \
+                .select("id, menu_id, inventory_id, quantity, unit_id") \
+                .eq("menu_id", menu["id"]) \
+                .execute()
+            
+            menu_ingredients = []
+            if menu_ingredients_response.data:
+                for ingredient in menu_ingredients_response.data:
+                    # Find inventory item for display purposes
+                    inventory_item = next((item for item in formatted_inventory 
+                                           if item["id"] == ingredient["inventory_id"]), None)
+                    
+                    # Find unit for display purposes
+                    unit = next((unit for unit in units 
+                                if unit["id"] == ingredient["unit_id"]), None)
+                    
+                    menu_ingredients.append({
+                        "id": ingredient["id"],
+                        "menu_id": ingredient["menu_id"],
+                        "inventory_id": ingredient["inventory_id"],
+                        "quantity": ingredient["quantity"],
+                        "unit_id": ingredient["unit_id"],
+                        # Include these for display in EditMenuModal
+                        "item_name": inventory_item["name"] if inventory_item else "Unknown",
+                        "unit": unit["symbol"] if unit else ""
+                    })
+
+            formatted_menus.append({
+                "id": menu["id"],
+                "name": menu["name"],
+                "type_id": menu["type_id"],
+                "category_id": menu["category_id"],
+                "price": menu["price"],
+                "image": image_url,
+                "status_id": menu["status_id"],
+                "menu_ingredients": menu_ingredients
+            })
+
+        return Response({
+            "menu_categories": menu_categories,
+            "menu_statuses": menu_statuses,
+            "menu_types": menu_types,
+            "units": units,
+            "inventory": formatted_inventory,
+            "menu_items": formatted_menus
+        })
+    
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
 def fetch_stockout_page_data(request):
     """Specialized endpoint for StockOut.jsx"""
     try:
@@ -2495,7 +2618,7 @@ def fetch_order_data(request, transactionId=None):
         instore_categories = supabase_anon.table("instore_category").select("id", "name", "base_amount").execute().data or []
         
         # Fetch Order Status Type
-        order_status_types = supabase_anon.table("order_status_type").select("id", "name").execute().data or []
+        order_status_types = supabase_anon.table("order_status_type").select("id, name").execute().data or []
         
         # Fetch employees
         active_status_id = 1  # Adjust based on your actual "Active" status ID
@@ -3881,184 +4004,3 @@ def check_menu_inventory(request, menu_id):
         return Response({
             "error": str(e)
         }, status=500)
-
-@api_view(['GET'])
-@authentication_classes([])
-@permission_classes([AllowAny])
-def fetch_stockin_page_data(request):
-    """Specialized endpoint for StockIn.jsx"""
-    try:
-        # Use supabase_anon for data retrieval with foreign keys
-        receipts = supabase_anon.table('receipts').select('*').execute()
-        stockin_items = supabase_anon.table('stockin').select('*').execute()
-        suppliers = supabase_anon.table('supplier').select('*').execute()
-        items = supabase_anon.table('items').select('*').execute()
-        inventory = supabase_anon.table('inventory').select('*, item:items(*)').execute()
-        units = supabase_anon.table('unit_of_measurement').select('*').execute()
-        
-        # Extract data
-        receipts_data = receipts.data
-        stockin_items_data = stockin_items.data
-        suppliers_data = suppliers.data
-        inventory_data = inventory.data
-        items_data = items.data
-        
-        # Get all items indexed by ID for quick lookup
-        items_lookup = {item['id']: item for item in items_data}
-        
-        # Get all inventory items indexed by ID
-        inventory_lookup = {inv['id']: inv for inv in inventory_data}
-        
-        # Enrich receipts with supplier information
-        for receipt in receipts_data:
-            supplier_id = receipt.get('supplier')
-            if supplier_id:
-                # Find the supplier and add as nested object
-                supplier = next((s for s in suppliers_data if s.get('id') == supplier_id), None)
-                if supplier:
-                    receipt['supplier'] = supplier
-        
-        # Process stock-in items and organize by receipt_id
-        stock_ins_by_receipt = {}
-        for stock_in in stockin_items_data:
-            receipt_id = stock_in.get('receipt_id')
-            if receipt_id not in stock_ins_by_receipt:
-                stock_ins_by_receipt[receipt_id] = []
-            
-            # Get inventory details
-            inventory_id = stock_in.get('inventory_id')
-            inventory_item = inventory_lookup.get(inventory_id, {})
-            
-            # Get item details from inventory or directly
-            item_id = stock_in.get('item_id')
-            if not item_id and inventory_item and 'item' in inventory_item:
-                if isinstance(inventory_item['item'], dict):
-                    item_details = inventory_item['item']
-                else:
-                    item_id = inventory_item.get('item')
-                    item_details = items_lookup.get(item_id, {})
-            else:
-                item_details = items_lookup.get(item_id, {})
-            
-            # Build a complete stock-in object with nested inventory and item data
-            enriched_stock_in = {
-                **stock_in,
-                'inventory': {
-                    'id': inventory_id,
-                    'item': item_details
-                }
-            }
-            
-            stock_ins_by_receipt[receipt_id].append(enriched_stock_in)
-        
-        # Add stock-in items to each receipt
-        for receipt in receipts_data:
-            receipt_id = receipt.get('id')
-            receipt['stock_ins'] = stock_ins_by_receipt.get(receipt_id, [])
-        
-        # Log the first receipt with stock-ins for debugging
-        if receipts_data and len(receipts_data) > 0:
-            first_receipt = receipts_data[0]
-            stock_ins = first_receipt.get('stock_ins', [])
-            print(f"First receipt has {len(stock_ins)} stock-in items")
-            if stock_ins:
-                print("First stock-in item structure:", stock_ins[0])
-        
-        return Response({
-            'receipts': receipts_data,
-            'supplier': suppliers_data,
-            'items': items_data,
-            'inventory': inventory_data,
-            'units': units.data,
-        })
-    except Exception as e:
-        import traceback
-        print(traceback.format_exc())
-        return Response({'error': str(e)}, status=500)
-
-@api_view(['GET'])
-@authentication_classes([])
-@permission_classes([AllowAny])
-def fetch_stockout_page_data(request):
-    """Specialized endpoint for StockOut.jsx"""
-    try:
-        # Fetch disposed inventory with better joins to ensure we get all related data
-        disposed_inventory_response = supabase_anon.table("disposed_inventory") \
-            .select("id, inventory_id, disposed_quantity, reason_id, disposer, disposal_datetime, other_reason, "
-                    "disposed_unit:unit_of_measurement(id, symbol), "
-                    "reason:reason_id(id, name), "
-                    "employee:disposer(id, first_name, last_name), "
-                    "inventory:inventory_id(id, item, items(id, name, measurement))") \
-            .execute()
-
-        disposed_inventory = disposed_inventory_response.data if disposed_inventory_response.data else []
-
-        # Format the data like in fetch_item_data
-        formatted_disposed_inventory = []
-        for disposal in disposed_inventory:
-            # Carefully extract nested data, with fallbacks for missing values
-            # Get item name from inventory's nested items
-            inventory = disposal.get("inventory", {})
-            item_data = inventory.get("items", {}) if inventory else {}
-            item_name = item_data.get("name", "Unknown Item")
-            
-            # Get disposer's full name
-            disposer_data = disposal.get("employee", {})
-            disposer_name = ""
-            if disposer_data:
-                first_name = disposer_data.get("first_name", "")
-                last_name = disposer_data.get("last_name", "")
-                disposer_name = f"{first_name} {last_name}".strip()
-            
-            # Get unit symbol
-            unit_data = disposal.get("disposed_unit", {})
-            unit_symbol = unit_data.get("symbol", "") if unit_data else ""
-            
-            # Get reason name
-            reason_data = disposal.get("reason", {})
-            reason_name = reason_data.get("name", "") if reason_data else ""
-            
-            formatted_disposed_inventory.append({
-                "id": disposal.get("id"),
-                "inventory_id": disposal.get("inventory_id"),
-                "item_name": item_name,
-                "disposed_quantity": disposal.get("disposed_quantity", 0),
-                "disposed_unit": unit_symbol,
-                "reason": reason_name,
-                "reason_name": reason_name,  # Added for clarity and consistency
-                "disposer": disposer_name or disposal.get("disposer", "Unknown"),
-                "disposer_name": disposer_name,  # Added for clarity and consistency
-                "disposal_datetime": disposal.get("disposal_datetime"),
-                "other_reason": disposal.get("other_reason", "")
-            })
-        
-        # Log the first item for debugging
-        if formatted_disposed_inventory and len(formatted_disposed_inventory) > 0:
-            print("First disposed item:", formatted_disposed_inventory[0])
-        
-        # Fetch additional data needed for the DisposedInventory modal
-        employees_response = supabase_anon.table("employee") \
-            .select("id, first_name, last_name") \
-            .execute()
-        employees = employees_response.data if employees_response.data else []
-        
-        units_response = supabase_anon.table("unit_of_measurement") \
-            .select("*") \
-            .execute()
-        units = units_response.data if units_response.data else []
-        
-        reason_disposal_response = supabase_anon.table("reason_of_disposal") \
-            .select("id, name") \
-            .execute()
-        reason_disposal = reason_disposal_response.data if reason_disposal_response.data else []
-        
-        return Response({
-            'disposed_inventory': formatted_disposed_inventory,
-            'employees': employees,
-            'units': units,
-            'disposalreason': reason_disposal
-        })
-    except Exception as e:
-        import traceback
-        print(traceback.format_exc())
-        return Response({'error': str(e)}, status=500)

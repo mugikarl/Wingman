@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import Table from "../components/tables/Table";
 import axios from "axios";
 import DisposedInventory from "../components/popups/DisposedInventory";
-import LoadingScreen from "../components/popups/LoadingScreen"; // Import the LoadingScreen component
+import LoadingScreen from "../components/popups/LoadingScreen";
+import { PiMagnifyingGlass } from "react-icons/pi";
 
 const Inventory = () => {
   const [inventoryData, setInventoryData] = useState([]);
@@ -21,6 +22,10 @@ const Inventory = () => {
     console.log("Row clicked:", item);
     setSelectedInventory(item);
     setIsDisposedModalOpen(true);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value);
   };
 
   const fetchInventoryData = async () => {
@@ -69,22 +74,40 @@ const Inventory = () => {
   });
 
   return (
-    <div className="flex-grow p-6 bg-[#eeeeee] min-h-full">
-      {/* Search Bar */}
-      <div className="flex mb-4 w-[400px]">
-        <input
-          type="text"
-          placeholder="Search..."
-          className="flex-grow p-2 border rounded-lg shadow"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+    <div className="flex-grow p-6 bg-[#fcf4dc] min-h-full">
+      {/* Search Bar - Updated to match Order.jsx */}
+      <div className="flex flex-col space-y-4 mb-4">
+        <div className="flex w-[400px]">
+          <div className="relative flex-grow">
+            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <PiMagnifyingGlass className="w-5 h-5 text-gray-500" />
+            </div>
+            <div className="absolute inset-y-0 left-10 flex items-center pointer-events-none">
+              <span className="text-gray-400">|</span>
+            </div>
+            <input
+              type="text"
+              placeholder="Search by item name or category..."
+              className="w-full pl-14 p-2 border rounded-lg shadow"
+              value={searchQuery}
+              onChange={handleSearchChange}
+            />
+          </div>
+        </div>
       </div>
+
+      {/* Show search results info if searching */}
+      {searchQuery && (
+        <div className="mb-2 text-sm text-gray-600">
+          Showing {filteredInventoryData.length} of {inventoryData.length} items
+          for "{searchQuery}"
+        </div>
+      )}
 
       {/* Table */}
       {loading ? (
         <div className="w-full flex justify-center items-center">
-          <LoadingScreen /> {/* Display the LoadingScreen component */}
+          <LoadingScreen />
         </div>
       ) : (
         <Table

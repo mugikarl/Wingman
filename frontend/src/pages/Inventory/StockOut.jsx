@@ -18,9 +18,7 @@ const StockOut = () => {
         "http://127.0.0.1:8000/fetch-stockout-page-data/"
       );
 
-      // Log the response for debugging
       console.log("StockOut data:", response.data);
-
       setDisposedInventory(response.data.disposed_inventory || []);
     } catch (error) {
       console.error("Error fetching disposed inventory:", error);
@@ -39,20 +37,18 @@ const StockOut = () => {
     return itemDate === selectedDate.toLocaleDateString("en-CA");
   });
 
-  // Add debugging to see what data we're working with
   useEffect(() => {
     if (filteredDisposedData.length > 0) {
       console.log("Filtered disposed data sample:", filteredDisposedData[0]);
     }
   }, [filteredDisposedData]);
 
-  // Handle date change from the TableWithDatePicker component
   const handleDateChange = (newDate) => {
     setSelectedDate(new Date(newDate));
   };
 
   return (
-    <div className="h-screen bg-[#eeeeee] flex flex-col p-6">
+    <div className="h-screen bg-[#fcf4dc] flex flex-col p-6">
       {loading ? (
         <div className="w-full flex justify-center items-center">
           <LoadingScreen />

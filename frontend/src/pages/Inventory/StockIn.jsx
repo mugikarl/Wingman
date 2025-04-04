@@ -7,7 +7,7 @@ import EditStockInDetails from "../../components/popups/EditStockInDetails";
 import NewSupplier from "../../components/popups/NewSupplier"; // Updated import
 import LoadingScreen from "../../components/popups/LoadingScreen"; // Import the LoadingScreen component
 import { FaBoxOpen, FaRegFileLines } from "react-icons/fa6";
-import { FaSearch } from "react-icons/fa";
+import { PiMagnifyingGlass } from "react-icons/pi";
 
 const StockIn = () => {
   const [isAddStockInOpen, setIsAddStockInOpen] = useState(false);
@@ -140,7 +140,7 @@ const StockIn = () => {
 
   // Handle search input change
   const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value.toLowerCase());
+    setSearchTerm(e.target.value);
   };
 
   // Filter the receipts based on search term
@@ -167,9 +167,10 @@ const StockIn = () => {
     // Check if search term is in receipt number, supplier name, or date
     return (
       (receipt.receipt_no &&
-        receipt.receipt_no.toLowerCase().includes(searchTerm)) ||
-      supplierName.toLowerCase().includes(searchTerm) ||
-      (formattedDate && formattedDate.toLowerCase().includes(searchTerm))
+        receipt.receipt_no.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (formattedDate &&
+        formattedDate.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   });
 
@@ -214,31 +215,36 @@ const StockIn = () => {
   });
 
   return (
-    <div className="h-screen bg-[#eeeeee] flex flex-col p-6">
+    <div className="h-screen bg-[#fcf4dc] flex flex-col p-6">
       {/* Search Bar and Buttons */}
       <div className="flex justify-between items-center mb-4">
-        {/* Search Bar */}
-        <div className="w-[400px] relative border rounded-sm shadow-md">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <FaSearch className="h-5 w-5 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            placeholder="Search by Receipt No., Supplier, or Date..."
-            className="w-full p-2 pl-10 border rounded-sm shadow"
-            value={searchTerm}
-            onChange={handleSearchChange}
-          />
-          {searchTerm && (
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-              <button
-                onClick={() => setSearchTerm("")}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                ✕
-              </button>
+        {/* Search Bar - Updated to match Order.jsx */}
+        <div className="w-[400px]">
+          <div className="relative flex-grow">
+            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <PiMagnifyingGlass className="w-5 h-5 text-gray-500" />
             </div>
-          )}
+            <div className="absolute inset-y-0 left-10 flex items-center pointer-events-none">
+              <span className="text-gray-400">|</span>
+            </div>
+            <input
+              type="text"
+              placeholder="Search by Receipt No., Supplier, or Date..."
+              className="w-full pl-14 p-2 border rounded-lg shadow"
+              value={searchTerm}
+              onChange={handleSearchChange}
+            />
+            {searchTerm && (
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Buttons */}
@@ -246,15 +252,9 @@ const StockIn = () => {
           {/* New Receipt Button */}
           <button
             onClick={openAddStockInModal}
-            className="flex items-center bg-white border text-[#CC5500] shadow-md rounded-sm duration-200 w-48 overflow-hidden"
+            className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
           >
-            {/* Image Side */}
             <div className="flex items-center justify-center border-r p-3">
-              {/* <img
-                src="/images/bill.png"
-                alt="New Receipt"
-                className="w-5 h-5 text-[#CC5500]"
-              /> */}
               <FaRegFileLines className="w-5 h-5 text-[#CC5500]" />
             </div>
             <span className="flex-1 text-left pl-3">New Receipt</span>
@@ -263,19 +263,11 @@ const StockIn = () => {
           {/* New Supplier Button */}
           <button
             onClick={openNewSupplierModal}
-            className="flex items-center bg-white border text-[#CC5500] shadow-md rounded-sm duration-200 w-48 overflow-hidden"
+            className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
           >
-            {/* Image Side */}
             <div className="flex items-center justify-center border-r p-3">
-              {/* <img
-                src="/images/delivery-box.png"
-                alt="New Supplier"
-                className="w-5 h-5 text-[#CC5500]"
-              /> */}
               <FaBoxOpen className="w-5 h-5 text-[#CC5500]" />
             </div>
-
-            {/* Text Side */}
             <span className="flex-1 text-left pl-3">New Supplier</span>
           </button>
         </div>
@@ -293,7 +285,7 @@ const StockIn = () => {
       <div className="flex-1" style={{ height: calculatedHeight }}>
         {loading ? (
           <div className="w-full h-full flex justify-center items-center">
-            <LoadingScreen /> {/* Display the LoadingScreen component */}
+            <LoadingScreen />
           </div>
         ) : (
           <Table

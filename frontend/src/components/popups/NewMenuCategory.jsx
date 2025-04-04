@@ -10,12 +10,15 @@ const NewMenuCategory = ({
   const [menuCategoryName, setMenuCategoryName] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddMenuCategory = async () => {
     if (!menuCategoryName.trim()) return;
+
+    setIsSubmitting(true);
     try {
       const token = localStorage.getItem("access_token");
-      const response = await axios.post(
+      await axios.post(
         "http://127.0.0.1:8000/add-menu-category/",
         { name: menuCategoryName },
         {
@@ -28,29 +31,34 @@ const NewMenuCategory = ({
       setMenuCategoryName("");
     } catch (error) {
       console.error("Error adding menu category:", error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
   const handleEditMenuCategory = async (e) => {
     e.preventDefault();
 
     if (!menuCategoryName.trim() || selectedIndex === null) return;
 
-    const menuCategoryId = menuCategories[selectedIndex]?.id; // Get the actual ID
-    console.log("Editing Menu Category ID:", menuCategoryId); // ✅ Debugging log
+    setIsSubmitting(true);
+
+    const menuCategoryId = menuCategories[selectedIndex]?.id;
 
     if (!menuCategoryId) {
       console.error("Error: No Menu Category ID found!");
+      setIsSubmitting(false);
       return;
     }
 
     const updatedMenuCategoryData = {
-      name: menuCategoryName, // Send the updated category name
+      name: menuCategoryName,
     };
 
     try {
       const token = localStorage.getItem("access_token");
       await axios.put(
-        `http://127.0.0.1:8000/edit-menu-category/${menuCategoryId}/`, // ✅ API endpoint for updating category
+        `http://127.0.0.1:8000/edit-menu-category/${menuCategoryId}/`,
         updatedMenuCategoryData,
         {
           headers: {
@@ -59,19 +67,15 @@ const NewMenuCategory = ({
         }
       );
       alert("Menu Category updated successfully!");
-      fetchItemData((prevMenuCategories) =>
-        prevMenuCategories.map((category, index) =>
-          index === selectedIndex
-            ? { ...category, name: menuCategoryName }
-            : category
-        )
-      ); // Refresh categories
+      fetchItemData();
       setMenuCategoryName("");
       setIsEditing(false);
-      setSelectedIndex(null); // Close modal if applicable
+      setSelectedIndex(null);
     } catch (error) {
       console.error("Error updating menu category:", error);
       alert("Failed to update menu category.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -80,6 +84,7 @@ const NewMenuCategory = ({
     if (!confirmDelete) return;
 
     try {
+      setIsSubmitting(true);
       const token = localStorage.getItem("access_token");
       await axios.delete(
         `http://127.0.0.1:8000/delete-menu-category/${menuCategories[index].id}/`,
@@ -89,7 +94,7 @@ const NewMenuCategory = ({
           },
         }
       );
-      fetchItemData((prevItems) => prevItems.filter((_, i) => i !== index));
+      fetchItemData();
       if (index === selectedIndex) {
         setMenuCategoryName("");
         setIsEditing(false);
@@ -97,95 +102,132 @@ const NewMenuCategory = ({
       }
     } catch (error) {
       console.error("Error deleting menu category:", error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
   return isOpen ? (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-96 relative">
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700"
-        >
-          &times;
-        </button>
-        <h2 className="text-lg font-bold mb-4">Manage Categories</h2>
-        {/* Input & Buttons */}
-        <div className="flex items-center space-x-2 mb-4">
-          <input
-            type="text"
-            placeholder="Enter category"
-            value={menuCategoryName}
-            onChange={(e) => setMenuCategoryName(e.target.value)}
-            className="w-1/2 p-2 border rounded-lg"
-          />
-          {!isEditing ? (
-            <button
-              onClick={handleAddMenuCategory}
-              className="bg-blue-500 text-white px-3 py-2 rounded-lg"
-            >
-              Add
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={() => setIsEditing(false)}
-                className="bg-gray-500 text-white px-3 py-2 rounded-lg"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleEditMenuCategory}
-                className="bg-green-500 text-white px-3 py-2 rounded-lg"
-              >
-                Update
-              </button>
-            </>
-          )}
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg w-1/3 max-w-4xl h-[500px] flex flex-col">
+        {/* Header */}
+        <div className="flex justify-between items-center p-4 border-b">
+          <h2 className="text-lg font-medium">Manage Menu Categories</h2>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-full hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
+          >
+            &times;
+          </button>
         </div>
-        {/* Scrollable Table */}
-        <div className="max-h-60 overflow-y-auto border rounded-lg">
-          <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 bg-gray-200">
-              <tr>
-                <th className="p-2">Category</th>
-                <th className="p-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(menuCategories || []).length > 0 ? (
-                menuCategories.map((category, index) => (
-                  <tr
-                    key={index}
-                    className="border-b cursor-pointer hover:bg-gray-100"
-                    onClick={() => {
-                      console.log("Clicked Category:", category); // Debugging log
-                      console.log("Category ID:", category.id);
-                      setMenuCategoryName(category.name);
-                      setSelectedIndex(index);
-                      setIsEditing(true);
-                    }}
-                  >
-                    <td className="p-2">{category.name}</td>
-                    <td className="p-2">
-                      <button
-                        onClick={() => handleDeleteMenuCategory(index)}
-                        className="bg-red-500 text-white px-2 py-1 rounded"
-                      >
-                        Delete
-                      </button>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          <div className="flex items-center space-x-2 mb-4">
+            <input
+              type="text"
+              placeholder="Enter category"
+              value={menuCategoryName}
+              onChange={(e) => setMenuCategoryName(e.target.value)}
+              className="w-1/2 p-2 border rounded-lg"
+            />
+            {!isEditing ? (
+              <button
+                onClick={handleAddMenuCategory}
+                disabled={isSubmitting}
+                className={`bg-[#CC5500] text-white px-3 py-2 rounded-lg ${
+                  isSubmitting
+                    ? "opacity-70 cursor-not-allowed"
+                    : "hover:hover:bg-[#b34600]"
+                }`}
+              >
+                {isSubmitting ? "Adding..." : "Add"}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => setIsEditing(false)}
+                  disabled={isSubmitting}
+                  className="bg-gray-500 text-white px-3 py-2 rounded-lg hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditMenuCategory}
+                  disabled={isSubmitting}
+                  className={`bg-green-500 text-white px-3 py-2 rounded-lg ${
+                    isSubmitting
+                      ? "opacity-70 cursor-not-allowed"
+                      : "hover:bg-green-600"
+                  }`}
+                >
+                  {isSubmitting ? "Updating..." : "Update"}
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Table */}
+          <div className="relative overflow-x-auto shadow-md sm:rounded-sm max-h-60">
+            <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+              <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
+                <tr>
+                  <th scope="col" className="px-6 py-3 font-medium">
+                    Category
+                  </th>
+                  <th scope="col" className="px-6 py-3 font-medium">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {(menuCategories || []).length > 0 ? (
+                  menuCategories.map((category, index) => (
+                    <tr
+                      key={index}
+                      className={`${
+                        index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                      } border-b hover:bg-gray-200 group cursor-pointer`}
+                      onClick={() => {
+                        setMenuCategoryName(category.name);
+                        setSelectedIndex(index);
+                        setIsEditing(true);
+                      }}
+                    >
+                      <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                        {category.name}
+                      </td>
+                      <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteMenuCategory(index);
+                          }}
+                          disabled={isSubmitting}
+                          className={`bg-red-500 text-white px-2 py-1 rounded ${
+                            isSubmitting
+                              ? "opacity-70 cursor-not-allowed"
+                              : "hover:bg-red-600"
+                          }`}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr className="bg-white border-b">
+                    <td
+                      colSpan="2"
+                      className="px-6 py-4 text-center font-normal text-gray-500 italic"
+                    >
+                      No Categories Available
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="2" className="p-2 text-center">
-                    No Categories Available
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

@@ -15,6 +15,7 @@ urlpatterns = [
     path('fetch-inventory-page-data/', views.fetch_inventory_page_data, name='fetch_inventory_page_data'),
     path('fetch-stockin-page-data/', views.fetch_stockin_page_data, name='fetch_stockin_page_data'),
     path('fetch-stockout-page-data/', views.fetch_stockout_page_data, name='fetch_stockout_page_data'),
+    path('fetch-menu-data/', views.fetch_menu_data, name='fetch_menu_data'),
     path('fetch-item-data/', views.fetch_item_data, name='fetch_item_data'),
     path('add-inventory/', views.add_inventory, name='add-inventory'),
     path('add-item/', views.add_item, name='add_item'),

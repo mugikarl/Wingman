@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { PiArrowsClockwiseLight } from "react-icons/pi";
 
 const NewMenuModal = ({
   onClose,
@@ -19,7 +20,7 @@ const NewMenuModal = ({
   const [isAvailable, setIsAvailable] = useState(true);
 
   // State for recipe data (storing added recipes)
-  const [recipes, setRecipes] = useState([]); // Stores added recipes with item, quantity, and unit_id
+  const [recipes, setRecipes] = useState([]);
   const [currentRecipe, setCurrentRecipe] = useState({
     inventory_id: "",
     quantity: "",
@@ -139,280 +140,342 @@ const NewMenuModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-3 sm:p-4 rounded-lg shadow-lg w-[90%] sm:w-[80%] md:w-[65%] lg:w-[50%] max-w-2xl mx-auto">
-        {/* Modal Header */}
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-bold">New Menu</h2>
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl h-[600px] flex flex-col">
+        {/* Header */}
+        <div className="flex justify-between items-center p-4 border-b">
+          <h2 className="text-lg font-medium">Add New Menu Item</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
+            className="p-1 rounded-full hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
           >
             &times;
           </button>
         </div>
 
-        {/* Modal Content - Restructured */}
-        <div className="flex flex-col">
-          {/* Upload Photo Section */}
-          <div className="relative group h-48 border-2 border-dashed border-gray-300 mb-3 w-full">
-            {image ? (
-              <>
-                <img
-                  src={URL.createObjectURL(image)}
-                  alt="Uploaded"
-                  className="w-full h-full object-cover"
-                />
-                <div
-                  onClick={() =>
-                    document.getElementById("image-upload").click()
-                  }
-                  className="absolute inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 cursor-pointer"
-                >
-                  <span className="text-white text-lg">Change Picture</span>
-                </div>
-              </>
-            ) : (
-              // Initially shows a grey area with "Add Picture" so the user can click to upload.
-              <div
-                onClick={() => document.getElementById("image-upload").click()}
-                className="flex items-center justify-center w-full h-full bg-gray-800 bg-opacity-50 cursor-pointer"
-              >
-                <span className="text-white text-lg">Add Picture</span>
-              </div>
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
-              id="image-upload"
-            />
-          </div>
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          <div className="grid grid-cols-2 gap-6">
+            {/* Menu Details Section - Left Column */}
+            <div className="h-full">
+              <div className="bg-white p-4 rounded-lg border h-full flex flex-col">
+                <h3 className="text-lg font-medium mb-4">Menu Item Details</h3>
 
-          {/* Form Fields - In a grid layout */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-            {/* Item Name */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700">
-                Item Name
-              </label>
-              <input
-                type="text"
-                value={itemName}
-                onChange={(e) => setItemName(e.target.value)}
-                className="mt-1 p-1.5 text-sm border rounded-lg w-full"
-              />
-            </div>
-
-            {/* Price */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700">
-                Price
-              </label>
-              <input
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="mt-1 p-1.5 text-sm border rounded-lg w-full"
-              />
-            </div>
-
-            {/* Category Dropdown */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700">
-                Category
-              </label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="mt-1 p-1.5 text-sm border rounded-lg w-full"
-              >
-                <option value="">Select Category</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Type Dropdown */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700">
-                Menu Type
-              </label>
-              <select
-                value={typeId}
-                onChange={(e) => setTypeId(e.target.value)}
-                className="mt-1 p-1.5 text-sm border rounded-lg w-full"
-              >
-                <option value="">Select Type</option>
-                {menuTypes.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Availability */}
-          <div className="mb-3">
-            <label className="block text-xs font-medium text-gray-700">
-              Availability
-            </label>
-            <div className="flex space-x-4 mt-1">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={isAvailable}
-                  onChange={() => setIsAvailable(true)}
-                  className="mr-1"
-                />
-                <span className="text-sm">Available</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={!isAvailable}
-                  onChange={() => setIsAvailable(false)}
-                  className="mr-1"
-                />
-                <span className="text-sm">Unavailable</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Add Recipe Section */}
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold mb-1">Add Recipe</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {/* Item Dropdown */}
-              <select
-                value={currentRecipe.inventory_id}
-                onChange={(e) =>
-                  setCurrentRecipe({
-                    ...currentRecipe,
-                    inventory_id: e.target.value,
-                  })
-                }
-                className="p-1.5 text-sm border rounded-lg"
-              >
-                <option value="">Select Item</option>
-                {inventory.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-
-              {/* Quantity Input */}
-              <input
-                type="number"
-                value={currentRecipe.quantity}
-                onChange={(e) =>
-                  setCurrentRecipe({
-                    ...currentRecipe,
-                    quantity: e.target.value,
-                  })
-                }
-                placeholder="Qty"
-                className="p-1.5 text-sm border rounded-lg"
-              />
-
-              {/* Unit Dropdown */}
-              <select
-                value={currentRecipe.unit_id}
-                onChange={(e) =>
-                  setCurrentRecipe({
-                    ...currentRecipe,
-                    unit_id: e.target.value,
-                  })
-                }
-                className="p-1.5 text-sm border rounded-lg"
-              >
-                <option value="">Select Unit</option>
-                {units.map((unit) => (
-                  <option key={unit.id} value={unit.id}>
-                    {unit.symbol}
-                  </option>
-                ))}
-              </select>
-
-              {/* Add Recipe Button */}
-              <button
-                onClick={handleAddRecipe}
-                className="bg-green-500 text-white px-2 py-1 text-sm rounded-lg"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-
-          {/* Recipe Table with fixed header and scrollable body */}
-          <div className="mb-3">
-            <div className="border border-gray-200 rounded">
-              {/* Table Header */}
-              <div className="grid grid-cols-4 bg-[#FFCF03] font-semibold text-gray-700 text-xs">
-                <div className="px-2 py-1 border-r border-gray-200">
-                  ITEM NAME
-                </div>
-                <div className="px-2 py-1 border-r border-gray-200">QTY</div>
-                <div className="px-2 py-1 border-r border-gray-200">UNIT</div>
-                <div className="px-2 py-1">ACTION</div>
-              </div>
-
-              {/* Table Body - Scrollable */}
-              <div className="max-h-12 overflow-y-auto">
-                {recipes.length > 0 ? (
-                  recipes.map((recipe, index) => (
+                {/* Upload Photo Section */}
+                <div className="relative group h-48 border-2 border-dashed border-gray-300 mb-4 w-full">
+                  {image ? (
+                    <>
+                      <img
+                        src={URL.createObjectURL(image)}
+                        alt="Uploaded"
+                        className="w-full h-full object-cover"
+                      />
+                      <div
+                        onClick={() =>
+                          document.getElementById("image-upload").click()
+                        }
+                        className="absolute inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 cursor-pointer"
+                      >
+                        <span className="text-white text-lg">
+                          Change Picture
+                        </span>
+                      </div>
+                    </>
+                  ) : (
                     <div
-                      key={index}
-                      className="grid grid-cols-4 border-t border-gray-200 hover:bg-gray-100 text-xs"
+                      onClick={() =>
+                        document.getElementById("image-upload").click()
+                      }
+                      className="flex items-center justify-center w-full h-full bg-gray-100 cursor-pointer"
                     >
-                      <div className="px-2 py-1 border-r border-gray-200 truncate">
-                        {recipe.inventory_name}
-                      </div>
-                      <div className="px-2 py-1 border-r border-gray-200">
-                        {recipe.quantity}
-                      </div>
-                      <div className="px-2 py-1 border-r border-gray-200">
-                        {recipe.unit}
-                      </div>
-                      <div className="px-2 py-1">
-                        <button
-                          onClick={() => handleDeleteRecipe(index)}
-                          className="bg-red-500 text-white px-1.5 py-0.5 rounded text-xs"
-                        >
-                          Delete
-                        </button>
-                      </div>
+                      <span className="text-gray-500 text-lg">Add Picture</span>
                     </div>
-                  ))
-                ) : (
-                  <div className="p-2 text-center text-gray-500 text-xs">
-                    No recipes added yet
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="image-upload"
+                  />
+                </div>
+
+                {/* Item Name */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Item Name
+                  </label>
+                  <input
+                    type="text"
+                    value={itemName}
+                    onChange={(e) => setItemName(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md"
+                    placeholder="Enter menu item name"
+                  />
+                </div>
+
+                {/* Price */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Price
+                  </label>
+                  <input
+                    type="number"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md"
+                    placeholder="Enter price"
+                  />
+                </div>
+
+                {/* Category Dropdown */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Type Dropdown */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Menu Type
+                  </label>
+                  <select
+                    value={typeId}
+                    onChange={(e) => setTypeId(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md"
+                  >
+                    <option value="">Select Type</option>
+                    {menuTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Availability */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Availability
+                  </label>
+                  <div className="flex space-x-6">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={isAvailable}
+                        onChange={() => setIsAvailable(true)}
+                        className="hidden"
+                      />
+                      <div
+                        className={`w-5 h-5 border rounded-full flex items-center justify-center 
+                          ${
+                            isAvailable
+                              ? "bg-[#CC5500] border-[#b34600]"
+                              : "border-gray-400 bg-white"
+                          }`}
+                      >
+                        {isAvailable && (
+                          <div className="w-3 h-3 bg-white rounded-full"></div>
+                        )}
+                      </div>
+                      <span>Available</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={!isAvailable}
+                        onChange={() => setIsAvailable(false)}
+                        className="hidden"
+                      />
+                      <div
+                        className={`w-5 h-5 border rounded-full flex items-center justify-center 
+                          ${
+                            !isAvailable
+                              ? "bg-[#CC5500] border-[#b34600]"
+                              : "border-gray-400 bg-white"
+                          }`}
+                      >
+                        {!isAvailable && (
+                          <div className="w-3 h-3 bg-white rounded-full"></div>
+                        )}
+                      </div>
+                      <span>Unavailable</span>
+                    </label>
                   </div>
-                )}
+                </div>
+              </div>
+            </div>
+
+            {/* Ingredients Section - Right Column */}
+            <div className="flex flex-col space-y-4">
+              {/* Add Recipe Section */}
+              <div className="bg-white p-4 rounded-lg border">
+                <h3 className="text-lg font-medium mb-4">Add Ingredients</h3>
+                <div className="grid grid-cols-1 gap-3 mb-3">
+                  {/* Item Dropdown */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Item
+                    </label>
+                    <select
+                      value={currentRecipe.inventory_id}
+                      onChange={(e) =>
+                        setCurrentRecipe({
+                          ...currentRecipe,
+                          inventory_id: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border rounded-md"
+                    >
+                      <option value="">Select Item</option>
+                      {inventory.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Quantity Input */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Quantity
+                      </label>
+                      <input
+                        type="number"
+                        value={currentRecipe.quantity}
+                        onChange={(e) =>
+                          setCurrentRecipe({
+                            ...currentRecipe,
+                            quantity: e.target.value,
+                          })
+                        }
+                        placeholder="Enter quantity"
+                        className="w-full px-3 py-2 border rounded-md"
+                      />
+                    </div>
+
+                    {/* Unit Dropdown */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Unit
+                      </label>
+                      <select
+                        value={currentRecipe.unit_id}
+                        onChange={(e) =>
+                          setCurrentRecipe({
+                            ...currentRecipe,
+                            unit_id: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border rounded-md"
+                      >
+                        <option value="">Select Unit</option>
+                        {units.map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.symbol}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Add Recipe Button */}
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleAddRecipe}
+                      className="bg-[#CC5500] text-white px-4 py-2 rounded-md hover:bg-[#b34600]"
+                    >
+                      Add Ingredient
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recipe Table */}
+              <div className="bg-white p-4 rounded-lg border flex-grow overflow-hidden">
+                <h3 className="text-lg font-medium mb-4">Ingredients List</h3>
+                <div className="overflow-y-auto" style={{ maxHeight: "250px" }}>
+                  {recipes.length > 0 ? (
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            ITEM NAME
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            QTY
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                            UNIT
+                          </th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                            ACTION
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {recipes.map((recipe, index) => (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 whitespace-nowrap">
+                              {recipe.inventory_name}
+                            </td>
+                            <td className="px-4 py-2 whitespace-nowrap">
+                              {recipe.quantity}
+                            </td>
+                            <td className="px-4 py-2 whitespace-nowrap">
+                              {recipe.unit}
+                            </td>
+                            <td className="px-4 py-2 whitespace-nowrap text-right">
+                              <button
+                                onClick={() => handleDeleteRecipe(index)}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 italic">
+                      No ingredients added yet
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex justify-between mt-2">
-            <button
-              onClick={onClose}
-              className="bg-gray-400 text-white px-4 py-2 text-sm rounded-lg"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="bg-[#209528] text-white px-4 py-2 text-sm rounded-lg"
-            >
-              Save
-            </button>
-          </div>
+        {/* Footer with save button */}
+        <div className="border-t p-4 flex justify-end space-x-4">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 rounded-md bg-[#CC5500] text-white hover:bg-[#b34600]"
+          >
+            Add Menu Item
+          </button>
         </div>
       </div>
     </div>
