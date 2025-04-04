@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Datepicker } from "flowbite-react";
 import { FaSortUp, FaSortDown } from "react-icons/fa";
+import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
 
 // Helper: Converts a Date object to a "YYYY-MM-DD" string in local time.
 const getLocalDateString = (date) => {
@@ -15,6 +16,7 @@ const TableWithDatePicker = ({
   initialDate = new Date(),
   onDateChange,
   customTheme = {},
+  emptyMessage = "No Data Available",
 }) => {
   const [selectedDate, setSelectedDate] = useState(
     getLocalDateString(initialDate)
@@ -179,22 +181,22 @@ const TableWithDatePicker = ({
       {/* Date picker navigation */}
       <div className="bg-[#cc5500] text-lg font-semibold w-full rounded-t-sm flex justify-between items-center relative shadow-md">
         <button
-          className="px-4 py-2 text-white hover:bg-white hover:text-[#cc5500] border-r border-white"
+          className="px-4 py-2 text-white hover:bg-white hover:text-[#cc5500]"
           onClick={decrementDate}
         >
-          &lt;
+          <HiChevronLeft className="w-5 h-5" />
         </button>
         <div
-          className="absolute left-1/2 transform -translate-x-1/2 cursor-pointer px-2 bg-[#cc5500] text-white"
+          className="absolute left-1/2 transform -translate-x-1/2 cursor-pointer px-2 bg-[#cc5500] text-white text-"
           onClick={() => setShowDatepicker(!showDatepicker)}
         >
           {displayDate}
         </div>
         <button
-          className="px-4 py-2 text-white hover:bg-white hover:text-[#cc5500] border-l border-white"
+          className="px-4 py-2 text-white hover:bg-white hover:text-[#cc5500]"
           onClick={incrementDate}
         >
-          &gt;
+          <HiChevronRight className="w-5 h-5" />
         </button>
         {showDatepicker && (
           <div className="absolute top-10 left-1/2 transform -translate-x-1/2 mt-2 z-10 bg-white shadow-lg">
@@ -293,7 +295,7 @@ const TableWithDatePicker = ({
                   className="px-6 py-4 text-center font-normal text-gray-500 italic"
                   colSpan={columns.length}
                 >
-                  No Data Available
+                  {emptyMessage}
                 </td>
               </tr>
             )}

@@ -71,6 +71,11 @@ const StockOut = () => {
           initialDate={selectedDate}
           onDateChange={handleDateChange}
           maxHeight="calc(100vh - 140px)"
+          emptyMessage={
+            disposedInventory.length > 0
+              ? "No Disposed Items for Today."
+              : "No Data Available"
+          }
         />
       )}
     </div>
