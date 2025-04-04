@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FaPlus, FaMinus } from "react-icons/fa6";
 import OrderProductCard from "../cards/OrderProductCard";
 import OrderPayment from "../popups/OrderPayment";
+import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 // Helper to create a composite key for an item
 const getItemKey = (item, menuType) => {
@@ -40,7 +42,12 @@ const OrderSummary = ({
   const [isAlaCarteOpen, setIsAlaCarteOpen] = useState(false);
   const [isUnliWingsOpen, setIsUnliWingsOpen] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [isPaymentLoading, setIsPaymentLoading] = useState(false);
+  const [paymentButtonText, setPaymentButtonText] =
+    useState("Proceed to Payment");
+  const loadingIntervalRef = useRef(null);
   const deduction = menuType?.deduction_percentage || 0;
+  const navigate = useNavigate();
 
   // Get Unli Wings base amount from inStoreCategories
   const unliCategory = inStoreCategories?.find(
@@ -168,23 +175,131 @@ const OrderSummary = ({
     console.log("Placing order with:", paymentMethod, cashReceived);
   };
 
+  // Add a new function to check inventory for all items
+  const checkInventoryBeforePayment = async () => {
+    if (selectedItems.length === 0) {
+      alert("Please add at least one item before proceeding to payment");
+      return false;
+    }
+
+    // Group items by ID and sum quantities to check total amounts needed
+    const itemQuantityMap = {};
+    selectedItems.forEach((item) => {
+      if (!itemQuantityMap[item.id]) {
+        itemQuantityMap[item.id] = 0;
+      }
+      itemQuantityMap[item.id] += item.quantity;
+    });
+
+    // Check inventory for each menu item
+    let allItemsAvailable = true;
+    let warningMessages = [];
+
+    try {
+      // Check each item's inventory
+      for (const [menuId, quantity] of Object.entries(itemQuantityMap)) {
+        const response = await axios.get(
+          `http://127.0.0.1:8000/check-menu-inventory/${menuId}?quantity=${quantity}`
+        );
+
+        if (response.data.has_sufficient_inventory === false) {
+          const warnings = response.data.warnings || [];
+
+          if (warnings.length > 0) {
+            // Find the menu item name
+            const itemName =
+              selectedItems.find((item) => item.id.toString() === menuId)
+                ?.name || "Unknown item";
+
+            // Add to warning messages
+            warnings.forEach((w) => {
+              warningMessages.push(
+                `${itemName}: ${w.inventory_name} - ${w.available_quantity} ${w.unit} available, ${w.required_quantity} ${w.unit} needed`
+              );
+            });
+
+            allItemsAvailable = false;
+          }
+        }
+      }
+
+      // If there are warnings, show them all together
+      if (!allItemsAvailable) {
+        const proceed = window.confirm(
+          `Warning: Some items may exceed available inventory! Insufficient ingredients will default to 0 quantity.\n\n${warningMessages.join(
+            "\n"
+          )}\n\nDo you want to continue?`
+        );
+        return proceed;
+      }
+      return true;
+    } catch (error) {
+      console.error("Error checking inventory:", error);
+      const proceed = window.confirm(
+        "Error checking inventory. If you proceed, items with insufficient ingredients will have quantity set to 0. Do you want to continue anyway?"
+      );
+      return proceed;
+    }
+  };
+
+  // Add this effect to handle the loading animation
+  useEffect(() => {
+    if (isPaymentLoading) {
+      let dotCount = 0;
+      loadingIntervalRef.current = setInterval(() => {
+        const dots = ".".repeat(dotCount % 4);
+        setPaymentButtonText(`Processing${dots}`);
+        dotCount++;
+      }, 500);
+    } else {
+      setPaymentButtonText("Proceed to Payment");
+    }
+
+    return () => {
+      if (loadingIntervalRef.current) {
+        clearInterval(loadingIntervalRef.current);
+      }
+    };
+  }, [isPaymentLoading]);
+
+  // Modify the button click handler
+  const handleProceedToPayment = async () => {
+    if (selectedItems.length === 0) {
+      alert("Please add at least one item before proceeding to payment");
+      return;
+    }
+
+    setIsPaymentLoading(true);
+
+    try {
+      // Check inventory before opening payment modal
+      const canProceed = await checkInventoryBeforePayment();
+      if (canProceed) {
+        setIsPaymentOpen(true);
+      }
+    } finally {
+      setIsPaymentLoading(false);
+    }
+  };
+
   return (
-    <div className="w-1/4 bg-white p-4 flex flex-col h-full">
+    <div className="w-[30%] bg-white shadow-lg flex flex-col h-full rounded-l-sm relative">
       {/* Title */}
-      <div className="text-center font-bold text-lg border-b pb-2">
+      <div className="text-center font-bold text-xl border-b-[1px] pb-3 pt-4 bg-gray-50">
         Order Summary
       </div>
 
       {/* Scrollable content container */}
-      <div className="flex-grow overflow-y-auto">
+      <div className="flex-grow overflow-y-auto px-4 py-2">
         {menuType?.id !== 1 ? (
           // For non-In-Store orders (Grab/FoodPanda), render product cards immediately.
-          <div className="mt-4">
-            <div className="p-3 border border-t-0 border-gray-300 space-y-4">
+          <div className="mt-2">
+            <div className="space-y-3">
               {selectedItems.length === 0 ? (
-                <p className="text-gray-500 text-center">
-                  No Order Details Added
-                </p>
+                <div className="text-gray-500 text-center py-8 bg-gray-50 rounded-sm mt-4">
+                  <p>No Order Details Added</p>
+                  <p className="text-xs mt-2">Add items from the menu</p>
+                </div>
               ) : (
                 selectedItems.map((item) => (
                   <OrderProductCard
@@ -210,23 +325,28 @@ const OrderSummary = ({
         ) : (
           <>
             {/* Ala Carte Accordion for In-Store */}
-            <div className="mt-4">
+            <div className="mt-3">
               <button
                 onClick={() => {
                   setIsAlaCarteOpen(!isAlaCarteOpen);
                   setActiveSection("alaCarte");
                 }}
-                className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200"
+                className="w-full flex justify-between items-center px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-sm transition-all duration-200"
               >
                 <span className="font-semibold">Ala Carte</span>
-                {isAlaCarteOpen ? <FaMinus /> : <FaPlus />}
+                {isAlaCarteOpen ? (
+                  <FaMinus className="text-gray-600" />
+                ) : (
+                  <FaPlus className="text-gray-600" />
+                )}
               </button>
               {isAlaCarteOpen && (
-                <div className="p-3 border border-t-0 border-gray-300 space-y-4">
+                <div className="p-3 space-y-3 mt-2">
                   {alaCarteItems.length === 0 ? (
-                    <p className="text-gray-500 text-center">
-                      No Order Details Added
-                    </p>
+                    <div className="text-gray-500 text-center py-6 bg-gray-50 rounded-sm">
+                      <p>No Order Details Added</p>
+                      <p className="text-xs mt-2">Add items from the menu</p>
+                    </div>
                   ) : (
                     alaCarteItems.map((item) => (
                       <OrderProductCard
@@ -255,7 +375,7 @@ const OrderSummary = ({
             </div>
             {/* Unli Wings Accordion for In-Store */}
             {menuType?.id === 1 && (
-              <div className="mt-4">
+              <div className="mt-3 mb-4">
                 <button
                   onClick={() => {
                     setIsUnliWingsOpen(!isUnliWingsOpen);
@@ -263,58 +383,77 @@ const OrderSummary = ({
                       isUnliWingsOpen ? "alaCarte" : "unliWings"
                     );
                   }}
-                  className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200"
+                  className="w-full flex justify-between items-center px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-sm transition-all duration-200"
                 >
                   <span className="font-semibold">Unli Wings</span>
-                  {isUnliWingsOpen ? <FaMinus /> : <FaPlus />}
+                  {isUnliWingsOpen ? (
+                    <FaMinus className="text-gray-600" />
+                  ) : (
+                    <FaPlus className="text-gray-600" />
+                  )}
                 </button>
                 {isUnliWingsOpen && (
-                  <div className="p-3 border border-t-0 border-gray-300 space-y-4">
+                  <div className="p-3 space-y-3 mt-2">
                     {activeSection === "unliWings" && (
                       <button
-                        className="w-full py-2 bg-[#E88504] text-white rounded"
+                        className="w-full py-2 bg-[#CC5500] text-white rounded-sm font-medium hover:bg-[#B34A00] transition-colors duration-200"
                         onClick={handleAddNewUnliOrder}
                       >
                         Add New Unli Order
                       </button>
                     )}
                     {allOrderKeys.map((orderNumber) => (
-                      <div key={orderNumber} className="mb-4">
-                        <h4 className="font-bold text-sm mb-2">
-                          Unli Wings #{orderNumber}
-                        </h4>
-                        <p className="mb-2 text-sm text-gray-600">
-                          Base Amount: ₱{UNLI_BASE_AMOUNT}
-                        </p>
+                      <div
+                        key={orderNumber}
+                        className="mb-4 border-b-[1px] pb-3 last:border-0"
+                      >
+                        <div className="flex justify-between items-center">
+                          <h4 className="font-bold text-sm mb-2">
+                            Unli Wings #{orderNumber}
+                          </h4>
+                          <div className="px-2 py-1 bg-[#CC5500] bg-opacity-10 text-[#B34A00] text-xs rounded-sm font-medium">
+                            ₱{UNLI_BASE_AMOUNT}
+                          </div>
+                        </div>
                         {groupedUnliOrders[orderNumber] &&
                         groupedUnliOrders[orderNumber].length > 0 ? (
-                          groupedUnliOrders[orderNumber].map((item) => (
-                            <OrderProductCard
-                              key={getItemKey(item, menuType)}
-                              item={item}
-                              menuType={menuType}
-                              localQuantity={
-                                localQuantities[getItemKey(item, menuType)] !==
-                                undefined
-                                  ? localQuantities[getItemKey(item, menuType)]
-                                  : item.quantity.toString()
-                              }
-                              onLocalQuantityChange={onLocalQuantityChange}
-                              handleBlur={(id, group, discount) =>
-                                handleBlur(id, item.orderNumber, discount)
-                              }
-                              handleQuantityChange={wrappedHandleQuantityChange}
-                              handleInstoreCategoryChange={
-                                handleInstoreCategoryChange
-                              }
-                              handleDiscountChange={handleDiscountChange}
-                              discounts={discounts}
-                            />
-                          ))
+                          <div className="space-y-3 mt-2">
+                            {groupedUnliOrders[orderNumber].map((item) => (
+                              <OrderProductCard
+                                key={getItemKey(item, menuType)}
+                                item={item}
+                                menuType={menuType}
+                                localQuantity={
+                                  localQuantities[
+                                    getItemKey(item, menuType)
+                                  ] !== undefined
+                                    ? localQuantities[
+                                        getItemKey(item, menuType)
+                                      ]
+                                    : item.quantity.toString()
+                                }
+                                onLocalQuantityChange={onLocalQuantityChange}
+                                handleBlur={(id, group, discount) =>
+                                  handleBlur(id, item.orderNumber, discount)
+                                }
+                                handleQuantityChange={
+                                  wrappedHandleQuantityChange
+                                }
+                                handleInstoreCategoryChange={
+                                  handleInstoreCategoryChange
+                                }
+                                handleDiscountChange={handleDiscountChange}
+                                discounts={discounts}
+                              />
+                            ))}
+                          </div>
                         ) : (
-                          <p className="text-gray-500 text-center">
-                            No Order Details Added
-                          </p>
+                          <div className="text-gray-500 text-center py-4 bg-gray-50 rounded-sm mt-2">
+                            <p>No Order Details Added</p>
+                            <p className="text-xs mt-1">
+                              Add wings to this order
+                            </p>
+                          </div>
                         )}
                       </div>
                     ))}
@@ -327,28 +466,34 @@ const OrderSummary = ({
       </div>
 
       {/* Footer with totals */}
-      <div className="bg-gray-100 p-4 rounded-t-lg">
-        <div className="flex justify-between mb-2">
-          {menuType?.id === 1 ? (
-            <span>Discount:</span>
-          ) : (
-            <span>Deduction ({(deduction * 100).toFixed(0)}%):</span>
-          )}
-          <span>
-            {menuType?.id === 1
-              ? "₱0.00"
-              : `₱${(calculateSubtotal() * deduction).toFixed(2)}`}
-          </span>
+      <div className="bg-gray-50 p-5 rounded-t-sm shadow-inner">
+        <div className="space-y-3 mb-4 border-b-[1px] pb-3">
+          <div className="flex justify-between">
+            {menuType?.id === 1 ? (
+              <span className="text-gray-600">Discount:</span>
+            ) : (
+              <span className="text-gray-600">
+                Deduction ({(deduction * 100).toFixed(0)}%):
+              </span>
+            )}
+            <span className="font-medium">
+              {menuType?.id === 1
+                ? "₱0.00"
+                : `₱${(calculateSubtotal() * deduction).toFixed(2)}`}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">
+              {menuType?.id === 1 ? "Subtotal:" : "Total Amount to be Paid:"}
+            </span>
+            <span className="font-medium">
+              ₱{calculateSubtotal().toFixed(2)}
+            </span>
+          </div>
         </div>
-        <div className="flex justify-between mb-2">
-          <span>
-            {menuType?.id === 1 ? "Subtotal:" : "Total Amount to be Paid:"}
-          </span>
-          <span>₱{calculateSubtotal().toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between font-bold">
+        <div className="flex justify-between font-bold text-lg">
           <span>{menuType?.id === 1 ? "Total:" : "Total Sales:"}</span>
-          <span>
+          <span className="text-green-500">
             {menuType?.id === 1
               ? `₱${calculateSubtotal().toFixed(2)}`
               : `₱${(
@@ -358,18 +503,13 @@ const OrderSummary = ({
           </span>
         </div>
         <button
-          className="w-full bg-green-500 text-white py-2 mt-4 rounded"
-          onClick={() => {
-            if (selectedItems.length === 0) {
-              alert(
-                "Please add at least one item before proceeding to payment"
-              );
-              return;
-            }
-            setIsPaymentOpen(true);
-          }}
+          className={`w-full ${
+            isPaymentLoading ? "bg-gray-400" : "bg-green-500 hover:bg-green-600"
+          } text-white py-3 mt-5 rounded-sm font-bold shadow-md transition-colors duration-200`}
+          onClick={handleProceedToPayment}
+          disabled={isPaymentLoading}
         >
-          Proceed to Payment
+          {paymentButtonText}
         </button>
       </div>
 
@@ -377,10 +517,10 @@ const OrderSummary = ({
       {isPaymentOpen && (
         <OrderPayment
           isOpen={isPaymentOpen}
-          onClose={() => setIsPaymentOpen(false)}
+          onClose={() => {
+            setIsPaymentOpen(false);
+          }}
           totalAmount={
-            // For In-Store orders, keep the calculation;
-            // for Grab/FoodPanda (non‑In‑Store), use the Total Amount to be Paid (i.e. calculateSubtotal())
             menuType?.id === 1 ? calculateSubtotal() : calculateSubtotal()
           }
           onPlaceOrder={onPlaceOrder || defaultOnPlaceOrder}

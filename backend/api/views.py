@@ -2494,6 +2494,9 @@ def fetch_order_data(request, transactionId=None):
         # Fetch in-store categories
         instore_categories = supabase_anon.table("instore_category").select("id", "name", "base_amount").execute().data or []
         
+        # Fetch Order Status Type
+        order_status_types = supabase_anon.table("order_status_type").select("id", "name").execute().data or []
+        
         # Fetch employees
         active_status_id = 1  # Adjust based on your actual "Active" status ID
 
@@ -2552,6 +2555,7 @@ def fetch_order_data(request, transactionId=None):
             "discounts": discounts,
             "payment_methods": payment_methods,
             "instore_categories": instore_categories,
+            "order_status_types": order_status_types,
             "employees": employees,
             "transactions": formatted_transactions
         })

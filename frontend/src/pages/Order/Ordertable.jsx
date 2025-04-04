@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
+import { PiMagnifyingGlass, PiCirclesThreePlusLight } from "react-icons/pi";
+import { BiFoodMenu } from "react-icons/bi";
 import ChooseOrder from "../../components/popups/ChooseOrder";
 import Table from "../../components/tables/Table";
 import OrderEssentials from "../../components/popups/OrderEssentials";
@@ -17,6 +19,8 @@ const OrderTable = () => {
   const [statusFilters, setStatusFilters] = useState(["All"]);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const location = useLocation();
 
   const openOrderEssentialsModal = () => {
     setIsOrderEssentialsOpen(true);
@@ -54,6 +58,12 @@ const OrderTable = () => {
     orderData?.transactions?.filter((order) => {
       if (!orderData) return []; // Ensure orderData is available
 
+      // Search by Transaction ID
+      const searchLower = searchQuery.toLowerCase();
+      const transactionIdMatch =
+        !searchQuery ||
+        (order.id && order.id.toString().toLowerCase().includes(searchLower));
+
       // Filter by order status
       const statusMatch =
         statusFilters.includes("All") ||
@@ -70,7 +80,7 @@ const OrderTable = () => {
         selectedFilters.length === 0 || // If no filter is selected, show all
         transactionTypes?.some((type) => selectedFilters.includes(type));
 
-      return statusMatch && transactionTypeMatch;
+      return transactionIdMatch && statusMatch && transactionTypeMatch;
     }) || [];
 
   const toggleStatus = (status) => {
@@ -87,12 +97,16 @@ const OrderTable = () => {
   };
 
   const fetchOrderData = async () => {
+    setLoading(true);
+    console.log("Fetching order data..."); // Debug log
     try {
       const response = await axios.get(
         "http://127.0.0.1:8000/fetch-order-data/"
       );
+      console.log("Order data fetched successfully:", response.data); // Debug log
       setOrderData(response.data);
     } catch (err) {
+      console.error("Error fetching order data:", err); // Debug log
       setError(err.message || "Error fetching data");
     } finally {
       setLoading(false);
@@ -100,8 +114,13 @@ const OrderTable = () => {
   };
 
   useEffect(() => {
-    fetchOrderData();
-  }, []);
+    console.log("Location state:", location.state); // Debug log
+    if (location.state?.refresh) {
+      fetchOrderData();
+    } else {
+      fetchOrderData();
+    }
+  }, [location.state]);
 
   if (loading) {
     return <LoadingScreen />;
@@ -128,136 +147,193 @@ const OrderTable = () => {
 
   return (
     <div className="h-screen p-4 bg-[#fcf4dc]">
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <div className="flex space-x-2 mt-2">
-            {["All", "Pending", "Completed", "Cancelled"].map((status) => (
-              <button
-                key={status}
-                onClick={() => toggleStatus(status)}
-                className={`px-3 py-1 rounded-md transition-colors ${
-                  statusFilters.includes(status)
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 hover:bg-gray-300"
-                }`}
-              >
-                {status}
-              </button>
-            ))}
-          </div>
-          <div className="flex mt-2 space-x-2">
+      <div className="flex mb-4">
+        {/* Search Bar with icon and separator */}
+        <div className="flex w-[400px]">
+          <div className="relative flex-grow">
+            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <PiMagnifyingGlass className="w-5 h-5 text-gray-500" />
+            </div>
+            <div className="absolute inset-y-0 left-10 flex items-center pointer-events-none">
+              <span className="text-gray-400">|</span>
+            </div>
             <input
               type="text"
-              placeholder="Search..."
-              className="border border-gray-300 px-3 py-1 rounded-md flex-1"
+              placeholder="Search by Transaction ID..."
+              className="w-full pl-14 p-2 border rounded-lg shadow"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
-            {["In-Store", "Grab", "FoodPanda"].map((option) => (
-              <button
-                key={option}
-                onClick={() => toggleFilter(option)}
-                className={`flex items-center px-3 py-1 rounded-md transition-colors ${
-                  selectedFilters.includes(option)
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 hover:bg-gray-300"
-                }`}
-              >
-                <span>{option}</span>
-              </button>
-            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-start">
+        <div>
+          {/* Status Filters */}
+          <div className="flex space-x-2">
+            <button
+              key="All"
+              onClick={() => toggleStatus("All")}
+              className={`px-3 py-1 rounded-md transition-colors w-28 text-center border border-gray-300 shadow-sm ${
+                statusFilters.includes("All")
+                  ? "bg-[#CC5500] hover:bg-[#B34A00] text-white"
+                  : "bg-white hover:bg-gray-200"
+              }`}
+            >
+              All
+            </button>
+            {orderData?.order_status_types
+              ?.slice()
+              .sort((a, b) => a.id - b.id)
+              .map((status) => {
+                let color = "bg-white hover:bg-gray-200";
+                if (status.name === "Pending") {
+                  color = "bg-yellow-400 hover:bg-yellow-500";
+                } else if (status.name === "Completed") {
+                  color = "bg-green-500 hover:bg-green-600";
+                } else if (status.name === "Cancelled") {
+                  color = "bg-red-500 hover:bg-red-600";
+                }
+
+                return (
+                  <button
+                    key={status.id}
+                    onClick={() => toggleStatus(status.name)}
+                    className={`px-3 py-1 rounded-md transition-colors w-28 text-center border border-gray-300 shadow-sm ${
+                      statusFilters.includes(status.name)
+                        ? `${color} text-white`
+                        : "bg-white hover:bg-gray-200"
+                    }`}
+                  >
+                    {status.name}
+                  </button>
+                );
+              })}
+          </div>
+
+          {/* Menu Type Filters */}
+          <div className="flex mt-2 space-x-2">
+            {orderData?.menu_types?.map((type) => {
+              let color = "bg-white hover:bg-gray-200";
+              if (type.name === "In-Store") {
+                color = "bg-[#CC5500] hover:bg-[#B34A00]";
+              } else if (type.name === "Grab") {
+                color = "bg-green-500 hover:bg-green-600";
+              } else if (type.name === "FoodPanda") {
+                color = "bg-pink-500 hover:bg-pink-600";
+              }
+
+              return (
+                <button
+                  key={type.id}
+                  onClick={() => toggleFilter(type.name)}
+                  className={`px-3 py-1 rounded-md transition-colors w-28 text-center border border-gray-300 shadow-sm ${
+                    selectedFilters.includes(type.name)
+                      ? `${color} text-white`
+                      : "bg-white hover:bg-gray-200"
+                  }`}
+                >
+                  <span>{type.name}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         <div className="flex flex-col space-y-2">
           <Link to="/order">
-            <button className="bg-orange-500 text-white px-4 py-2 rounded-md shadow hover:bg-orange-600">
-              Add New Order
+            <button className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden">
+              <div className="flex items-center justify-center border-r p-3">
+                <BiFoodMenu className="w-5 h-5 text-[#CC5500]" />
+              </div>
+              <span className="flex-1 text-left pl-3">Add New Order</span>
             </button>
           </Link>
           <button
             onClick={openOrderEssentialsModal}
-            className="flex items-center bg-gradient-to-r from-[#1c4686] to-[#2a5ca7] text-white rounded-md shadow-md hover:from-[#163a6f] hover:to-[#1c4686] transition-colors duration-200 w-48 overflow-hidden"
+            className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
           >
-            <div className="flex items-center justify-center bg-[#1c4686] p-3">
-              <img
-                src="/images/stockout/trash.png"
-                alt="New Receipt"
-                className="w-6 h-6"
-              />
+            <div className="flex items-center justify-center border-r p-3">
+              <PiCirclesThreePlusLight className="w-5 h-5 text-[#CC5500]" />
             </div>
             <span className="flex-1 text-left pl-3">Order Essentials</span>
           </button>
         </div>
       </div>
-      {showPopup && <ChooseOrder onClose={() => setShowPopup(false)} />}
-      <OrderEssentials
-        isOpen={isOrderEssentialsOpen}
-        onClose={closeOrderEssentialsModal}
-        menuTypes={orderData.menu_types}
-        discountsData={orderData.discounts}
-        paymentMethods={orderData.payment_methods}
-        fetchOrderData={fetchOrderData}
-      />
 
-      {/* Table with built-in scrolling */}
-      <Table
-        columns={[
-          "Transaction ID",
-          "Date",
-          "Order Summary",
-          "Total Amount",
-          "Order Status",
-        ]}
-        data={filteredTransactions.map((order) => {
-          const orderSummary =
-            order.order_details?.map(
-              (order_details) =>
-                `${order_details.quantity}x - ${order_details.menu_item?.name}`
-            ) || [];
+      <div className="mt-4">
+        {showPopup && <ChooseOrder onClose={() => setShowPopup(false)} />}
+        <OrderEssentials
+          isOpen={isOrderEssentialsOpen}
+          onClose={closeOrderEssentialsModal}
+          menuTypes={orderData.menu_types}
+          discountsData={orderData.discounts}
+          paymentMethods={orderData.payment_methods}
+          fetchOrderData={fetchOrderData}
+        />
 
-          let formattedOrderSummary;
-          if (orderSummary.length === 1) {
-            formattedOrderSummary = orderSummary[0];
-          } else if (orderSummary.length === 2) {
-            formattedOrderSummary = (
-              <>
-                {orderSummary[0]} <br />
-                {orderSummary[1]}
-              </>
-            );
-          } else if (orderSummary.length > 2) {
-            formattedOrderSummary = (
-              <>
-                {orderSummary[0]} <br />
-                {orderSummary[1]} ...
-              </>
-            );
-          } else {
-            formattedOrderSummary = "N/A";
+        {/* Table with built-in scrolling */}
+        <Table
+          columns={[
+            "Transaction ID",
+            "Date",
+            "Order Summary",
+            "Total Amount",
+            "Order Status",
+          ]}
+          data={filteredTransactions.map((order) => {
+            const orderSummary =
+              order.order_details?.map(
+                (order_details) =>
+                  `${order_details.quantity}x - ${order_details.menu_item?.name}`
+              ) || [];
+
+            let formattedOrderSummary;
+            if (orderSummary.length === 1) {
+              formattedOrderSummary = orderSummary[0];
+            } else if (orderSummary.length === 2) {
+              formattedOrderSummary = (
+                <>
+                  {orderSummary[0]} <br />
+                  {orderSummary[1]}
+                </>
+              );
+            } else if (orderSummary.length > 2) {
+              formattedOrderSummary = (
+                <>
+                  {orderSummary[0]} <br />
+                  {orderSummary[1]} ...
+                </>
+              );
+            } else {
+              formattedOrderSummary = "N/A";
+            }
+
+            return [
+              order.id || "N/A",
+              formatDate(order.date) || "N/A",
+              formattedOrderSummary,
+              `₱${
+                order.order_details
+                  ?.reduce(
+                    (total, order_details) =>
+                      total +
+                      order_details.quantity *
+                        (order_details.menu_item?.price || 0),
+                    0
+                  )
+                  .toFixed(2) || "0.00"
+              }`,
+              order.order_status?.name || "N/A",
+            ];
+          })}
+          rowOnClick={(rowIndex) =>
+            openTransactionModal(filteredTransactions[rowIndex])
           }
-
-          return [
-            order.id || "N/A",
-            formatDate(order.date) || "N/A",
-            formattedOrderSummary,
-            `₱${
-              order.order_details
-                ?.reduce(
-                  (total, order_details) =>
-                    total +
-                    order_details.quantity *
-                      (order_details.menu_item?.price || 0),
-                  0
-                )
-                .toFixed(2) || "0.00"
-            }`,
-            order.order_status?.name || "N/A",
-          ];
-        })}
-        rowOnClick={(rowIndex) =>
-          openTransactionModal(filteredTransactions[rowIndex])
-        }
-        maxHeight="500px"
-      />
+          maxHeight="500px"
+        />
+      </div>
 
       <TransactionModal
         isOpen={isTransactionModalOpen}

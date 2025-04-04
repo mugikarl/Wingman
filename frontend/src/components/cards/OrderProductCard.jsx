@@ -1,8 +1,6 @@
 import React from "react";
-import { FaEllipsisVertical } from "react-icons/fa6";
+import { FaChevronDown } from "react-icons/fa6";
 
-// Helper to create a composite key for an item.
-// We add a guard to ensure item is defined.
 export const getItemKey = (item, menuType) => {
   if (!item) return "";
   if (
@@ -62,9 +60,9 @@ const OrderProductCard = ({
   const discountOptions = discounts || [];
 
   return (
-    <div className="flex border rounded-lg p-1 relative overflow-hidden">
+    <div className="flex border border-gray-200 rounded-sm p-2 relative overflow-hidden hover:shadow-md transition-shadow duration-200 bg-white">
       {/* Left Column: Image */}
-      <div className="w-20 h-20 flex-shrink-0 p-0">
+      <div className="w-20 h-20 flex-shrink-0 rounded-sm overflow-hidden">
         <img
           src={item.image || "/placeholder.svg"}
           alt={item.name}
@@ -72,111 +70,86 @@ const OrderProductCard = ({
         />
       </div>
       {/* Right Column: Details */}
-      <div className="flex flex-col flex-grow ml-1 overflow-hidden">
-        <div className="flex justify-between items-start">
+      <div className="flex flex-col flex-grow ml-3 overflow-hidden">
+        <div className="flex justify-between items-start mb-1">
           <span className="font-semibold text-base truncate">{item.name}</span>
-          {menuType?.id === 1 && (
-            <div className="relative">
-              <button
-                onClick={() =>
-                  setOpenDropdownId(
-                    openDropdownId === compositeKey ? null : compositeKey
+        </div>
+
+        {/* Middle Row: Quantity Controls and Discount Dropdown (conditional) */}
+        <div className="flex items-center mt-1 space-x-2">
+          <div className="flex border border-gray-300 rounded-sm overflow-hidden shadow-sm">
+            <button
+              onClick={() =>
+                handleQuantityChange(
+                  item.id,
+                  groupIdentifier,
+                  currentDiscount,
+                  item.quantity - 1
+                )
+              }
+              className="bg-[#CC5500] text-white px-3 hover:bg-[#B34A00] transition-colors duration-150 h-8 flex items-center justify-center font-medium"
+            >
+              -
+            </button>
+            <input
+              type="number"
+              value={localQuantity}
+              onChange={(e) =>
+                onLocalQuantityChange(compositeKey, e.target.value)
+              }
+              onBlur={() =>
+                handleBlur(item.id, groupIdentifier, currentDiscount)
+              }
+              className="w-8 text-center text-sm h-8 focus:outline-none focus:ring-1 focus:ring-[#CC5500]"
+            />
+            <button
+              onClick={() =>
+                handleQuantityChange(
+                  item.id,
+                  groupIdentifier,
+                  currentDiscount,
+                  item.quantity + 1
+                )
+              }
+              className="bg-[#CC5500] text-white px-3 hover:bg-[#B34A00] transition-colors duration-150 h-8 flex items-center justify-center font-medium"
+            >
+              +
+            </button>
+          </div>
+          {/* Only show discount dropdown for non-Unli Wings orders and menuType is In-Store */}
+          {menuType?.id === 1 && !isUnliOrder && (
+            <div className="relative w-28">
+              <select
+                value={item.discount || "0"}
+                onChange={(e) =>
+                  handleDiscountChange(
+                    item.id,
+                    groupIdentifier,
+                    parseInt(e.target.value, 10),
+                    compositeKey
                   )
                 }
-                className="p-1"
+                className="border border-gray-300 rounded-sm text-sm h-8 px-2 pr-8 focus:outline-none focus:ring-1 focus:ring-[#CC5500] appearance-none bg-white w-full"
               >
-                <FaEllipsisVertical className="text-gray-600" />
-              </button>
-              {openDropdownId === compositeKey && (
-                <div className="absolute right-0 mt-2 w-28 bg-white border rounded shadow-lg z-10">
-                  <button
-                    onClick={() => {
-                      handleInstoreCategoryChange(item.id, "Unli Wings");
-                      setOpenDropdownId(null);
-                    }}
-                    className="block w-full text-left px-2 py-1 hover:bg-gray-100 text-sm whitespace-nowrap"
-                  >
-                    Unli Wings
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleInstoreCategoryChange(item.id, "Ala Carte");
-                      setOpenDropdownId(null);
-                    }}
-                    className="block w-full text-left px-2 py-1 hover:bg-gray-100 text-sm whitespace-nowrap"
-                  >
-                    Ala Carte
-                  </button>
-                </div>
-              )}
+                <option value="0">None (0%)</option>
+                {discountOptions.map((disc) => (
+                  <option key={disc.id} value={disc.id}>
+                    {disc.type} ({(disc.percentage * 100).toFixed(0)}%)
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                <FaChevronDown className="w-3 h-3" />
+              </div>
             </div>
           )}
         </div>
-        {/* Middle Row: Quantity Controls and Discount Dropdown */}
-        <div className="flex items-center mt-1 space-x-1">
-          <button
-            onClick={() =>
-              handleQuantityChange(
-                item.id,
-                groupIdentifier,
-                currentDiscount,
-                item.quantity - 1
-              )
-            }
-            className="bg-[#E88504] text-white px-2 border border-r-0 h-8 whitespace-nowrap"
-          >
-            -
-          </button>
-          <input
-            type="number"
-            value={localQuantity}
-            onChange={(e) =>
-              onLocalQuantityChange(compositeKey, e.target.value)
-            }
-            onBlur={() => handleBlur(item.id, groupIdentifier, currentDiscount)}
-            className="w-10 text-center border-t border-b border-gray-300 text-sm h-8"
-          />
-          <button
-            onClick={() =>
-              handleQuantityChange(
-                item.id,
-                groupIdentifier,
-                currentDiscount,
-                item.quantity + 1
-              )
-            }
-            className="bg-[#E88504] text-white px-2 border border-l-0 h-8 whitespace-nowrap"
-          >
-            +
-          </button>
-          {menuType?.id === 1 && (
-            <select
-              // If no discount is applied, item.discount will be 0 (as a string or number)
-              value={item.discount || "0"}
-              onChange={(e) =>
-                handleDiscountChange(
-                  item.id,
-                  groupIdentifier,
-                  parseInt(e.target.value, 10),
-                  compositeKey
-                )
-              }
-              className="ml-2 border border-gray-300 text-sm h-8 w-24 whitespace-nowrap"
-            >
-              <option value="0">None (0%)</option>
-              {discountOptions.map((disc) => (
-                <option key={disc.id} value={disc.id}>
-                  {disc.type} ({(disc.percentage * 100).toFixed(0)}%)
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
+
         {/* Bottom Row: Price Information (only for non-Unli orders) */}
         {!isUnliOrder && (
-          <div className="flex justify-between items-center mt-1">
+          <div className="flex justify-between items-center mt-2">
             <span className="text-sm text-gray-600 whitespace-nowrap">
-              ₱{(item.price || 0).toFixed(2)}
+              ₱{(item.price || 0).toFixed(2)} × {item.quantity}
             </span>
             <span className="font-semibold text-green-600 whitespace-nowrap">
               ₱{finalPrice.toFixed(2)}
