@@ -123,7 +123,7 @@ const OrderTable = () => {
   }, [location.state]);
 
   if (loading) {
-    return <LoadingScreen />;
+    return <LoadingScreen message={"Loading orders"} />;
   }
 
   if (error) {
@@ -175,10 +175,10 @@ const OrderTable = () => {
             <button
               key="All"
               onClick={() => toggleStatus("All")}
-              className={`px-3 py-1 rounded-md transition-colors w-28 text-center border border-gray-300 shadow-sm ${
+              className={`px-3 py-1 font-normal rounded-md transition-colors w-28 text-center border bg-white hover:bg-gray-200 shadow-s ${
                 statusFilters.includes("All")
-                  ? "bg-[#CC5500] hover:bg-[#B34A00] text-white"
-                  : "bg-white hover:bg-gray-200"
+                  ? "border-l-4 border-[#CC5500] text-[#CC5500] hover:text-[#B34A00]"
+                  : "border-gray-300 bg-white hover:bg-gray-200"
               }`}
             >
               All
@@ -189,21 +189,24 @@ const OrderTable = () => {
               .map((status) => {
                 let color = "bg-white hover:bg-gray-200";
                 if (status.name === "Pending") {
-                  color = "bg-yellow-400 hover:bg-yellow-500";
+                  color =
+                    "border-l-4 border-yellow-400 bg-white text-yellow-400 hover:text-yellow-500";
                 } else if (status.name === "Completed") {
-                  color = "bg-green-500 hover:bg-green-600";
+                  color =
+                    "border-l-4 border-green-500 bg-white text-green-500 hover:text-green-600";
                 } else if (status.name === "Cancelled") {
-                  color = "bg-red-500 hover:bg-red-600";
+                  color =
+                    "border-l-4 border-red-500 bg-white text-red-500 hover:text-red-600";
                 }
 
                 return (
                   <button
                     key={status.id}
                     onClick={() => toggleStatus(status.name)}
-                    className={`px-3 py-1 rounded-md transition-colors w-28 text-center border border-gray-300 shadow-sm ${
+                    className={`px-3 py-1 rounded-md transition-colors w-28 text-center border-gray-300 shadow-sm ${
                       statusFilters.includes(status.name)
-                        ? `${color} text-white`
-                        : "bg-white hover:bg-gray-200"
+                        ? `${color} text-white border`
+                        : "border bg-white hover:bg-gray-200"
                     }`}
                   >
                     {status.name}

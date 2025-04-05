@@ -3511,6 +3511,11 @@ def update_order_status(request, transaction_id):
         if not transaction_response.data:
             return Response({"error": f"Transaction {transaction_id} not found"}, status=404)
         
+         # Extract employee_id from the transaction
+        employee_id = transaction_response.data[0].get('employee_id')
+        if not employee_id:
+            return Response({"error": "Employee ID not found in transaction"}, status=400)
+        
         # Update transaction status
         status_update = supabase_anon.table("transaction").update({
             "order_status": status_id
@@ -3588,7 +3593,16 @@ def update_order_status(request, transaction_id):
                                     else:
                                         menu_unit_symbol = inventory_unit_symbol
                                         category_name = None
-                                    
+                                    # Get the unit_id for the disposed_unit
+                                    if inventory_unit_symbol:
+                                        unit_response = supabase_anon.table("unit_of_measurement").select("id").eq("symbol", inventory_unit_symbol).execute()
+                                        if unit_response.data:
+                                            disposed_unit_id = unit_response.data[0].get('id')
+                                        else:
+                                            disposed_unit_id = None
+                                    else:
+                                        disposed_unit_id = None
+
                                     # Total quantity to deduct (menu item quantity * required quantity per item)
                                     total_deduction = quantity * required_quantity
                                     
@@ -3624,6 +3638,26 @@ def update_order_status(request, transaction_id):
                                         "new_quantity": new_quantity
                                     })
                                     
+                                     # Prepare disposal data
+                                    disposal_data = {
+                                        "disposed_quantity": total_deduction,
+                                        "inventory_id": inventory_id,
+                                        "reason_id": 1,
+                                        "disposal_datetime": datetime.now().isoformat(),
+                                        "disposed_unit": disposed_unit_id,
+                                        "disposer": employee_id
+                                    }
+
+                                    # Insert into disposed inventory
+                                    try:
+                                        disposal_response = supabase_anon.table("disposed_inventory").insert(disposal_data).execute()
+                                        if not disposal_response.data:
+                                            debug_steps.append(f"Failed to insert disposal record for inventory {inventory_id}")
+                                        else:
+                                            debug_steps.append(f"Successfully inserted disposal record for inventory {inventory_id}")
+                                    except Exception as disposal_error:
+                                        debug_steps.append(f"Error inserting disposal record: {str(disposal_error)}")
+
                                     debug_steps.append(f"Updated inventory {inventory_id} for item {item_id}: {current_quantity} -> {new_quantity}")
                                 else:
                                     debug_steps.append(f"Item not found for inventory {inventory_id}")
@@ -3730,9 +3764,6 @@ def update_menu_availability(request):
         
         menu_items = menu_items_response.data
         debug_steps.append(f"Found {len(menu_items)} menu items to check")
-        
-        # Import conversion utility
-        from .utils.conversion import convert_value
         
         # Process each menu item
         for menu_item in menu_items:

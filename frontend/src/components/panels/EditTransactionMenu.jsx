@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 import axios from "axios";
+import { PiBasket } from "react-icons/pi";
 
 const EditTransactionMenu = ({
   menuCategories,
@@ -66,31 +67,25 @@ const EditTransactionMenu = ({
   };
 
   return (
-    <div className="w-400 px-4 flex flex-col h-full">
+    <div className="w-400 overflow-y-auto flex flex-col h-full">
       <h3 className="font-bold text-xl mb-4">Menu</h3>
       {/* Select Category Dropdown */}
       <div className="relative inline-block text-left mb-4">
         <button
           onClick={() => setIsCatDropdownOpen(!isCatDropdownOpen)}
-          className="flex items-center bg-[#E88504] rounded-md shadow-md hover:opacity-90 active:scale-95 transition-transform duration-150 w-56 overflow-hidden"
+          className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
         >
-          <div className="flex items-center justify-center bg-[#D87A03] p-3">
-            <img
-              src="/images/groceries.png"
-              alt="Category"
-              className="w-6 h-6"
-            />
+          <div className="flex items-center justify-center border-r p-3">
+            <PiBasket className="w-5 h-5 text-[#CC5500]" />
           </div>
-          <span className="flex-1 text-left px-3 text-white">
-            {selectedMenuCategory
-              ? selectedMenuCategory.name
-              : "Select Category"}
+          <span className="flex-1 text-left pl-3">
+            {selectedMenuCategory ? selectedMenuCategory.name : "All"}
           </span>
-          <div className="flex items-center justify-center p-3">
+          <div className="flex items-center justify-center pr-3">
             {isCatDropdownOpen ? (
-              <FaChevronUp className="h-6 text-white" />
+              <FaChevronUp className="h-4 w-4 text-[#CC5500]" />
             ) : (
-              <FaChevronDown className="h-6 text-white" />
+              <FaChevronDown className="h-4 w-4 text-[#CC5500]" />
             )}
           </div>
         </button>
@@ -99,12 +94,12 @@ const EditTransactionMenu = ({
             <div className="bg-white rounded-md py-2">
               <button
                 onClick={() => {
-                  setSelectedMenuCategory({ id: 0, name: "Overall" });
+                  setSelectedMenuCategory({ id: 0, name: "All" });
                   setIsCatDropdownOpen(false);
                 }}
                 className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
               >
-                Overall
+                All
               </button>
               {menuCategories.map((cat) => (
                 <button

@@ -92,7 +92,7 @@ const AddProfile = ({
             <h2 className="text-lg font-medium">Add New Staff Profile</h2>
             <button
               onClick={closeModal}
-              className="p-1 rounded-full hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
+              className="p-1 rounded hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
             >
               &times;
             </button>

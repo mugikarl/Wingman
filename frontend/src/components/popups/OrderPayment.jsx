@@ -76,7 +76,6 @@ const OrderPayment = ({
         );
         setIsProcessing(false);
         onClose();
-        onOrderPlaced(); // Call the callback after order is placed
       }, 1000);
     } else if (selectedPaymentMethod.name.toLowerCase() === "gcash") {
       if (!gcashReferenceNo) {

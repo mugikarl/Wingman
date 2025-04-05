@@ -167,7 +167,7 @@ const OrderEditPayment = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-md mx-4 overflow-hidden">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-md mx-4 overflow-hidden max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-xl font-semibold">Payment</h2>
@@ -179,216 +179,166 @@ const OrderEditPayment = ({
           </button>
         </div>
         {/* Content */}
-        <div className="p-4 space-y-6">
-          {/* Display Current Order Total */}
-          <div className="flex items-center justify-between border-b pb-4">
-            <span className="text-lg font-medium text-gray-700">
-              Updated Order Total
-            </span>
-            <span className="text-xl font-bold">₱{finalTotal.toFixed(2)}</span>
-          </div>
+        <div className="p-4">
+          {/* Scrollable section */}
+          <div className="space-y-6 max-h-[60vh] overflow-y-auto">
+            {/* Display Current Order Total */}
+            <div className="flex items-center justify-between border-b pb-4">
+              <span className="text-lg font-medium text-gray-700">
+                Updated Order Total
+              </span>
+              <span className="text-xl font-bold">
+                ₱{finalTotal.toFixed(2)}
+              </span>
+            </div>
 
-          {/* Display Extra Payment Required */}
-          <div className="flex items-center justify-between border-b pb-4">
-            <span className="text-lg font-medium text-gray-700">
-              Extra Payment Required
-            </span>
-            <span className="text-xl font-bold">
-              ₱{extraPaymentRequired.toFixed(2)}
-            </span>
-          </div>
-          {/* Employee Display - Read-only */}
-          {transaction.employee && (
-            <div className="space-y-2 border-b pb-4">
-              <label className="text-sm font-medium">Employee</label>
-              <div className="w-full p-2 border rounded-md bg-gray-50 text-gray-700">
-                {transaction.employee.first_name}{" "}
-                {transaction.employee.last_name}
+            {/* Display Extra Payment Required */}
+            <div className="flex items-center justify-between border-b pb-4">
+              <span className="text-lg font-medium text-gray-700">
+                Extra Payment Required
+              </span>
+              <span className="text-xl font-bold">
+                ₱{extraPaymentRequired.toFixed(2)}
+              </span>
+            </div>
+            {/* Employee Display - Read-only */}
+            {transaction.employee && (
+              <div className="space-y-2 border-b pb-4">
+                <label className="text-sm font-medium">Employee</label>
+                <div className="w-full p-2 border rounded-md bg-gray-50 text-gray-700">
+                  {transaction.employee.first_name}{" "}
+                  {transaction.employee.last_name}
+                </div>
               </div>
-            </div>
-          )}
-          {/* Payment Method Selection */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Payment Method</label>
-            <div className="grid grid-cols-2 gap-4">
-              {paymentMethods && paymentMethods.length > 0 ? (
-                paymentMethods.map((method) => (
-                  <button
-                    key={method.id}
-                    type="button"
-                    className={`h-16 flex flex-col items-center justify-center gap-1 rounded-lg border ${
-                      selectedPaymentMethod &&
-                      selectedPaymentMethod.id === method.id
-                        ? "bg-green-500 text-white border-green-600"
-                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
-                    onClick={() => setSelectedPaymentMethod(method)}
-                  >
-                    {method.name.toLowerCase() === "cash" ? (
-                      <FaMoneyBill />
-                    ) : method.name.toLowerCase() === "gcash" ? (
-                      <FaCreditCard />
-                    ) : (
-                      <FaCreditCard />
-                    )}
-                    <span>{method.name}</span>
-                  </button>
-                ))
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className={`h-16 flex flex-col items-center justify-center gap-1 rounded-lg border ${
-                      selectedPaymentMethod &&
-                      selectedPaymentMethod.name.toLowerCase() === "cash"
-                        ? "bg-green-500 text-white border-green-600"
-                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
-                    onClick={() =>
-                      setSelectedPaymentMethod({ id: 1, name: "Cash" })
-                    }
-                  >
-                    <FaMoneyBill />
-                    <span>Cash</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`h-16 flex flex-col items-center justify-center gap-1 rounded-lg border ${
-                      selectedPaymentMethod &&
-                      selectedPaymentMethod.name.toLowerCase() === "gcash"
-                        ? "bg-blue-500 text-white border-blue-600"
-                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
-                    onClick={() =>
-                      setSelectedPaymentMethod({ id: 2, name: "GCash" })
-                    }
-                  >
-                    <FaCreditCard />
-                    <span>GCash</span>
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-          {/* Fields for Cash Payment */}
-          {selectedPaymentMethod &&
-            selectedPaymentMethod.name.toLowerCase() === "cash" && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="cash-received"
-                    className="text-sm font-medium"
-                  >
-                    Cash Received
-                  </label>
-                </div>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                    ₱
-                  </span>
-                  <input
-                    id="cash-received"
-                    type="number"
-                    value={cashReceived}
-                    onChange={(e) => setCashReceived(e.target.value)}
-                    className="w-full pl-8 pr-4 py-2 border rounded-md text-right text-lg font-medium focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="0.00"
-                    step="0.01"
-                  />
-                </div>
-                {/* Show total payment amount and change after edit */}
-                <div className="border-t pt-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">
-                      Cash Amount
-                    </span>
-                    <span className="text-sm font-bold">
-                      ₱{parseFloat(cashReceived || 0).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">
-                      Change
-                    </span>
-                    <span
-                      className={`text-sm font-bold ${
-                        change >= 0 ? "text-green-600" : "text-red-600"
+            )}
+            {/* Payment Method Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Payment Method</label>
+              <div className="grid grid-cols-2 gap-4">
+                {paymentMethods && paymentMethods.length > 0 ? (
+                  paymentMethods.map((method) => (
+                    <button
+                      key={method.id}
+                      type="button"
+                      className={`h-16 flex flex-col items-center justify-center gap-1 rounded-lg border ${
+                        selectedPaymentMethod &&
+                        selectedPaymentMethod.id === method.id
+                          ? "bg-green-500 text-white border-green-600"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                       }`}
+                      onClick={() => setSelectedPaymentMethod(method)}
                     >
-                      ₱{change.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between mt-2 border-t pt-2">
-                    <span className="text-sm font-medium text-gray-700">
-                      Total Payment After Edit
-                    </span>
-                    <span className="text-sm font-bold text-blue-600">
-                      ₱
-                      {(
-                        transaction.payment_amount +
-                        (Number.parseFloat(cashReceived) || 0) -
-                        change
-                      ).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
+                      {method.name.toLowerCase() === "cash" ? (
+                        <FaMoneyBill />
+                      ) : method.name.toLowerCase() === "gcash" ? (
+                        <FaCreditCard />
+                      ) : (
+                        <FaCreditCard />
+                      )}
+                      <span>{method.name}</span>
+                    </button>
+                  ))
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className={`h-16 flex flex-col items-center justify-center gap-1 rounded-lg border ${
+                        selectedPaymentMethod &&
+                        selectedPaymentMethod.name.toLowerCase() === "cash"
+                          ? "bg-green-500 text-white border-green-600"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      }`}
+                      onClick={() =>
+                        setSelectedPaymentMethod({ id: 1, name: "Cash" })
+                      }
+                    >
+                      <FaMoneyBill />
+                      <span>Cash</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`h-16 flex flex-col items-center justify-center gap-1 rounded-lg border ${
+                        selectedPaymentMethod &&
+                        selectedPaymentMethod.name.toLowerCase() === "gcash"
+                          ? "bg-blue-500 text-white border-blue-600"
+                          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      }`}
+                      onClick={() =>
+                        setSelectedPaymentMethod({ id: 2, name: "GCash" })
+                      }
+                    >
+                      <FaCreditCard />
+                      <span>GCash</span>
+                    </button>
+                  </>
+                )}
               </div>
-            )}
-          {/* Fields for GCash Payment */}
-          {selectedPaymentMethod &&
-            selectedPaymentMethod.name.toLowerCase() === "gcash" && (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Reference No.
-                  </label>
-                  <input
-                    type="text"
-                    value={gcashReferenceNo}
-                    onChange={(e) => setGcashReferenceNo(e.target.value)}
-                    className="w-full pl-3 pr-4 py-2 border border-gray-300 rounded-md text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter reference number"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Reference Image (optional)
-                  </label>
-                  <div
-                    onClick={() =>
-                      document.getElementById("gcash-image-upload").click()
-                    }
-                    className="flex-1 py-2 rounded bg-blue-500 text-white cursor-pointer text-center"
-                  >
-                    Choose File
-                  </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    id="gcash-image-upload"
-                  />
-                  {gcashReferenceImage && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      {gcashReferenceImage.name}
-                    </p>
-                  )}
-                </div>
-
-                {/* Show total payment amount after edit */}
-                <div className="border-t pt-4">
+            </div>
+            {/* Fields for Cash Payment */}
+            {selectedPaymentMethod &&
+              selectedPaymentMethod.name.toLowerCase() === "cash" && (
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">
-                      Payment Amount
+                    <label
+                      htmlFor="cash-received"
+                      className="text-sm font-medium"
+                    >
+                      Cash Received
+                    </label>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                      ₱
                     </span>
-                    <span className="text-sm font-bold">
-                      ₱{extraPaymentRequired.toFixed(2)}
-                    </span>
+                    <input
+                      id="cash-received"
+                      type="number"
+                      value={cashReceived}
+                      onChange={(e) => setCashReceived(e.target.value)}
+                      className="w-full pl-8 pr-4 py-2 border rounded-md text-right text-lg font-medium focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      placeholder="0.00"
+                      step="0.01"
+                    />
+                  </div>
+                  {/* Show total payment amount and change after edit */}
+                  <div className="border-t pt-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">
+                        Cash Amount
+                      </span>
+                      <span className="text-sm font-bold">
+                        ₱{parseFloat(cashReceived || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">
+                        Change
+                      </span>
+                      <span
+                        className={`text-sm font-bold ${
+                          change >= 0 ? "text-green-600" : "text-red-600"
+                        }`}
+                      >
+                        ₱{change.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-2 border-t pt-2">
+                      <span className="text-sm font-medium text-gray-700">
+                        Total Payment After Edit
+                      </span>
+                      <span className="text-sm font-bold text-blue-600">
+                        ₱
+                        {(
+                          transaction.payment_amount +
+                          (Number.parseFloat(cashReceived) || 0) -
+                          change
+                        ).toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+          </div>
         </div>
         {/* Footer */}
         <div className="p-4 border-t">

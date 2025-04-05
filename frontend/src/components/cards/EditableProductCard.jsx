@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { getItemKey } from "../cards/OrderProductCard";
+import { FaChevronDown } from "react-icons/fa";
 
 const EditableProductCard = ({
   item,
@@ -53,59 +54,75 @@ const EditableProductCard = ({
   };
 
   return (
-    <div className="flex items-center border rounded p-1 mb-2 w-full">
-      <div className="flex-shrink-0">
+    <div className="flex border border-gray-200 rounded-sm p-2 relative overflow-hidden hover:shadow-md transition-shadow duration-200 bg-white">
+      {/* Left Column: Image */}
+      <div className="w-20 h-20 flex-shrink-0 rounded-sm overflow-hidden">
         <img
           src={item.menu_item?.image || "/placeholder.svg"}
           alt={item.menu_item?.name}
-          className="w-20 h-20 object-cover"
+          className="w-full h-full object-cover"
         />
       </div>
-      <div className="flex flex-col flex-grow ml-2">
-        <p className="font-semibold text-sm truncate">{item.menu_item?.name}</p>
-        <div className="flex items-center mt-1">
-          <button
-            onClick={handleDecrease}
-            className="bg-[#E88504] px-2 text-sm text-white h-8 flex items-center justify-center"
-          >
-            -
-          </button>
-          <input
-            type="number"
-            value={inputQty}
-            onChange={handleInputChange}
-            onBlur={handleInputBlur}
-            className="w-10 text-center border text-sm h-8"
-          />
-          <button
-            onClick={handleIncrease}
-            className="bg-[#E88504] px-2 text-sm text-white h-8 flex items-center justify-center"
-          >
-            +
-          </button>
+      {/* Right Column: Details */}
+      <div className="flex flex-col flex-grow ml-3 overflow-hidden">
+        <div className="flex justify-between items-start mb-1">
+          <span className="font-semibold text-base truncate">
+            {item.menu_item?.name}
+          </span>
+        </div>
+
+        {/* Middle Row: Quantity Controls and Discount Dropdown (conditional) */}
+        <div className="flex items-center mt-1 space-x-2">
+          <div className="flex border border-gray-300 rounded-sm overflow-hidden shadow-sm">
+            <button
+              onClick={handleDecrease}
+              className="bg-[#CC5500] text-white px-3 hover:bg-[#B34A00] transition-colors duration-150 h-8 flex items-center justify-center font-medium"
+            >
+              -
+            </button>
+            <input
+              type="number"
+              value={inputQty}
+              onChange={handleInputChange}
+              onBlur={handleInputBlur}
+              className="w-8 text-center text-sm h-8 focus:outline-none focus:ring-1 focus:ring-[#CC5500]"
+            />
+            <button
+              onClick={handleIncrease}
+              className="bg-[#CC5500] text-white px-3 hover:bg-[#B34A00] transition-colors duration-150 h-8 flex items-center justify-center font-medium"
+            >
+              +
+            </button>
+          </div>
           {/* Only show discount dropdown if not an Unli Wings order */}
           {discounts && !isUnliWings && (
-            <select
-              value={item.discount ? item.discount.id : 0}
-              onChange={handleDiscountChange}
-              className="ml-2 h-8 text-sm border rounded w-24"
-            >
-              <option value={0}>None</option>
-              {discounts.map((disc) => (
-                <option key={disc.id} value={disc.id}>
-                  {disc.type} ({(disc.percentage * 100).toFixed(0)}%)
-                </option>
-              ))}
-            </select>
+            <div className="relative w-28">
+              <select
+                value={item.discount ? item.discount.id : 0}
+                onChange={handleDiscountChange}
+                className="border border-gray-300 rounded-sm text-sm h-8 px-2 pr-8 focus:outline-none focus:ring-1 focus:ring-[#CC5500] appearance-none bg-white w-full"
+              >
+                <option value={0}>None (0%)</option>
+                {discounts.map((disc) => (
+                  <option key={disc.id} value={disc.id}>
+                    {disc.type} ({(disc.percentage * 100).toFixed(0)}%)
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                <FaChevronDown className="w-3 h-3" />
+              </div>
+            </div>
           )}
         </div>
-        {/* For Unli Wings orders, don't show individual prices */}
+
+        {/* Bottom Row: Price Information (only for non-Unli orders) */}
         {!isUnliWings && (
-          <div className="flex justify-between items-center mt-1">
-            <span className="text-xs text-gray-600">
-              ₱{originalPrice.toFixed(2)}
+          <div className="flex justify-between items-center mt-2">
+            <span className="text-sm text-gray-600 whitespace-nowrap">
+              ₱{originalPrice.toFixed(2)} × {item.quantity}
             </span>
-            <span className="text-xs font-semibold text-green-600">
+            <span className="font-semibold text-green-600 whitespace-nowrap">
               ₱{computedPrice.toFixed(2)}
             </span>
           </div>

@@ -1,10 +1,16 @@
 import React from "react";
 
-const Table = ({ columns, data, rowOnClick, maxHeight = "700px" }) => {
+const Table = ({
+  columns,
+  data,
+  rowOnClick,
+  maxHeight = "100%",
+  maxWidth = "100%",
+}) => {
   return (
     <div
-      className="relative overflow-x-auto shadow-md sm:rounded-sm"
-      style={{ maxHeight }}
+      className="relative overflow-x-auto shadow-md sm:rounded-sm w-full"
+      style={{ maxHeight, maxWidth }}
     >
       <table className="w-full text-sm text-left rtl:text-right text-gray-500">
         <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
