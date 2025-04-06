@@ -13,11 +13,13 @@ const LoadingScreen = ({ message }) => {
           className="w-[150px] h-[150px]"
         />
         <div className="flex text-4xl font-light text-black mt-4 text-center">
-          {message && (
+          {message ? (
             <p>
               {message}
               <span className="loading-dots"></span>
             </p>
+          ) : (
+            <span className="loading-dots"></span>
           )}
         </div>
       </div>

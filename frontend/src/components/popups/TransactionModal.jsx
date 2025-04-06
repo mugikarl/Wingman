@@ -117,7 +117,7 @@ const TransactionModal = ({
   const getOrderStatusClass = (status) => {
     switch (status) {
       case "Pending":
-        return "bg-orange-500 text-white";
+        return "bg-orange-500 text-orange-500";
       case "Completed":
         return "bg-green-500 text-white";
       case "Cancelled":
@@ -143,13 +143,13 @@ const TransactionModal = ({
   const getMenuTypeClass = (menuTypeName) => {
     switch (menuTypeName) {
       case "In-Store":
-        return "bg-orange-500 text-white";
+        return "text-orange-500";
       case "Grab":
-        return "bg-green-500 text-white";
+        return "text-green-500";
       case "FoodPanda":
-        return "bg-pink-500 text-white";
+        return "text-pink-500";
       default:
-        return "bg-gray-500 text-white";
+        return "text-gray-500";
     }
   };
 
@@ -351,15 +351,13 @@ const TransactionModal = ({
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      {/* Modal container */}
-      <div
-        className={`bg-white rounded-lg shadow-lg p-6 ${
-          isExpanded ? "w-[1200px] flex" : "w-[500px] flex flex-col"
-        } h-[680px] relative`}
-      >
-        {/* Close Button */}
-        <div className="absolute top-2 right-2">
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-lg w-[1280px] h-[680px] flex flex-col overflow-y-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center p-4 border-b">
+          <h2 className="text-lg font-medium">
+            Transaction No.{transaction.id}
+          </h2>
           <button
             onClick={onClose}
             className="p-1 rounded hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
@@ -368,228 +366,259 @@ const TransactionModal = ({
           </button>
         </div>
 
-        {/* Add an overlay for non-editable orders */}
-        {isOrderNonEditable && (
-          <div className="absolute inset-0 bg-gray-200 bg-opacity-50 z-10 pointer-events-none">
-            {/* This overlay makes the modal appear grayed out */}
-          </div>
-        )}
-
-        {/* Left Side: Transaction Details */}
-        <div
-          className={
-            isExpanded
-              ? "w-[500px] pr-4 flex flex-col h-full"
-              : "w-full flex flex-col h-full"
-          }
-        >
-          <div className="border-b pb-2">
-            <h2 className="text-2xl font-bold mt-4">
-              Transaction No. {transaction.id}
-            </h2>
-            <div className="mt-2">
-              <div className="flex justify-between items-start">
-                <div>
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          <div className="grid grid-cols-2 gap-6">
+            {/* Left Column: Order Summary and Computations */}
+            <div className="h-full flex flex-col space-y-6">
+              <div
+                className={`bg-white p-4 h-full rounded-lg border ${
+                  isOrderNonEditable ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                <h3 className="text-lg font-medium mb-4">Order Summary</h3>
+                <div className="space-y-2">
                   <p>
                     <strong>Date:</strong> {formatDate(transaction.date)}
                   </p>
                   <p>
                     <strong>Time:</strong> {formatTime(transaction.date)}
                   </p>
+                  <p>
+                    <strong>Menu Type:</strong>{" "}
+                    <span
+                      className={`font-medium ${getMenuTypeClass(menuType)}`}
+                    >
+                      {menuType}
+                    </span>
+                  </p>
+                  <div className="relative inline-block text-left">
+                    <button
+                      onClick={() => {
+                        if (!isOrderNonEditable) {
+                          setIsStatusDropdownOpen(!isStatusDropdownOpen);
+                        }
+                      }}
+                      className={`flex items-center ${getOrderStatusClass(
+                        orderStatus
+                      )} rounded-md shadow-md ${
+                        !isOrderNonEditable
+                          ? "hover:opacity-90 active:scale-95"
+                          : "opacity-90 cursor-default"
+                      } transition-transform duration-150 w-40 overflow-hidden`}
+                      disabled={isOrderNonEditable}
+                    >
+                      <div
+                        className={`flex items-center justify-center ${getStatusLeftBg(
+                          orderStatus
+                        )} p-2`}
+                      >
+                        <FaClipboardList className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="flex-1 text-left px-2 text-white text-sm">
+                        {orderStatus}
+                      </span>
+                      <div className="flex items-center justify-center p-2">
+                        {!isOrderNonEditable &&
+                          (isStatusDropdownOpen ? (
+                            <FaChevronUp className="w-4 h-4 text-white" />
+                          ) : (
+                            <FaChevronDown className="w-4 h-4 text-white" />
+                          ))}
+                      </div>
+                    </button>
+                    {isStatusDropdownOpen && !isOrderNonEditable && (
+                      <div className="absolute right-0 mt-2 w-40 rounded-md shadow-lg z-20">
+                        <div className="bg-white rounded-md py-2">
+                          {(transaction.status === 1 ||
+                            transaction.status === null ||
+                            transaction.status === undefined) && (
+                            <>
+                              <button
+                                onClick={() => updateStatus("Completed")}
+                                className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                              >
+                                Completed
+                              </button>
+                              <button
+                                onClick={() => updateStatus("Cancelled")}
+                                className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                              >
+                                Cancelled
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-              {/* Row for Menu Type and Status Dropdown */}
-              <div className="flex justify-between items-center mt-2">
-                <p className="font-medium">
-                  <strong>Menu Type:</strong>{" "}
-                  <span
-                    className={`px-2 py-1 rounded ${getMenuTypeClass(
-                      menuType
-                    )}`}
-                  >
-                    {menuType}
-                  </span>
-                </p>
-                <div className="relative inline-block text-left">
-                  <button
-                    onClick={() => {
-                      // Only toggle dropdown if order is not completed or cancelled
-                      if (!isOrderNonEditable) {
-                        setIsStatusDropdownOpen(!isStatusDropdownOpen);
-                      }
-                    }}
-                    // Disable hover effects and pointer events for non-editable orders
-                    className={`flex items-center ${getOrderStatusClass(
-                      orderStatus
-                    )} rounded-md shadow-md ${
-                      !isOrderNonEditable
-                        ? "hover:opacity-90 active:scale-95"
-                        : "opacity-90 cursor-default"
-                    } transition-transform duration-150 w-40 overflow-hidden`}
-                    disabled={isOrderNonEditable}
-                  >
-                    <div
-                      className={`flex items-center justify-center ${getStatusLeftBg(
-                        orderStatus
-                      )} p-2`}
-                    >
-                      <FaClipboardList className="w-5 h-5 text-white" />
-                    </div>
-                    <span className="flex-1 text-left px-2 text-white text-sm">
-                      {orderStatus}
-                    </span>
-                    <div className="flex items-center justify-center p-2">
-                      {/* Only show dropdown icon if status is not Completed/Cancelled */}
-                      {!isOrderNonEditable &&
-                        (isStatusDropdownOpen ? (
-                          <FaChevronUp className="w-4 h-4 text-white" />
-                        ) : (
-                          <FaChevronDown className="w-4 h-4 text-white" />
-                        ))}
-                    </div>
-                  </button>
-                  {isStatusDropdownOpen && !isOrderNonEditable && (
-                    <div className="absolute right-0 mt-2 w-40 rounded-md shadow-lg z-20">
-                      <div className="bg-white rounded-md py-2">
-                        {(transaction.status === 1 ||
-                          transaction.status === null ||
-                          transaction.status === undefined) && (
-                          <>
-                            <button
-                              onClick={() => updateStatus("Completed")}
-                              className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
-                            >
-                              Completed
-                            </button>
-                            <button
-                              onClick={() => updateStatus("Cancelled")}
-                              className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
-                            >
-                              Cancelled
-                            </button>
-                          </>
+
+              {/* Computations */}
+              <div
+                className={`bg-white p-4 rounded-lg border ${
+                  isOrderNonEditable ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                <h3 className="text-lg font-medium mb-4">Computations</h3>
+                <div className="flex flex-col">
+                  {isDelivery ? (
+                    <>
+                      <p>
+                        <strong>Subtotal:</strong> ₱
+                        {(totalDeliverySubtotal || 0).toFixed(2)}
+                      </p>
+                      <p className="text-gray-500">
+                        <strong>
+                          Platform Deduction (
+                          {(deductionPercentage * 100).toFixed(2)}%):
+                        </strong>{" "}
+                        -₱
+                        {(totalDeliverySubtotal * deductionPercentage).toFixed(
+                          2
                         )}
-                      </div>
-                    </div>
+                      </p>
+                      <p className="font-bold mt-1">
+                        <strong>Total Amount:</strong> ₱
+                        {(displayTotal || 0).toFixed(2)}
+                      </p>
+                      <p className="font-bold mt-1">
+                        <strong>Amount Paid:</strong> ₱
+                        {(paymentAmount || 0).toFixed(2)}
+                      </p>
+                      <p className="font-bold mt-1">
+                        <strong>Total Sales:</strong>
+                        <span className="text-green-500 ml-1">
+                          ₱{(displayTotal || 0).toFixed(2)}
+                        </span>
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        <strong>Subtotal:</strong> ₱
+                        {(totalBeforeDiscount || 0).toFixed(2)}
+                      </p>
+                      <p className="text-gray-500">
+                        <strong>Discount Amount:</strong> -₱
+                        {(totalDiscountAmount || 0).toFixed(2)}
+                      </p>
+                      <p className="font-bold mt-1">
+                        <strong>Total Amount:</strong> ₱
+                        {(totalInStore || 0).toFixed(2)}
+                      </p>
+                      <p className="font-bold mt-1">
+                        <strong>Amount Paid:</strong> ₱
+                        {(paymentAmount || 0).toFixed(2)}
+                      </p>
+                      {change > 0 && (
+                        <p className="text-gray-500">
+                          <strong>Change:</strong> ₱{change.toFixed(2)}
+                        </p>
+                      )}
+                      <p className="font-bold mt-1">
+                        <strong>Total Sales:</strong>
+                        <span className="text-green-500 ml-1">
+                          {(totalInStore || 0).toFixed(2)}
+                        </span>
+                      </p>
+                    </>
                   )}
                 </div>
               </div>
             </div>
-            <h3 className="font-semibold text-xl mt-2">Order Summary</h3>
-          </div>
 
-          {/* Scrollable Content for Left Side */}
-          <div className="flex-1 mt-4 overflow-y-auto overflow-x-hidden">
-            {isInStore ? (
-              <>
-                <div
-                  className="flex items-center justify-between mb-2 cursor-pointer border hover:bg-gray-100 px-3 py-5 rounded-lg"
-                  onClick={() => setUnliOverallOpen(!unliOverallOpen)}
-                >
-                  <h4 className="font-semibold">
-                    Unli Wings Orders - ₱
-                    {unliWingsOrders
-                      .reduce((sum, detail) => {
-                        const groupKey = detail.unli_wings_group || "Ungrouped";
-                        const isFirstItemInGroup =
-                          unliWingsOrders.findIndex(
-                            (d) => d.unli_wings_group === groupKey
-                          ) === unliWingsOrders.indexOf(detail);
-
-                        if (isFirstItemInGroup) {
+            {/* Right Column: Combined Orders or Delivery Orders */}
+            <div className="flex flex-col space-y-6 w-full h-full">
+              {isInStore ? (
+                <div className="bg-white p-4 rounded-lg border w-full h-full overflow-y-auto">
+                  <h3 className="text-lg font-medium mb-4">Orders</h3>
+                  <div className="space-y-4 h-[400px] overflow-y-auto">
+                    {/* Unli Wings Orders Accordion */}
+                    <div>
+                      <h4 className="text-md font-medium mb-2">
+                        Unli Wings Orders
+                      </h4>
+                      {/* {!isOrderNonEditable && (
+                        <button
+                          onClick={handleAdd}
+                          className="w-full mb-3 px-3 py-2 bg-[#CC5500] text-white rounded hover:bg-[#B34C00]"
+                        >
+                          Add a new Unli Order
+                        </button>
+                      )} */}
+                      {Object.keys(groupedUnliWingsOrders).length > 0 ? (
+                        Object.keys(groupedUnliWingsOrders).map((groupKey) => {
+                          const groupOrders = groupedUnliWingsOrders[groupKey];
+                          const baseAmount =
+                            groupOrders[0]?.instore_category?.base_amount || 0;
                           return (
-                            sum + (detail.instore_category?.base_amount || 0)
-                          );
-                        }
-                        return sum;
-                      }, 0)
-                      .toFixed(2)}
-                  </h4>
-                  <div>{unliOverallOpen ? <FaAngleUp /> : <FaAngleDown />}</div>
-                </div>
-                {unliOverallOpen && (
-                  <div className="w-full max-h-[300px] overflow-y-auto">
-                    {!isOrderNonEditable && (
-                      <button
-                        onClick={handleAdd}
-                        className="w-full mb-3 px-3 py-2 bg-[#E88504] text-white rounded hover:bg-[#E88504]/70"
-                      >
-                        Add a new Unli Order
-                      </button>
-                    )}
-                    {Object.keys(groupedUnliWingsOrders).map((groupKey) => {
-                      const groupOrders = groupedUnliWingsOrders[groupKey];
-                      const baseAmount =
-                        groupOrders[0]?.instore_category?.base_amount || 0;
-                      return (
-                        <div key={groupKey} className="border rounded mb-2">
-                          <div
-                            className="flex justify-between items-center bg-gray-200 hover:bg-gray-300 px-3 py-2 cursor-pointer"
-                            onClick={() => toggleAccordion(groupKey)}
-                          >
-                            <span className="flex-1 text-left">
-                              Unli Wings Order #{groupKey} - ₱
-                              {baseAmount.toFixed(2)}
-                            </span>
-                            <span>
-                              {openAccordion[groupKey] ? (
-                                <FaAngleUp />
-                              ) : (
-                                <FaAngleDown />
-                              )}
-                            </span>
-                          </div>
-                          {openAccordion[groupKey] && (
-                            <div className="px-3 py-2">
-                              <div className="max-h-[200px] overflow-y-auto overflow-x-hidden">
-                                <Table
-                                  columns={["Menu Item", "Quantity"]}
-                                  data={groupOrders.map((detail) => [
-                                    detail?.menu_item?.name || "N/A",
-                                    detail?.quantity || 0,
-                                  ])}
-                                />
-                                {!isOrderNonEditable && (
-                                  <button
-                                    onClick={handleUpdateClick}
-                                    className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                                  >
-                                    Update
-                                  </button>
-                                )}
+                            <div key={groupKey} className="border rounded mb-2">
+                              <div
+                                className="flex justify-between items-center border bg-white hover:bg-gray-200 px-3 py-2 cursor-pointer"
+                                onClick={() => toggleAccordion(groupKey)}
+                              >
+                                <span className="flex-1 text-left">
+                                  Unli Wings Order #{groupKey} - ₱
+                                  {baseAmount.toFixed(2)}
+                                </span>
+                                <span>
+                                  {openAccordion[groupKey] ? (
+                                    <FaAngleUp />
+                                  ) : (
+                                    <FaAngleDown />
+                                  )}
+                                </span>
                               </div>
+                              {openAccordion[groupKey] && (
+                                <div className="px-3 py-2 w-full">
+                                  <div className="h-[200px] overflow-y-auto overflow-x-hidden w-full">
+                                    <Table
+                                      columns={["Menu Item", "Quantity"]}
+                                      data={groupOrders.map((detail) => [
+                                        detail?.menu_item?.name || "N/A",
+                                        detail?.quantity || 0,
+                                      ])}
+                                      maxHeight="100%"
+                                    />
+                                    {/* {!isOrderNonEditable && (
+                                      <button
+                                        onClick={handleUpdateClick}
+                                        className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                                      >
+                                        Update
+                                      </button>
+                                    )} */}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          )}
+                          );
+                        })
+                      ) : (
+                        <div className="bg-gray-100 p-4 rounded-lg text-gray-500 text-center">
+                          No Orders added
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      )}
+                    </div>
 
-                <div
-                  className="flex items-center justify-between mb-2 mt-4 cursor-pointer border hover:bg-gray-100 px-3 py-5 rounded-lg"
-                  onClick={() => setAlaCarteOverallOpen(!alaCarteOverallOpen)}
-                >
-                  <h4 className="font-semibold">
-                    Ala Carte Orders - ₱{totalAlaCarte.toFixed(2)}
-                  </h4>
-                  <div>
-                    {alaCarteOverallOpen ? <FaAngleUp /> : <FaAngleDown />}
-                  </div>
-                </div>
-                {alaCarteOverallOpen && (
-                  <div className="w-full max-h-[300px] overflow-y-auto overflow-x-hidden">
-                    <Table
-                      columns={[
-                        "Menu Item",
-                        "Quantity",
-                        "Price",
-                        "Discounts",
-                        "Total",
-                      ]}
-                      data={
-                        alaCarteOrders.length > 0
-                          ? alaCarteOrders.map((detail) => {
+                    {/* Ala Carte Orders Accordion */}
+                    <div>
+                      <h4 className="text-md font-medium mb-2">
+                        Ala Carte Orders
+                      </h4>
+                      <div className="w-full overflow-y-auto overflow-x-hidden">
+                        {alaCarteOrders.length > 0 ? (
+                          <Table
+                            columns={[
+                              "Menu Item",
+                              "Quantity",
+                              "Price",
+                              "Discounts",
+                              "Total",
+                            ]}
+                            data={alaCarteOrders.map((detail) => {
                               const quantity = detail?.quantity || 0;
                               const price = detail?.menu_item?.price || 0;
                               const discount =
@@ -603,116 +632,72 @@ const TransactionModal = ({
                                 `${(discount * 100).toFixed(0)}%`,
                                 `₱${computedTotal.toFixed(2)}`,
                               ];
-                            })
-                          : [["None", "-", "-", "-", "-"]]
-                      }
-                    />
-                    {!isOrderNonEditable && (
+                            })}
+                          />
+                        ) : (
+                          <div className="bg-gray-100 p-4 rounded-lg text-gray-500 text-center">
+                            No Orders added
+                          </div>
+                        )}
+                        {/* {!isOrderNonEditable && (
+                          <button
+                            onClick={handleUpdateClick}
+                            className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                          >
+                            Update
+                          </button>
+                        )} */}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : isDelivery ? (
+                <div className="bg-white p-4 rounded-lg border w-full h-full overflow-y-auto">
+                  <h3 className="text-lg font-medium mb-4">{menuType} Order</h3>
+                  <div className="max-h-[300px] overflow-y-auto overflow-x-hidden">
+                    {orderDetails.length > 0 ? (
+                      <Table
+                        columns={["Menu Item", "Quantity", "Price"]}
+                        data={orderDetails.map((detail) => {
+                          const quantity = detail?.quantity || 0;
+                          const price = detail?.menu_item?.price || 0;
+                          return [
+                            detail?.menu_item?.name || "N/A",
+                            quantity,
+                            `₱${price.toFixed(2)}`,
+                          ];
+                        })}
+                      />
+                    ) : (
+                      <div className="bg-gray-100 p-4 rounded-lg text-gray-500 text-center">
+                        No Orders added
+                      </div>
+                    )}
+                    {/* {!isOrderNonEditable && (
                       <button
                         onClick={handleUpdateClick}
                         className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
                       >
                         Update
                       </button>
-                    )}
+                    )} */}
                   </div>
-                )}
-              </>
-            ) : isDelivery ? (
-              <>
-                <h3 className="font-semibold">Order Summary</h3>
-                <div className="max-h-[300px] overflow-y-auto overflow-x-hidden">
-                  <Table
-                    columns={["Menu Item", "Quantity", "Price"]}
-                    data={
-                      orderDetails.length > 0
-                        ? orderDetails.map((detail) => {
-                            const quantity = detail?.quantity || 0;
-                            const price = detail?.menu_item?.price || 0;
-                            return [
-                              detail?.menu_item?.name || "N/A",
-                              quantity,
-                              `₱${price.toFixed(2)}`,
-                            ];
-                          })
-                        : [["None", "-", "-"]]
-                    }
-                  />
-                  {!isOrderNonEditable && (
-                    <button
-                      onClick={handleUpdateClick}
-                      className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                    >
-                      Update
-                    </button>
-                  )}
                 </div>
-              </>
-            ) : null}
-          </div>
-
-          <div className="border-t pt-4 mt-4" style={{ flexShrink: 0 }}>
-            <div className="flex flex-col text-right">
-              {isDelivery ? (
-                <>
-                  <p>
-                    <strong>Subtotal:</strong> ₱
-                    {(totalDeliverySubtotal || 0).toFixed(2)}
-                  </p>
-                  <p className="text-gray-500">
-                    <strong>
-                      Platform Deduction (
-                      {(deductionPercentage * 100).toFixed(2)}%):
-                    </strong>{" "}
-                    -₱
-                    {(totalDeliverySubtotal * deductionPercentage).toFixed(2)}
-                  </p>
-                  <p className="font-bold mt-1">
-                    <strong>Total Amount:</strong> ₱
-                    {(displayTotal || 0).toFixed(2)}
-                  </p>
-                  <p className="font-bold mt-1">
-                    <strong>Amount Paid:</strong> ₱
-                    {(paymentAmount || 0).toFixed(2)}
-                  </p>
-                  <p className="font-bold mt-1">
-                    <strong>Total Sales:</strong> ₱
-                    {(displayTotal || 0).toFixed(2)}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p>
-                    <strong>Subtotal:</strong> ₱
-                    {(totalBeforeDiscount || 0).toFixed(2)}
-                  </p>
-                  <p className="text-gray-500">
-                    <strong>Discount Amount:</strong> -₱
-                    {(totalDiscountAmount || 0).toFixed(2)}
-                  </p>
-                  <p className="font-bold mt-1">
-                    <strong>Total Amount:</strong> ₱
-                    {(totalInStore || 0).toFixed(2)}
-                  </p>
-                  <p className="font-bold mt-1">
-                    <strong>Amount Paid:</strong> ₱
-                    {(paymentAmount || 0).toFixed(2)}
-                  </p>
-                  {change > 0 && (
-                    <p className="text-gray-500">
-                      <strong>Change:</strong> ₱{change.toFixed(2)}
-                    </p>
-                  )}
-                  <p className="font-bold mt-1">
-                    <strong>Total Sales:</strong> ₱
-                    {(totalInStore || 0).toFixed(2)}
-                  </p>
-                </>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
-
+        {/* Footer */}
+        {!isOrderNonEditable && (
+          <div className="p-4 border-t flex justify-end">
+            <button
+              onClick={handleUpdateClick}
+              className="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            >
+              Update
+            </button>
+          </div>
+        )}
         {isEditModalOpen && (
           <OrderEditModal
             isOpen={isEditModalOpen}
@@ -733,5 +718,4 @@ const TransactionModal = ({
     </div>
   );
 };
-
 export default TransactionModal;

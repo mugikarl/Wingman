@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { getItemKey } from "../cards/OrderProductCard";
 import EditableProductCard from "../cards/EditableProductCard";
 import OrderEditPayment from "../popups/OrderEditPayment";
@@ -7,7 +7,6 @@ import axios from "axios";
 const EditTransactionOrderSummary = ({
   orderDetails,
   finalTotal, // (You might recalc final total later)
-  onCancelUpdate,
   totalAmount,
   handleEditOrder, // Passed from OrderEditModal
   onUpdateComplete,
@@ -30,6 +29,9 @@ const EditTransactionOrderSummary = ({
 }) => {
   const [openAccordion, setOpenAccordion] = useState({});
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Loading state
+  const [buttonText, setButtonText] = useState("Save All Changes"); // Button text state
+  const loadingIntervalRef = useRef(null); // Ref for the loading interval
 
   // Compute orders directly from orderDetails prop.
   const alaCarteOrders = orderDetails.filter(
@@ -198,234 +200,309 @@ const EditTransactionOrderSummary = ({
   const requiresPayment =
     hasNewUnliWingsGroup || newTotal > calculateOriginalOrderPrice();
 
-  // Add this new function to check inventory before changing quantity
-  const handleQuantityChange = async (item, newQuantity) => {
-    // No need to check if decreasing quantity
-    if (newQuantity <= 0 || newQuantity < item.quantity) {
-      onQuantityChange(item, newQuantity);
-      return;
+  // Function to check inventory for all items before saving changes
+  const checkInventoryBeforeSave = async () => {
+    if (orderDetails.length === 0) {
+      alert("Please add at least one item before saving changes");
+      return false;
     }
 
+    // Group items by ID and sum quantities to check total amounts needed
+    const itemQuantityMap = {};
+    orderDetails.forEach((item) => {
+      if (!itemQuantityMap[item.menu_item.id]) {
+        itemQuantityMap[item.menu_item.id] = 0;
+      }
+      itemQuantityMap[item.menu_item.id] += item.quantity;
+    });
+
+    // Check inventory for each menu item
+    let allItemsAvailable = true;
+    let warningMessages = [];
+
     try {
-      // Check inventory levels via API
-      const response = await axios.get(
-        `http://127.0.0.1:8000/check-menu-inventory/${item.menu_item.id}?quantity=${newQuantity}`
-      );
+      // Check each item's inventory
+      for (const [menuId, quantity] of Object.entries(itemQuantityMap)) {
+        const response = await axios.get(
+          `http://127.0.0.1:8000/check-menu-inventory/${menuId}?quantity=${quantity}`
+        );
 
-      if (response.data.has_sufficient_inventory === false) {
-        const warnings = response.data.warnings || [];
+        if (response.data.has_sufficient_inventory === false) {
+          const warnings = response.data.warnings || [];
 
-        if (warnings.length > 0) {
-          // Format warning message
-          const warningItems = warnings
-            .map(
-              (w) =>
-                `${w.inventory_name}: ${w.available_quantity} ${w.unit} available, ${w.required_quantity} ${w.unit} needed`
-            )
-            .join("\n");
+          if (warnings.length > 0) {
+            // Find the menu item name
+            const itemName =
+              orderDetails.find(
+                (item) => item.menu_item.id.toString() === menuId
+              )?.menu_item.name || "Unknown item";
 
-          // Show warning but allow changing
-          const proceed = window.confirm(
-            `Warning: This quantity may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`
-          );
+            // Add to warning messages
+            warnings.forEach((w) => {
+              warningMessages.push(
+                `${itemName}: ${w.inventory_name} - ${w.available_quantity} ${w.unit} available, ${w.required_quantity} ${w.unit} needed`
+              );
+            });
 
-          if (!proceed) {
-            return;
+            allItemsAvailable = false;
           }
         }
       }
 
-      // If we get here, either inventory is sufficient or user confirmed to proceed
-      onQuantityChange(item, newQuantity);
+      // If there are warnings, show them all together
+      if (!allItemsAvailable) {
+        const proceed = window.confirm(
+          `Warning: Some items may exceed available inventory! Insufficient ingredients will default to 0 quantity.\n\n${warningMessages.join(
+            "\n"
+          )}\n\nDo you want to continue?`
+        );
+        return proceed;
+      }
+      return true;
     } catch (error) {
       console.error("Error checking inventory:", error);
-      // Still allow quantity change if check fails
-      onQuantityChange(item, newQuantity);
+      const proceed = window.confirm(
+        "Error checking inventory. If you proceed, items with insufficient ingredients will have quantity set to 0. Do you want to continue anyway?"
+      );
+      return proceed;
+    }
+  };
+
+  // Effect to handle the loading animation
+  useEffect(() => {
+    if (isLoading) {
+      let dotCount = 0;
+      loadingIntervalRef.current = setInterval(() => {
+        const dots = ".".repeat(dotCount % 4);
+        setButtonText(`Processing${dots}`);
+        dotCount++;
+      }, 500);
+    } else {
+      setButtonText(requiresPayment ? "Complete Order" : "Save All Changes");
+    }
+
+    return () => {
+      if (loadingIntervalRef.current) {
+        clearInterval(loadingIntervalRef.current);
+      }
+    };
+  }, [isLoading, requiresPayment]);
+
+  // Modify the "Save All Changes" button click handler
+  const handleSaveAllChanges = async () => {
+    setIsLoading(true);
+
+    try {
+      // Check inventory before saving changes
+      const canProceed = await checkInventoryBeforeSave();
+      if (canProceed) {
+        if (requiresPayment) {
+          setIsPaymentModalOpen(true);
+        } else {
+          // Create a payload object for the edit
+          const payload = {
+            employee_id: transaction.employee.id,
+            payment_method: transaction.payment_method.id,
+            payment_amount: transaction.payment_amount,
+            reference_id: transaction.reference_id,
+            receipt_image: transaction.receipt_image,
+            // Pass the current orderDetails so handleEditOrder can use them
+            order_details: orderDetails,
+          };
+          handleEditOrder(payload);
+        }
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="relative w-[350px] h-full">
-      <div>
-        <h2 className="text-xl font-bold">Order Summary</h2>
-      </div>
-      <div className="p-4 flex flex-col flex-grow overflow-y-auto h-[calc(100%-150px)]">
-        {menuType === "In-Store" ? (
-          <>
-            {/* Ala Carte Section */}
-            <div>
-              <button
-                className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200 rounded"
-                onClick={() => toggleAccordion("alaCarte")}
-              >
-                <span className="font-semibold">
-                  Ala Carte Orders - ₱{alaCarteSubtotal.toFixed(2)}
-                </span>
-                {openAccordion["alaCarte"] ? (
-                  <span>&#9650;</span>
-                ) : (
-                  <span>&#9660;</span>
-                )}
-              </button>
-              {openAccordion["alaCarte"] &&
-                (alaCarteOrders.length === 0 ? (
-                  <p className="text-gray-500 text-center">
-                    No Order Details Found
-                  </p>
-                ) : (
-                  alaCarteOrders.map((item) => (
-                    <EditableProductCard
-                      key={getItemKey(item, { id: 1, name: "In-Store" })}
-                      item={item}
-                      onQuantityChange={handleQuantityChange}
-                      discounts={discounts}
-                      onDiscountChange={onDiscountChange}
-                    />
-                  ))
-                ))}
-            </div>
-            {/* Unli Wings Section */}
-            <div className="mt-2">
-              <button
-                className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200 rounded"
-                onClick={() => toggleAccordion("unliWings")}
-              >
-                <span className="font-semibold">
-                  Unli Wings Orders - ₱{unliWingsSubtotal.toFixed(2)}
-                </span>
-                {openAccordion["unliWings"] ? (
-                  <span>&#9650;</span>
-                ) : (
-                  <span>&#9660;</span>
-                )}
-              </button>
-              {openAccordion["unliWings"] &&
-                Object.keys(groupedUnliWingsOrders).map((groupKey) => {
-                  const groupOrders = groupedUnliWingsOrders[groupKey];
-                  const baseAmount = getUnliWingsBaseAmount(groupOrders);
-                  // Convert groupKey to a number for accurate comparison.
-                  const isActive = Number(groupKey) === activeUnliWingsGroup;
-                  return (
-                    <div
-                      key={groupKey}
-                      className={`border rounded mb-2 p-2 ${
-                        isActive ? "border-green-900" : "border-gray-300"
-                      }`}
-                    >
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-bold text-sm">
-                          Unli Wings Order #{groupKey} - ₱
-                          {baseAmount && baseAmount.toFixed(2)}
-                        </h4>
-                        {isActive ? (
-                          <div className="flex gap-2">
+    <div className="relative w-full h-full flex flex-col">
+      <div className="p-4 flex-1 overflow-y-auto">
+        <div>
+          <h2 className="text-xl font-bold">Order Summary</h2>
+        </div>
+        <div className="p-4 flex flex-col flex-grow overflow-y-auto">
+          {menuType === "In-Store" ? (
+            <>
+              {/* Ala Carte Section */}
+              <div>
+                <button
+                  className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200 rounded"
+                  onClick={() => toggleAccordion("alaCarte")}
+                >
+                  <span className="font-semibold">
+                    Ala Carte Orders - ₱{alaCarteSubtotal.toFixed(2)}
+                  </span>
+                  {openAccordion["alaCarte"] ? (
+                    <span>&#9650;</span>
+                  ) : (
+                    <span>&#9660;</span>
+                  )}
+                </button>
+                {openAccordion["alaCarte"] &&
+                  (alaCarteOrders.length === 0 ? (
+                    <p className="text-gray-500 text-center">
+                      No Order Details Found
+                    </p>
+                  ) : (
+                    alaCarteOrders.map((item) => (
+                      <EditableProductCard
+                        key={getItemKey(item, { id: 1, name: "In-Store" })}
+                        item={item}
+                        onQuantityChange={onQuantityChange}
+                        discounts={discounts}
+                        onDiscountChange={onDiscountChange}
+                      />
+                    ))
+                  ))}
+              </div>
+              {/* Unli Wings Section */}
+              <div className="mt-2">
+                <button
+                  className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200 rounded"
+                  onClick={() => toggleAccordion("unliWings")}
+                >
+                  <span className="font-semibold">
+                    Unli Wings Orders - ₱{unliWingsSubtotal.toFixed(2)}
+                  </span>
+                  {openAccordion["unliWings"] ? (
+                    <span>&#9650;</span>
+                  ) : (
+                    <span>&#9660;</span>
+                  )}
+                </button>
+                {openAccordion["unliWings"] &&
+                  Object.keys(groupedUnliWingsOrders).map((groupKey) => {
+                    const groupOrders = groupedUnliWingsOrders[groupKey];
+                    const baseAmount = getUnliWingsBaseAmount(groupOrders);
+                    // Convert groupKey to a number for accurate comparison.
+                    const isActive = Number(groupKey) === activeUnliWingsGroup;
+                    return (
+                      <div
+                        key={groupKey}
+                        className={`border rounded mb-2 p-2 ${
+                          isActive ? "border-green-900" : "border-gray-300"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <h4 className="font-bold text-sm">
+                            Unli Wings Order #{groupKey} - ₱
+                            {baseAmount && baseAmount.toFixed(2)}
+                          </h4>
+                          {isActive ? (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setActiveUnliWingsGroup(null);
+                                }}
+                                className="px-2 py-1 rounded text-xs bg-red-500 text-white"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => {
+                                  // Don't call handleEditOrder here - just exit edit mode
+                                  setActiveUnliWingsGroup(null);
+                                }}
+                                className="px-2 py-1 rounded text-xs bg-green-500 text-white"
+                              >
+                                Done Editing
+                              </button>
+                            </div>
+                          ) : (
                             <button
                               onClick={() => {
-                                setActiveUnliWingsGroup(null);
+                                setActiveUnliWingsGroup(Number(groupKey));
                               }}
-                              className="px-2 py-1 rounded text-xs bg-red-500 text-white"
+                              className="px-2 py-1 rounded text-xs bg-orange-500 text-white"
                             >
-                              Cancel
+                              Update
                             </button>
-                            <button
-                              onClick={() => {
-                                // Don't call handleEditOrder here - just exit edit mode
-                                setActiveUnliWingsGroup(null);
-                              }}
-                              className="px-2 py-1 rounded text-xs bg-green-500 text-white"
-                            >
-                              Done Editing
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              setActiveUnliWingsGroup(Number(groupKey));
-                            }}
-                            className="px-2 py-1 rounded text-xs bg-orange-500 text-white"
-                          >
-                            Update
-                          </button>
+                          )}
+                        </div>
+                        {/* If there are no items, show a placeholder */}
+                        {groupOrders.length === 0 && (
+                          <p className="text-gray-500 text-center">
+                            No items added yet
+                          </p>
                         )}
+                        {groupOrders.map((item) => (
+                          <EditableProductCard
+                            key={getItemKey(item, { id: 1, name: "In-Store" })}
+                            item={item}
+                            onQuantityChange={onQuantityChange}
+                          />
+                        ))}
                       </div>
-                      {/* If there are no items, show a placeholder */}
-                      {groupOrders.length === 0 && (
-                        <p className="text-gray-500 text-center">
-                          No items added yet
-                        </p>
-                      )}
-                      {groupOrders.map((item) => (
-                        <EditableProductCard
-                          key={getItemKey(item, { id: 1, name: "In-Store" })}
-                          item={item}
-                          onQuantityChange={handleQuantityChange}
-                        />
-                      ))}
-                    </div>
-                  );
-                })}
-              {/* Add New Unli Wings Order Button */}
-              {openAccordion["unliWings"] && (
-                <div className="mb-2">
-                  <button
-                    onClick={() => {
-                      // Ensure the Unli Wings accordion is open.
-                      setOpenAccordion((prev) => ({
-                        ...prev,
-                        unliWings: true,
-                      }));
-                      const currentGroups = unliWingsOrders
-                        .map((detail) => detail.unli_wings_group)
-                        .filter((g) => g !== undefined)
-                        .map(Number);
-                      const newGroupNumber =
-                        currentGroups.length > 0
-                          ? Math.max(...currentGroups) + 1
-                          : 1;
-                      // Always use the base_amount from unliWingsCategory (retrieved from backend)
-                      const baseAmount = unliWingsCategory?.base_amount;
-                      const newDetail = {
-                        id: Date.now(),
-                        unli_wings_group: newGroupNumber,
-                        instore_category: { id: 2, base_amount: baseAmount },
-                        quantity: 1,
-                        menu_item: {
-                          id: 0,
-                          name: "New Unli Wings Order",
-                          price: 0,
-                        },
-                        discount: { id: 0, type: "None", percentage: 0 },
-                      };
-                      onQuantityChange(newDetail, newDetail.quantity);
-                      setActiveUnliWingsGroup(newGroupNumber);
-                    }}
-                    className="w-full px-3 py-2 bg-[#E88504] text-white rounded"
-                  >
-                    Add New Unli Wings Order
-                  </button>
-                </div>
+                    );
+                  })}
+                {/* Add New Unli Wings Order Button */}
+                {openAccordion["unliWings"] && (
+                  <div className="mb-2">
+                    <button
+                      onClick={() => {
+                        // Ensure the Unli Wings accordion is open.
+                        setOpenAccordion((prev) => ({
+                          ...prev,
+                          unliWings: true,
+                        }));
+                        const currentGroups = unliWingsOrders
+                          .map((detail) => detail.unli_wings_group)
+                          .filter((g) => g !== undefined)
+                          .map(Number);
+                        const newGroupNumber =
+                          currentGroups.length > 0
+                            ? Math.max(...currentGroups) + 1
+                            : 1;
+                        // Always use the base_amount from unliWingsCategory (retrieved from backend)
+                        const baseAmount = unliWingsCategory?.base_amount;
+                        const newDetail = {
+                          id: Date.now(),
+                          unli_wings_group: newGroupNumber,
+                          instore_category: { id: 2, base_amount: baseAmount },
+                          quantity: 1,
+                          menu_item: {
+                            id: 0,
+                            name: "New Unli Wings Order",
+                            price: 0,
+                          },
+                          discount: { id: 0, type: "None", percentage: 0 },
+                        };
+                        onQuantityChange(newDetail, newDetail.quantity);
+                        setActiveUnliWingsGroup(newGroupNumber);
+                      }}
+                      className="w-full px-3 py-2 bg-[#E88504] text-white rounded"
+                    >
+                      Add New Unli Wings Order
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div>
+              {orderDetails.length === 0 ? (
+                <p className="text-gray-500 text-center">
+                  No Order Details Found
+                </p>
+              ) : (
+                orderDetails.map((item) => (
+                  <EditableProductCard
+                    key={getItemKey(item, { id: 2, name: "Delivery" })}
+                    item={item}
+                    onQuantityChange={onQuantityChange}
+                  />
+                ))
               )}
             </div>
-          </>
-        ) : (
-          <div>
-            {orderDetails.length === 0 ? (
-              <p className="text-gray-500 text-center">
-                No Order Details Found
-              </p>
-            ) : (
-              orderDetails.map((item) => (
-                <EditableProductCard
-                  key={getItemKey(item, { id: 2, name: "Delivery" })}
-                  item={item}
-                  onQuantityChange={handleQuantityChange}
-                />
-              ))
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
-      <div className="sticky bottom-0 left-0 right-0 bg-white border-t p-4">
+
+      {/* Sticky Footer */}
+      <div className="sticky bottom-0 bg-white border-t p-4">
         {menuType === "Grab" || menuType === "FoodPanda" ? (
           <>
             {/* Section for Total Amount to be Paid - without applying deduction to payment */}
@@ -454,31 +531,15 @@ const EditTransactionOrderSummary = ({
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    if (requiresPayment) {
-                      setIsPaymentModalOpen(true);
-                    } else {
-                      // Create a payload object for the edit
-                      const payload = {
-                        employee_id: transaction.employee.id,
-                        payment_method: transaction.payment_method.id,
-                        payment_amount: transaction.payment_amount,
-                        reference_id: transaction.reference_id,
-                        receipt_image: transaction.receipt_image,
-                        // Pass the current orderDetails so handleEditOrder can use them
-                        order_details: orderDetails,
-                      };
-                      handleEditOrder(payload);
-                    }
-                  }}
+                  onClick={handleSaveAllChanges}
                   className={`w-1/2 px-3 py-2 rounded text-white ${
-                    !hasOrderChanges()
+                    !hasOrderChanges() || isLoading
                       ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-[#E88504]"
+                      : "bg-green-500"
                   }`}
-                  disabled={!hasOrderChanges()}
+                  disabled={!hasOrderChanges() || isLoading}
                 >
-                  {requiresPayment ? "Complete Order" : "Save All Changes"}
+                  {buttonText}
                 </button>
               </div>
             </div>
@@ -493,39 +554,19 @@ const EditTransactionOrderSummary = ({
               <span>Total Amount:</span>
               <span>₱{newTotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between gap-2 mt-4">
+            <div className="flex w-full mt-4">
               <button
-                className="w-1/2 px-3 py-2 bg-red-500 text-white rounded"
-                onClick={onCancelUpdate}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (requiresPayment) {
-                    setIsPaymentModalOpen(true);
-                  } else {
-                    // Create a payload object for the edit
-                    const payload = {
-                      employee_id: transaction.employee.id,
-                      payment_method: transaction.payment_method.id,
-                      payment_amount: transaction.payment_amount,
-                      reference_id: transaction.reference_id,
-                      receipt_image: transaction.receipt_image,
-                      // Pass the current orderDetails so handleEditOrder can use them
-                      order_details: orderDetails,
-                    };
-                    handleEditOrder(payload);
-                  }
-                }}
-                className={`w-1/2 px-3 py-2 rounded text-white ${
-                  activeUnliWingsGroup || !hasOrderChanges()
+                onClick={handleSaveAllChanges}
+                className={`w-full px-3 py-2 rounded text-white ${
+                  activeUnliWingsGroup || !hasOrderChanges() || isLoading
                     ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-[#E88504]"
+                    : "bg-green-500"
                 }`}
-                disabled={activeUnliWingsGroup || !hasOrderChanges()}
+                disabled={
+                  activeUnliWingsGroup || !hasOrderChanges() || isLoading
+                }
               >
-                {requiresPayment ? "Complete Order" : "Save All Changes"}
+                {buttonText}
               </button>
             </div>
           </div>

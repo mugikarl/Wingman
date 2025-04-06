@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import EditTransactionMenu from "../panels/EditTransactionMenu";
 import EditTransactionOrderSummary from "../panels/EditTransactionOrderSummary";
+import { FaChevronUp, FaChevronDown } from "react-icons/fa";
 
 const OrderEditModal = ({
   isOpen,
@@ -15,7 +16,6 @@ const OrderEditModal = ({
   onUpdateComplete, // Callback when editing is finished and updated order details should be saved
   unliWingsCategory,
   employees,
-  fetchOrderData, // Add this prop for refreshing data
 }) => {
   if (!isOpen) return null;
 
@@ -39,6 +39,8 @@ const OrderEditModal = ({
   const [isUpdatingAvailability, setIsUpdatingAvailability] = useState(false);
   const [availabilityMessage, setAvailabilityMessage] = useState("");
   const [isInitialDataFetched, setIsInitialDataFetched] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // New loading state
+  const [inventoryWarnings, setInventoryWarnings] = useState({}); // New state for inventory warnings
 
   // Filter menu items based on the current menu type and selected category.
   const filteredMenuItems = menuItems.filter((item) => {
@@ -49,6 +51,69 @@ const OrderEditModal = ({
         : true;
     return matchesType && matchesCategory;
   });
+
+  const fetchOrderData = async () => {
+    try {
+      const response = await axios.get(
+        "http://127.0.0.1:8000/fetch-order-data/"
+      );
+      console.log("Order data fetched successfully:", response.data);
+    } catch (error) {
+      console.error("Error fetching order data:", error);
+    }
+  };
+
+  // Function to check inventory before adding an item
+  const handleItemSelect = async (item) => {
+    try {
+      // First check if this item is already unavailable
+      if (item.status_id === 2) {
+        alert("This item is currently unavailable!");
+        return;
+      }
+
+      // Check inventory levels via API
+      const response = await axios.get(
+        `http://127.0.0.1:8000/check-menu-inventory/${item.id}?quantity=1`
+      );
+
+      if (response.data.has_sufficient_inventory === false) {
+        const warnings = response.data.warnings || [];
+
+        if (warnings.length > 0) {
+          // Format warning message
+          const warningItems = warnings
+            .map(
+              (w) =>
+                `${w.inventory_name}: ${w.available_quantity} ${w.unit} available, ${w.required_quantity} ${w.unit} needed`
+            )
+            .join("\n");
+
+          // Show warning but allow adding
+          const proceed = window.confirm(
+            `Warning: Adding this item may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`
+          );
+
+          if (!proceed) {
+            return;
+          }
+
+          // Store warning for this item
+          setInventoryWarnings((prev) => ({
+            ...prev,
+            [item.id]: warnings,
+          }));
+        }
+      }
+
+      // If we get here, either inventory is sufficient or user confirmed to proceed
+      onItemSelect(item);
+    } catch (error) {
+      console.error("Error checking inventory:", error);
+      // Still allow adding if check fails
+      onItemSelect(item);
+    }
+  };
 
   // When a menu item is clicked in the menu panel, either add it to or update the local order details.
   const onItemSelect = (menuItem) => {
@@ -134,7 +199,6 @@ const OrderEditModal = ({
     });
   };
 
-  // Handlers for changes inside the EditTransactionOrderSummary component.
   const handleQuantityChange = (changedItem, newQty) => {
     const quantity = Number(newQty);
     setLocalOrderDetails((prevDetails) => {
@@ -235,9 +299,7 @@ const OrderEditModal = ({
       );
       if (response.status === 200) {
         // Refresh order data before calling onUpdateComplete
-        if (fetchOrderData) {
-          await fetchOrderData();
-        }
+        await fetchOrderData();
         onUpdateComplete(response.data);
         onClose();
         return response.data;
@@ -252,11 +314,6 @@ const OrderEditModal = ({
       );
       throw error;
     }
-  };
-
-  // When the user clicks "Save", call our edit function.
-  const handleAddOrderDetails = () => {
-    handleEditOrder();
   };
 
   const handleCancel = () => {
@@ -305,6 +362,7 @@ const OrderEditModal = ({
   // Function to update menu availability
   const updateMenuAvailability = async () => {
     try {
+      setIsLoading(true); // Set loading state to true
       setIsUpdatingAvailability(true);
       setAvailabilityMessage("Checking menu availability...");
 
@@ -323,10 +381,10 @@ const OrderEditModal = ({
       const updatedCount = response.data.updated_items?.length || 0;
       if (updatedCount > 0) {
         setAvailabilityMessage(
-          `Updated availability for ${updatedCount} menu items`
+          `Updated availability for ${updatedCount} menu items, Loading order items now...`
         );
-        // Refresh menu items
-        fetchOrderData();
+        // Refresh menu items using the independent fetchOrderData
+        await fetchOrderData();
       } else {
         setAvailabilityMessage("All menu items are up to date");
       }
@@ -334,6 +392,7 @@ const OrderEditModal = ({
       console.error("Error updating menu availability:", error);
       setAvailabilityMessage("Failed to update menu availability");
     } finally {
+      setIsLoading(false); // Set loading state to false
       setIsUpdatingAvailability(false);
 
       // Auto-hide message after 3 seconds
@@ -350,58 +409,110 @@ const OrderEditModal = ({
 
   // Update availability when data is loaded
   useEffect(() => {
+    let intervalId;
+
     if (isInitialDataFetched) {
+      // Call the function immediately when the component mounts
       updateMenuAvailability();
+
+      // Set up the interval to call the function every 10 minutes
+      intervalId = setInterval(updateMenuAvailability, 10 * 60 * 1000);
     }
+
+    // Cleanup function to clear the interval when the component unmounts
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [isInitialDataFetched]);
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      {/* Modal Container */}
-      <div className="bg-white rounded-lg shadow-lg p-6 w-[800px] h-[650px] flex">
-        {/* Show availability message if present */}
-        {availabilityMessage && (
-          <div className="absolute top-0 left-0 right-0 bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-2 z-10">
-            <p>{availabilityMessage}</p>
-          </div>
-        )}
-
-        {/* Left Panel: Menu */}
-        <div className="w-1/2">
-          <EditTransactionMenu
-            menuCategories={menuCategories}
-            isCatDropdownOpen={isCatDropdownOpen}
-            setIsCatDropdownOpen={setIsCatDropdownOpen}
-            selectedMenuCategory={selectedMenuCategory}
-            setSelectedMenuCategory={setSelectedMenuCategory}
-            filteredMenuItems={filteredMenuItems}
-            onItemSelect={onItemSelect}
-          />
-        </div>
-        {/* Right Panel: Order Summary */}
-        <div className="w-1/2 border-l border-gray-300 pl-4">
-          <EditTransactionOrderSummary
-            orderDetails={localOrderDetails}
-            finalTotal={newTotal}
-            totalAmount={originalPaymentAmount}
-            transaction={transaction}
-            onCancelUpdate={handleCancel}
-            handleEditOrder={handleEditOrder}
-            menuType={menuType}
-            discounts={discountsData}
-            openDropdownId={null}
-            onQuantityChange={handleQuantityChange}
-            onDiscountChange={handleDiscountChange}
-            setOpenDropdownId={() => {}}
-            deductionPercentage={deductionPercentage}
-            activeUnliWingsGroup={activeUnliWingsGroup}
-            setActiveUnliWingsGroup={setActiveUnliWingsGroup}
-            alaCarteOrders={localOrderDetails.filter(
-              (detail) => detail.instore_category?.id === 1
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-lg w-[1280px] h-[680px] flex flex-col">
+        {/* Header */}
+        <div className="flex justify-between items-center p-4 border-b">
+          <div className="flex items-center space-x-4">
+            <h2 className="text-lg font-medium">
+              Edit Transaction No.{transaction.id}
+            </h2>
+            {/* Status message */}
+            {availabilityMessage && (
+              <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-3">
+                <p>{availabilityMessage}</p>
+              </div>
             )}
-            unliWingsCategory={unliWingsCategory}
-            employees={employees}
-          />
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
+          >
+            &times;
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 p-6">
+          <div className="grid grid-cols-2 gap-6 h-full">
+            {/* Left Panel: Menu */}
+            <div
+              className={`flex flex-col space-y-6 h-[475px] overflow-y-auto p-4 rounded-lg border ${
+                isLoading ? "opacity-50" : ""
+              }`}
+            >
+              <EditTransactionMenu
+                menuCategories={menuCategories}
+                isCatDropdownOpen={isCatDropdownOpen}
+                setIsCatDropdownOpen={setIsCatDropdownOpen}
+                selectedMenuCategory={selectedMenuCategory}
+                setSelectedMenuCategory={setSelectedMenuCategory}
+                filteredMenuItems={filteredMenuItems}
+                onItemSelect={onItemSelect}
+              />
+            </div>
+
+            {/* Right Panel: Order Summary */}
+            <div
+              className={`flex flex-col space-y-6 h-[475px] overflow-y-auto p-4 rounded-lg border ${
+                isLoading ? "opacity-50" : ""
+              }`}
+            >
+              <EditTransactionOrderSummary
+                orderDetails={localOrderDetails}
+                finalTotal={newTotal}
+                totalAmount={originalPaymentAmount}
+                transaction={transaction}
+                handleEditOrder={handleEditOrder}
+                menuType={menuType}
+                discounts={discountsData}
+                openDropdownId={null}
+                onQuantityChange={handleQuantityChange}
+                onDiscountChange={handleDiscountChange}
+                setOpenDropdownId={() => {}}
+                deductionPercentage={deductionPercentage}
+                activeUnliWingsGroup={activeUnliWingsGroup}
+                setActiveUnliWingsGroup={setActiveUnliWingsGroup}
+                alaCarteOrders={localOrderDetails.filter(
+                  (detail) => detail.instore_category?.id === 1
+                )}
+                unliWingsCategory={unliWingsCategory}
+                employees={employees}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t flex justify-start">
+          <button
+            onClick={handleCancel}
+            disabled={isLoading}
+            className={`px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 mr-2 ${
+              isLoading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>
