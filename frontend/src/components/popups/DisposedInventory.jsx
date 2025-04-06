@@ -31,6 +31,8 @@ const DisposedInventory = ({
   const [selectedReason, setSelectedReason] = useState("");
   const [selectedDisposer, setSelectedDisposer] = useState("");
   const [otherReason, setOtherReason] = useState("");
+  const [isDisposing, setIsDisposing] = useState(false);
+  const [loadingDots, setLoadingDots] = useState("");
 
   // Get the category ID of the current unit
   const currentUnitCategory = currentUnitObject
@@ -42,6 +44,24 @@ const DisposedInventory = ({
   const filteredUnits = currentUnitCategory
     ? units.filter((unit) => unit.unit_category === currentUnitCategory)
     : units;
+
+  // Loading animation effect
+  useEffect(() => {
+    let interval;
+    if (isDisposing) {
+      let dotCount = 0;
+      interval = setInterval(() => {
+        setLoadingDots(".".repeat(dotCount % 4));
+        dotCount++;
+      }, 500);
+    } else {
+      setLoadingDots("");
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isDisposing]);
 
   // Handler for reason change
   const handleReasonChange = (event) => {
@@ -60,8 +80,33 @@ const DisposedInventory = ({
       return;
     }
 
+    if (!disposalQuantity || disposalQuantity <= 0) {
+      alert("Please enter a valid disposal quantity.");
+      return;
+    }
+
+    if (!selectedDisposalUnit) {
+      alert("Please select a unit for disposal.");
+      return;
+    }
+
+    if (selectedReason === "4" && !otherReason.trim()) {
+      alert("Please specify the other reason for disposal.");
+      return;
+    }
+
+    // Check if disposal unit is the same as current unit and compare quantities directly
+    if (parseInt(selectedDisposalUnit) === measurementId) {
+      if (parseFloat(disposalQuantity) > parseFloat(currentQuantity)) {
+        alert("Disposal quantity cannot be greater than current quantity.");
+        return;
+      }
+    }
+    // If units are different, the backend will handle the conversion and validation
+
+    setIsDisposing(true);
     try {
-      await axios.post("http://127.0.0.1:8000/dispose-item/", {
+      const response = await axios.post("http://127.0.0.1:8000/dispose-item/", {
         inventory_id: selectedInventory.id,
         disposed_quantity: disposalQuantity,
         disposed_unit: selectedDisposalUnit,
@@ -75,6 +120,13 @@ const DisposedInventory = ({
       refreshInventory();
     } catch (error) {
       console.error("Error disposing item:", error);
+      // Extract the error message from the response if available
+      const errorMessage =
+        error.response?.data?.error ||
+        "Failed to dispose item. Please try again.";
+      alert(errorMessage);
+    } finally {
+      setIsDisposing(false);
     }
   };
 
@@ -104,6 +156,7 @@ const DisposedInventory = ({
                 console.log("Selected disposer:", e.target.value);
                 setSelectedDisposer(e.target.value);
               }}
+              disabled={isDisposing}
             >
               <option value="" hidden></option>
               {employees.map((employee) => (
@@ -150,6 +203,7 @@ const DisposedInventory = ({
                 min="1"
                 value={disposalQuantity}
                 onChange={(e) => setDisposalQuantity(e.target.value)}
+                disabled={isDisposing}
               />
             </div>
             <div className="w-1/2">
@@ -160,6 +214,7 @@ const DisposedInventory = ({
                 className="w-full p-2 border rounded-lg"
                 value={selectedDisposalUnit}
                 onChange={(e) => setSelectedDisposalUnit(e.target.value)}
+                disabled={isDisposing}
               >
                 <option value="" hidden></option>
                 {filteredUnits.map((unit) => (
@@ -178,6 +233,7 @@ const DisposedInventory = ({
               className="w-full p-2 border rounded-lg"
               value={selectedReason}
               onChange={handleReasonChange}
+              disabled={isDisposing}
             >
               <option value="" hidden></option>
               {reason
@@ -197,6 +253,7 @@ const DisposedInventory = ({
                 value={otherReason}
                 onChange={(e) => setOtherReason(e.target.value)}
                 className="w-full p-2 mt-2 border rounded-lg"
+                disabled={isDisposing}
               />
             )}
           </div>
@@ -206,9 +263,14 @@ const DisposedInventory = ({
         <div className="flex justify-end mt-4 space-x-2">
           <button
             onClick={handleDispose}
-            className="bg-red-500 text-white px-4 py-2 rounded-lg"
+            disabled={isDisposing}
+            className={`bg-red-500 text-white px-4 py-2 rounded-lg w-[120px] ${
+              isDisposing ? "opacity-70 cursor-not-allowed" : "hover:bg-red-600"
+            }`}
           >
-            Dispose
+            <span className="inline-block text-center w-full">
+              {isDisposing ? `Disposing${loadingDots}` : "Dispose"}
+            </span>
           </button>
         </div>
       </div>

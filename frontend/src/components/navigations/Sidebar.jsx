@@ -124,18 +124,6 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
                     </Link>
                     {role === "Admin" && (
                       <>
-                        <Link to="/dashboard-admin/items">
-                          <button
-                            onClick={() => handleDropdownButtonClick("items")}
-                            className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                              activeDropdownButton === "items"
-                                ? "bg-white/10 font-bold"
-                                : "bg-transparent"
-                            } hover:bg-white/10`}
-                          >
-                            <span className="flex-1 text-left pl-3">Items</span>
-                          </button>
-                        </Link>
                         <Link to="/dashboard-admin/menu">
                           <button
                             onClick={() => handleDropdownButtonClick("menu")}
@@ -271,18 +259,6 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
                     </Link>
                     {role === "Admin" && (
                       <>
-                        <Link to="/dashboard-admin/items">
-                          <button
-                            onClick={() => handleDropdownButtonClick("items")}
-                            className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
-                              activeDropdownButton === "items"
-                                ? "bg-white/10 font-bold"
-                                : "bg-transparent"
-                            } hover:bg-white/10`}
-                          >
-                            <span className="flex-1 text-left pl-3">Items</span>
-                          </button>
-                        </Link>
                         <Link to="/dashboard-admin/menu">
                           <button
                             onClick={() => handleDropdownButtonClick("menu")}

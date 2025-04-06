@@ -142,7 +142,7 @@ const Inventory = () => {
       {/* Table */}
       {loading ? (
         <div className="w-full flex justify-center items-center">
-          <LoadingScreen />
+          <LoadingScreen message="Loading inventory" />
         </div>
       ) : (
         <Table

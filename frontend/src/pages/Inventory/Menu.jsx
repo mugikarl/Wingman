@@ -12,6 +12,7 @@ import {
   PiGridFour,
   PiBasket,
   PiMagnifyingGlass,
+  PiArrowsClockwise,
 } from "react-icons/pi";
 
 const Menu = () => {
@@ -27,6 +28,7 @@ const Menu = () => {
   const [selectedMenuCategory, setSelectedMenuCategory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [loadingDots, setLoadingDots] = useState("");
 
   // Data states
   const [menuItems, setMenuItems] = useState([]);
@@ -39,13 +41,31 @@ const Menu = () => {
   // Add state for tracking availability update status
   const [isUpdatingAvailability, setIsUpdatingAvailability] = useState(false);
   const [availabilityMessage, setAvailabilityMessage] = useState("");
-  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [menuDataLoaded, setMenuDataLoaded] = useState(false);
+  const [availabilityChecked, setAvailabilityChecked] = useState(false);
+
+  // Loading animation for dots
+  useEffect(() => {
+    let interval;
+    if (isUpdatingAvailability) {
+      let dotCount = 0;
+      interval = setInterval(() => {
+        setLoadingDots(".".repeat(dotCount % 4));
+        dotCount++;
+      }, 500);
+    } else {
+      setLoadingDots("");
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isUpdatingAvailability]);
 
   const closeMenuCategoryModal = () => setIsMenuCategoryModalOpen(false);
 
   // Fetch menus when the component mounts
   const fetchMenus = async () => {
-    setLoading(true);
     try {
       const token = localStorage.getItem("access_token");
       const response = await axios.get(
@@ -63,12 +83,12 @@ const Menu = () => {
       setInventory(response.data.inventory || []);
       setMenuItems(response.data.menu_items || []);
 
-      // Mark data as fully loaded only after all state is updated
-      setIsDataLoaded(true);
+      // Mark menu data as loaded
+      setMenuDataLoaded(true);
     } catch (error) {
       console.error("Error fetching menus:", error);
-    } finally {
-      setLoading(false);
+      // Still mark as loaded so we don't get stuck in loading state
+      setMenuDataLoaded(true);
     }
   };
 
@@ -78,12 +98,11 @@ const Menu = () => {
 
   // Function to update menu availability
   const updateMenuAvailability = async () => {
-    // Skip if data isn't loaded yet
-    if (!isDataLoaded) return;
+    if (isUpdatingAvailability) return; // Prevent multiple simultaneous updates
 
     try {
       setIsUpdatingAvailability(true);
-      setAvailabilityMessage("Updating menu availability...");
+      setAvailabilityMessage("");
 
       const token = localStorage.getItem("access_token");
       const response = await axios.post(
@@ -105,10 +124,12 @@ const Menu = () => {
       );
 
       // Refresh menu items
-      fetchMenus();
+      await fetchMenus();
+      setAvailabilityChecked(true);
     } catch (error) {
       console.error("Error updating menu availability:", error);
       setAvailabilityMessage("Failed to update menu availability");
+      setAvailabilityChecked(true); // Mark as checked even on error
     } finally {
       setIsUpdatingAvailability(false);
 
@@ -119,31 +140,17 @@ const Menu = () => {
     }
   };
 
-  // Separate effects for initial data fetch and availability updates
+  // Initial load of data and availability check
   useEffect(() => {
-    fetchMenus();
-  }, []);
-
-  // Set up availability checking only after data is loaded
-  useEffect(() => {
-    let intervalId = null;
-
-    // Only set up the interval if data is loaded
-    if (isDataLoaded) {
-      // Run once initially after data is loaded
-      updateMenuAvailability();
-
-      // Set up interval for subsequent checks every 2 minutes
-      intervalId = setInterval(updateMenuAvailability, 2 * 60 * 1000);
-    }
-
-    // Clean up function
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+    const initialLoad = async () => {
+      setLoading(true);
+      await fetchMenus();
+      await updateMenuAvailability();
+      setLoading(false);
     };
-  }, [isDataLoaded]); // Only re-run when isDataLoaded changes
+
+    initialLoad();
+  }, []);
 
   // Set default filter to "In Store" once menuTypes are loaded
   useEffect(() => {
@@ -156,7 +163,7 @@ const Menu = () => {
   }, [menuTypes, selectedMenuType]);
 
   if (loading) {
-    return <LoadingScreen />;
+    return <LoadingScreen message="Checking menu availability" />;
   }
 
   // Function to add a new menu item
@@ -281,8 +288,8 @@ const Menu = () => {
             })}
           </div>
 
-          {/* Category Dropdown */}
-          <div className="relative text-left flex gap-2">
+          {/* Category Dropdown and Update Availability Button */}
+          <div className="relative text-left flex justify-between items-center">
             <button
               onClick={() => setIsCatDropdownOpen(!isCatDropdownOpen)}
               className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
@@ -303,8 +310,35 @@ const Menu = () => {
                 )}
               </div>
             </button>
+
+            {/* Status message - Adjusted to match dropdown height */}
+            {(availabilityMessage || isUpdatingAvailability) && (
+              <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 flex-1 mx-4 p-2.5 shadow-sm flex items-center">
+                <p className="pl-3">
+                  {isUpdatingAvailability
+                    ? `Updating Menu Availability${loadingDots}`
+                    : availabilityMessage}
+                </p>
+              </div>
+            )}
+
+            {/* Update Menu Availability Button - Reverted to icon-only but keeping consistent height */}
+            <button
+              onClick={updateMenuAvailability}
+              disabled={isUpdatingAvailability}
+              className="flex items-center justify-center p-3 rounded-full bg-blue-100 hover:bg-blue-700 transition-all duration-200 group shadow-sm"
+              title="Update Menu Availability"
+            >
+              <PiArrowsClockwise
+                className={`w-5 h-5 ${
+                  isUpdatingAvailability ? "animate-spin" : ""
+                } 
+                text-blue-700 group-hover:text-blue-100`}
+              />
+            </button>
+
             {isCatDropdownOpen && (
-              <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg z-10">
+              <div className="absolute left-0 mt-2 w-56 rounded-md shadow-lg z-10 top-full">
                 <div className="bg-white rounded-md py-2">
                   <button
                     onClick={() => {
@@ -331,13 +365,6 @@ const Menu = () => {
                     </button>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Status message */}
-            {availabilityMessage && (
-              <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-3">
-                <p>{availabilityMessage}</p>
               </div>
             )}
           </div>
@@ -372,8 +399,24 @@ const Menu = () => {
       {/* Modals */}
       {isModalOpen && (
         <NewMenuModal
-          onClose={() => setIsModalOpen(false)}
-          onSave={addMenuItem}
+          onClose={() => {
+            setIsModalOpen(false);
+            // Don't refresh when just closing
+          }}
+          onSave={(newItemData) => {
+            // Add the new item to state
+            addMenuItem(newItemData);
+            // Close modal
+            setIsModalOpen(false);
+            // Show loading screen and refresh data
+            const refreshWithLoading = async () => {
+              setLoading(true);
+              await fetchMenus();
+              await updateMenuAvailability();
+              setLoading(false);
+            };
+            refreshWithLoading();
+          }}
           categories={categories}
           menuTypes={menuTypes}
           inventory={inventory}
@@ -385,8 +428,36 @@ const Menu = () => {
       {isEditModalOpen && (
         <EditMenuModal
           item={selectedItem}
-          onClose={() => setIsEditModalOpen(false)}
-          onSave={updateMenuItem}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            // Don't refresh when just closing
+          }}
+          onSave={(updatedItemData) => {
+            // Update the item in state
+            updateMenuItem(updatedItemData);
+            // Close modal
+            setIsEditModalOpen(false);
+            // Show loading screen and refresh data
+            const refreshWithLoading = async () => {
+              setLoading(true);
+              await fetchMenus();
+              await updateMenuAvailability();
+              setLoading(false);
+            };
+            refreshWithLoading();
+          }}
+          onDelete={() => {
+            // Close modal
+            setIsEditModalOpen(false);
+            // Show loading screen and refresh data
+            const refreshWithLoading = async () => {
+              setLoading(true);
+              await fetchMenus();
+              await updateMenuAvailability();
+              setLoading(false);
+            };
+            refreshWithLoading();
+          }}
           categories={categories}
           menuTypes={menuTypes}
           inventory={inventory}

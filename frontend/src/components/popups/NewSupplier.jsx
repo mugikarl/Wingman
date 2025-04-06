@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { FaTrash } from "react-icons/fa";
+import { IoMdClose } from "react-icons/io";
 
-const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
+const NewSupplier = ({ isOpen, onClose, suppliers = [], fetchItemData }) => {
   const [supplierName, setSupplierName] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -10,34 +11,44 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [addingText, setAddingText] = useState("Add");
   const [updatingText, setUpdatingText] = useState("Update");
+  const [deletingDots, setDeletingDots] = useState("");
+
+  // Sort suppliers alphabetically by name
+  const sortedSuppliers = [...suppliers].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
 
   // Handle loading text animations
   useEffect(() => {
     let loadingInterval;
 
-    if (isSubmitting && !isEditing) {
+    if (isSubmitting || isDeleting) {
       let dotCount = 0;
       loadingInterval = setInterval(() => {
         const dots = ".".repeat(dotCount % 4);
-        setAddingText(`Adding${dots}`);
-        dotCount++;
-      }, 500);
-    } else if (isSubmitting && isEditing) {
-      let dotCount = 0;
-      loadingInterval = setInterval(() => {
-        const dots = ".".repeat(dotCount % 4);
-        setUpdatingText(`Updating${dots}`);
+
+        if (isSubmitting && !isEditing) {
+          setAddingText(`Adding${dots}`);
+        } else if (isSubmitting && isEditing) {
+          setUpdatingText(`Updating${dots}`);
+        }
+
+        if (isDeleting) {
+          setDeletingDots(dots);
+        }
+
         dotCount++;
       }, 500);
     } else {
       setAddingText("Add");
       setUpdatingText("Update");
+      setDeletingDots("");
     }
 
     return () => {
       if (loadingInterval) clearInterval(loadingInterval);
     };
-  }, [isSubmitting, isEditing]);
+  }, [isSubmitting, isEditing, isDeleting]);
 
   const handleAddSupplier = async () => {
     if (!supplierName.trim()) return;
@@ -70,7 +81,7 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
 
     setIsSubmitting(true);
 
-    const supplierId = suppliers[selectedIndex]?.id;
+    const supplierId = sortedSuppliers[selectedIndex]?.id;
 
     if (!supplierId) {
       console.error("Error: No supplier ID found!");
@@ -94,13 +105,7 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
         }
       );
       alert("Supplier updated successfully!");
-      fetchItemData((prevSuppliers) =>
-        prevSuppliers.map((supplier, index) =>
-          index === selectedIndex
-            ? { ...supplier, name: supplierName }
-            : supplier
-        )
-      );
+      fetchItemData();
       setSupplierName("");
       setIsEditing(false);
       setSelectedIndex(null);
@@ -122,16 +127,14 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
     try {
       const token = localStorage.getItem("access_token");
       await axios.delete(
-        `http://127.0.0.1:8000/delete-supplier/${suppliers[selectedIndex].id}/`,
+        `http://127.0.0.1:8000/delete-supplier/${sortedSuppliers[selectedIndex].id}/`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }
       );
-      fetchItemData((prevItems) =>
-        prevItems.filter((_, i) => i !== selectedIndex)
-      );
+      fetchItemData();
       setSupplierName("");
       setIsEditing(false);
       setSelectedIndex(null);
@@ -150,7 +153,7 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
 
   return isOpen ? (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg w-96 h-[500px] flex flex-col">
+      <div className="bg-white rounded-lg shadow-lg w-[480px] h-[500px] flex flex-col">
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-lg font-medium">Manage Suppliers</h2>
@@ -163,24 +166,35 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
         </div>
 
         {/* Content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {/* Fixed Input Area */}
           <div className="flex items-center space-x-2 p-4 bg-white border-b">
-            <input
-              type="text"
-              placeholder="Enter Supplier"
-              value={supplierName}
-              onChange={(e) => setSupplierName(e.target.value)}
-              className="w-1/2 p-2 border rounded-lg"
-            />
+            <div className="relative flex-grow">
+              <input
+                type="text"
+                placeholder="Enter Supplier"
+                value={supplierName}
+                onChange={(e) => setSupplierName(e.target.value)}
+                className="w-full p-2 pr-10 border rounded-lg"
+                style={{ paddingRight: "2.5rem" }}
+              />
+              {supplierName && (
+                <button
+                  onClick={handleCancelEdit}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-white rounded-full w-6 h-6 flex items-center justify-center"
+                >
+                  <IoMdClose size={16} />
+                </button>
+              )}
+            </div>
             {!isEditing ? (
               <button
                 onClick={handleAddSupplier}
                 disabled={isSubmitting}
-                className={`bg-[#CC5500] text-white px-3 py-2 rounded-lg ${
+                className={`bg-green-500 text-white px-3 py-2 rounded-lg h-10 w-24 flex-shrink-0 ${
                   isSubmitting
                     ? "opacity-70 cursor-not-allowed"
-                    : "hover:bg-[#b34600]"
+                    : "hover:bg-green-600"
                 }`}
               >
                 {addingText}
@@ -188,16 +202,9 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
             ) : (
               <>
                 <button
-                  onClick={handleCancelEdit}
-                  disabled={isSubmitting}
-                  className="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg w-8 h-8 flex items-center justify-center hover:bg-gray-300"
-                >
-                  ✕
-                </button>
-                <button
                   onClick={handleEditSupplier}
                   disabled={isSubmitting}
-                  className={`bg-green-500 text-white px-3 py-2 rounded-lg ${
+                  className={`bg-green-500 text-white px-3 py-2 rounded-lg h-10 w-28 flex-shrink-0 ${
                     isSubmitting
                       ? "opacity-70 cursor-not-allowed"
                       : "hover:bg-green-600"
@@ -208,26 +215,22 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
                 <button
                   onClick={handleDeleteSupplier}
                   disabled={isDeleting}
-                  className={`bg-red-500 text-white w-8 h-8 rounded-lg flex items-center justify-center ${
+                  className={`bg-red-500 text-white w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     isDeleting
                       ? "opacity-70 cursor-not-allowed"
                       : "hover:bg-red-600"
                   }`}
                   title="Delete"
                 >
-                  {isDeleting ? (
-                    <span>...</span>
-                  ) : (
-                    <FaTrash className="w-4 h-4" />
-                  )}
+                  {isDeleting ? deletingDots : <FaTrash className="w-4 h-4" />}
                 </button>
               </>
             )}
           </div>
 
           {/* Scrollable Table Area */}
-          <div className="relative overflow-x-auto shadow-md sm:rounded-sm flex-1 p-4">
-            <div className="overflow-y-auto max-h-[calc(100%_-_80px)]">
+          <div className="flex-1 overflow-hidden p-4">
+            <div className="h-full overflow-y-auto">
               <table className="w-full text-sm text-left rtl:text-right text-gray-500">
                 <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
                   <tr>
@@ -237,8 +240,8 @@ const NewSupplier = ({ isOpen, onClose, suppliers, fetchItemData }) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(suppliers || []).length > 0 ? (
-                    suppliers.map((supplier, index) => (
+                  {sortedSuppliers.length > 0 ? (
+                    sortedSuppliers.map((supplier, index) => (
                       <tr
                         key={index}
                         className={`${

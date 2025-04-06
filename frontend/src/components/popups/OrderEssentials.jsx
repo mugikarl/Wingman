@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { IoMdClose } from "react-icons/io";
+import { FaTrash, FaPencilAlt, FaCheck, FaTimes } from "react-icons/fa";
 
 const OrderEssentials = ({
   isOpen,
@@ -7,39 +9,130 @@ const OrderEssentials = ({
   menuTypes,
   discountsData,
   paymentMethods,
+  instore_categories,
   fetchOrderData,
 }) => {
-  const [activeTab, setActiveTab] = useState("discounts");
-  // Form states for adding new entries (for discounts and payments)
+  const [activeTab, setActiveTab] = useState("delivery");
 
-  // States for editing an existing delivery row.
-  // We use the parent's menuTypes directly (filtered in the render).
+  // States for editing an existing delivery row
   const [editingDeliveryId, setEditingDeliveryId] = useState(null);
   const [editingDeliveryPercentage, setEditingDeliveryPercentage] =
     useState("");
 
+  // Discount states
   const [newDiscountType, setNewDiscountType] = useState("");
   const [newDiscountPercentage, setNewDiscountPercentage] = useState("");
   const [editingDiscountId, setEditingDiscountId] = useState(null);
   const [editedDiscountType, setEditedDiscountType] = useState("");
   const [editedDiscountPercentage, setEditedDiscountPercentage] = useState("");
+  const [isSubmittingDiscount, setIsSubmittingDiscount] = useState(false);
+  const [isDeletingDiscount, setIsDeletingDiscount] = useState(false);
+  const [addingDiscountText, setAddingDiscountText] = useState("Add");
+  const [updatingDiscountText, setUpdatingDiscountText] = useState("Update");
+  const [deletingDiscountDots, setDeletingDiscountDots] = useState("");
 
-  const [newPaymentMethod, setNewPaymentMethod] = useState("");
-  const [editingPaymentId, setEditingPaymentId] = useState(null);
-  const [editedPaymentName, setEditedPaymentName] = useState("");
+  // Delivery states
+  const [isSubmittingDelivery, setIsSubmittingDelivery] = useState(false);
+  const [updatingDeliveryText, setUpdatingDeliveryText] = useState("Update");
 
+  // Unli Wings states
+  const [editingUnliWingsId, setEditingUnliWingsId] = useState(null);
+  const [editingBaseAmount, setEditingBaseAmount] = useState("");
+  const [isSubmittingBaseAmount, setIsSubmittingBaseAmount] = useState(false);
+
+  // Sort all data alphabetically
+  const sortedDiscounts = [...discountsData].sort((a, b) =>
+    a.type.localeCompare(b.type, undefined, { sensitivity: "base" })
+  );
+
+  const sortedMenuTypes = [...menuTypes].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
+
+  // Loading animations for Discounts tab
+  useEffect(() => {
+    let loadingInterval;
+
+    if (isSubmittingDiscount || isDeletingDiscount) {
+      let dotCount = 0;
+      loadingInterval = setInterval(() => {
+        const dots = ".".repeat(dotCount % 4);
+
+        if (isSubmittingDiscount && !editingDiscountId) {
+          setAddingDiscountText(`Adding${dots}`);
+        } else if (isSubmittingDiscount && editingDiscountId) {
+          setUpdatingDiscountText(`Updating${dots}`);
+        }
+
+        if (isDeletingDiscount) {
+          setDeletingDiscountDots(dots);
+        }
+
+        dotCount++;
+      }, 500);
+    } else {
+      setAddingDiscountText("Add");
+      setUpdatingDiscountText("Update");
+      setDeletingDiscountDots("");
+    }
+
+    return () => {
+      if (loadingInterval) clearInterval(loadingInterval);
+    };
+  }, [isSubmittingDiscount, editingDiscountId, isDeletingDiscount]);
+
+  // Loading animations for Delivery tab
+  useEffect(() => {
+    let loadingInterval;
+
+    if (isSubmittingDelivery) {
+      let dotCount = 0;
+      loadingInterval = setInterval(() => {
+        const dots = ".".repeat(dotCount % 4);
+        setUpdatingDeliveryText(`Updating${dots}`);
+        dotCount++;
+      }, 500);
+    } else {
+      setUpdatingDeliveryText("Update");
+    }
+
+    return () => {
+      if (loadingInterval) clearInterval(loadingInterval);
+    };
+  }, [isSubmittingDelivery]);
+
+  // Unli Wings loading animation
+  useEffect(() => {
+    let loadingInterval;
+
+    if (isSubmittingBaseAmount) {
+      let dotCount = 0;
+      loadingInterval = setInterval(() => {
+        const dots = ".".repeat(dotCount % 4);
+        setUpdatingDeliveryText(`Updating${dots}`);
+        dotCount++;
+      }, 500);
+    }
+
+    return () => {
+      if (loadingInterval) clearInterval(loadingInterval);
+    };
+  }, [isSubmittingBaseAmount]);
+
+  // Discount functions
   const handleAddDiscount = async () => {
     if (!newDiscountType || !newDiscountPercentage) {
       alert("Both fields are required.");
       return;
     }
 
-    const percentage = Number.parseFloat(newDiscountPercentage);
+    const percentage = Number.parseFloat(newDiscountPercentage) / 100;
     if (isNaN(percentage)) {
       alert("Percentage must be a valid number.");
       return;
     }
 
+    setIsSubmittingDiscount(true);
     try {
       const response = await axios.post("http://127.0.0.1:8000/add-discount/", {
         type: newDiscountType,
@@ -47,7 +140,6 @@ const OrderEssentials = ({
       });
 
       if (response.status === 201) {
-        alert("Discount added successfully.");
         setNewDiscountType("");
         setNewDiscountPercentage("");
         fetchOrderData(); // Refresh the table
@@ -58,13 +150,15 @@ const OrderEssentials = ({
         error.response?.data || error.message
       );
       alert("Failed to add discount.");
+    } finally {
+      setIsSubmittingDiscount(false);
     }
   };
 
   const handleEditDiscount = (discount) => {
     setEditingDiscountId(discount.id);
     setEditedDiscountType(discount.type);
-    setEditedDiscountPercentage(discount.percentage);
+    setEditedDiscountPercentage((discount.percentage * 100).toFixed(0));
   };
 
   const handleCancelEdit = () => {
@@ -80,6 +174,7 @@ const OrderEssentials = ({
       return;
     }
 
+    setIsSubmittingDiscount(true);
     try {
       const response = await axios.put(
         `http://127.0.0.1:8000/edit-discount/${discountId}/`,
@@ -87,7 +182,6 @@ const OrderEssentials = ({
       );
 
       if (response.status === 200) {
-        alert("Discount updated successfully.");
         fetchOrderData();
         handleCancelEdit();
       }
@@ -97,6 +191,8 @@ const OrderEssentials = ({
         error.response?.data || error.message
       );
       alert("Failed to update discount.");
+    } finally {
+      setIsSubmittingDiscount(false);
     }
   };
 
@@ -104,108 +200,32 @@ const OrderEssentials = ({
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this discount?"
     );
+    if (!confirmDelete) return;
 
-    if (!confirmDelete) return; // Stop if user cancels
-
+    setIsDeletingDiscount(true);
     try {
       await axios.delete(
         `http://127.0.0.1:8000/delete-discount/${discountId}/`
       );
-
       fetchOrderData();
-      alert("Discount deleted successfully!");
     } catch (error) {
       console.error("Error deleting discount:", error);
       alert("Failed to delete discount. Please try again.");
+    } finally {
+      setIsDeletingDiscount(false);
     }
   };
 
-  const handleAddPaymentMethod = async () => {
-    if (!newPaymentMethod.trim()) return; // Prevent adding empty names
-
-    try {
-      // Send request to the backend
-      await axios.post("http://127.0.0.1:8000/add-payment-method/", {
-        name: newPaymentMethod,
-      });
-
-      // Refresh the payment methods list
-      fetchOrderData();
-
-      // Clear the input field
-      setNewPaymentMethod("");
-
-      alert("Payment method added successfully!");
-    } catch (error) {
-      console.error("Error adding payment method:", error);
-      alert("Failed to add payment method. Please try again.");
-    }
-  };
-
-  // Function to handle clicking "Edit"
-  const handleEditPayment = (method) => {
-    setEditingPaymentId(method.id);
-    setEditedPaymentName(method.name);
-  };
-
-  // Function to cancel editing
-  const handleCancelEditPayment = () => {
-    setEditingPaymentId(null);
-    setEditedPaymentName("");
-  };
-
-  // Function to save edited payment method
-  const handleSaveEditPayment = async (paymentId) => {
-    if (!editedPaymentName.trim()) {
-      alert("Payment method name cannot be empty.");
-      return;
-    }
-
-    try {
-      const response = await axios.put(
-        `http://127.0.0.1:8000/edit-payment-method/${paymentId}/`,
-        { name: editedPaymentName }
-      );
-
-      if (response.status === 200) {
-        alert("Payment method updated successfully.");
-        fetchOrderData(); // Refresh the list
-        handleCancelEditPayment(); // Exit edit mode
-      }
-    } catch (error) {
-      console.error("Failed to update payment method", error);
-      alert("Failed to update payment method.");
-    }
-  };
-
-  // Function to delete payment method
-  const handleDeletePayment = async (paymentId) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this payment method?"
-    );
-
-    if (!confirmDelete) return;
-
-    try {
-      await axios.delete(
-        `http://127.0.0.1:8000/delete-payment-method/${paymentId}/`
-      );
-
-      alert("Payment method deleted successfully.");
-      fetchOrderData(); // Refresh the list
-    } catch (error) {
-      console.error("Error deleting payment method:", error);
-      alert("Failed to delete payment method.");
-    }
-  };
+  // Delivery percentage functions
   const handleSaveEditDelivery = async (appId) => {
-    const updatedPercentage = parseFloat(editingDeliveryPercentage);
+    const updatedPercentage = parseFloat(editingDeliveryPercentage) / 100;
 
     if (isNaN(updatedPercentage)) {
       console.error("Invalid percentage value.");
       return;
     }
 
+    setIsSubmittingDelivery(true);
     try {
       const response = await axios.put(
         `http://127.0.0.1:8000/edit-delivery-deduction/${appId}/`,
@@ -213,7 +233,6 @@ const OrderEssentials = ({
       );
 
       if (response.status === 200) {
-        alert("Percentage deduction has been updated successfully.");
         setEditingDeliveryId(null);
         fetchOrderData();
       }
@@ -222,8 +241,41 @@ const OrderEssentials = ({
         "Failed to update delivery deduction",
         error.response?.data || error.message
       );
+    } finally {
+      setIsSubmittingDelivery(false);
     }
   };
+
+  // Unli Wings functions
+  const handleSaveUnliWingsBaseAmount = async (categoryId) => {
+    const updatedBaseAmount = parseFloat(editingBaseAmount);
+
+    if (isNaN(updatedBaseAmount)) {
+      console.error("Invalid base amount value.");
+      return;
+    }
+
+    setIsSubmittingBaseAmount(true);
+    try {
+      const response = await axios.put(
+        `http://127.0.0.1:8000/edit-unli-wings-base-amount/${categoryId}/`,
+        { base_amount: updatedBaseAmount }
+      );
+
+      if (response.status === 200) {
+        setEditingUnliWingsId(null);
+        fetchOrderData();
+      }
+    } catch (error) {
+      console.error(
+        "Failed to update Unli Wings base amount",
+        error.response?.data || error.message
+      );
+    } finally {
+      setIsSubmittingBaseAmount(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -248,14 +300,6 @@ const OrderEssentials = ({
               <nav className="flex flex-col">
                 <button
                   className={`p-4 text-left hover:bg-gray-100 ${
-                    activeTab === "discounts" ? "bg-gray-100 font-medium" : ""
-                  }`}
-                  onClick={() => setActiveTab("discounts")}
-                >
-                  Discounts
-                </button>
-                <button
-                  className={`p-4 text-left hover:bg-gray-100 ${
                     activeTab === "delivery" ? "bg-gray-100 font-medium" : ""
                   }`}
                   onClick={() => setActiveTab("delivery")}
@@ -264,245 +308,127 @@ const OrderEssentials = ({
                 </button>
                 <button
                   className={`p-4 text-left hover:bg-gray-100 ${
-                    activeTab === "payments" ? "bg-gray-100 font-medium" : ""
+                    activeTab === "discounts" ? "bg-gray-100 font-medium" : ""
                   }`}
-                  onClick={() => setActiveTab("payments")}
+                  onClick={() => setActiveTab("discounts")}
                 >
-                  Payment Methods
+                  Discounts
+                </button>
+                <button
+                  className={`p-4 text-left hover:bg-gray-100 ${
+                    activeTab === "unliwings" ? "bg-gray-100 font-medium" : ""
+                  }`}
+                  onClick={() => setActiveTab("unliwings")}
+                >
+                  Unli Wings Base Amount
                 </button>
               </nav>
             </div>
 
             {/* Main Content */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex-1 overflow-auto p-4">
-                {activeTab === "discounts" ? (
-                  <div className="space-y-6">
-                    {/* Discounts Form and Table (unchanged) */}
-                    <div className="bg-white p-4 rounded-lg border">
-                      <h3 className="text-lg font-medium mb-4">Add Discount</h3>
-                      <div className="flex space-x-4 mb-4">
-                        <div className="flex-1">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Discount Type
-                          </label>
-                          <input
-                            type="text"
-                            className="w-full px-3 py-2 border rounded-md"
-                            placeholder="e.g. PWD, Senior Citizen"
-                            value={newDiscountType}
-                            onChange={(e) => setNewDiscountType(e.target.value)}
-                          />
-                        </div>
-                        <div className="w-32">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Percentage
-                          </label>
-                          <input
-                            type="text"
-                            className="w-full px-3 py-2 border rounded-md"
-                            placeholder="e.g. 0.20"
-                            value={newDiscountPercentage}
-                            onChange={(e) =>
-                              setNewDiscountPercentage(e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="flex items-end">
-                          <button
-                            onClick={handleAddDiscount}
-                            className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
-                          >
-                            Add
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="bg-white rounded-lg border overflow-hidden">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+              {activeTab === "delivery" ? (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {/* Delivery Deductions Table */}
+                  <div className="flex-1 overflow-hidden p-4">
+                    <div className="h-full overflow-y-auto">
+                      <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+                        <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Discount Type
+                            <th scope="col" className="px-6 py-3 font-medium">
+                              APP NAME
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Percentage
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Actions
+                            <th scope="col" className="px-6 py-3 font-medium">
+                              PERCENTAGE
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {discountsData.map((discount) => (
-                            <tr key={discount.id}>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {editingDiscountId === discount.id ? (
-                                  <input
-                                    type="text"
-                                    className="border rounded-md px-2 py-1"
-                                    value={editedDiscountType}
-                                    onChange={(e) =>
-                                      setEditedDiscountType(e.target.value)
-                                    }
-                                  />
-                                ) : (
-                                  discount.type
-                                )}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {editingDiscountId === discount.id ? (
-                                  <input
-                                    type="text"
-                                    className="border rounded-md px-2 py-1"
-                                    value={editedDiscountPercentage}
-                                    onChange={(e) =>
-                                      setEditedDiscountPercentage(
-                                        e.target.value
-                                      )
-                                    }
-                                  />
-                                ) : (
-                                  (discount.percentage * 100).toFixed(0) + "%"
-                                )}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {editingDiscountId === discount.id ? (
-                                  <>
-                                    <button
-                                      onClick={handleCancelEdit}
-                                      className="text-red-600 hover:text-red-800 p-1"
-                                    >
-                                      Cancel
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        handleSaveEditDiscount(discount.id)
-                                      }
-                                      className="text-green-600 hover:text-green-800 p-1"
-                                    >
-                                      Save
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() =>
-                                        handleDeleteDiscount(discount.id)
-                                      }
-                                      className="text-red-600 hover:text-red-800 p-1 ml-2"
-                                    >
-                                      Delete
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        handleEditDiscount(discount)
-                                      }
-                                      className="text-blue-600 hover:text-blue-800 p-1"
-                                    >
-                                      Edit
-                                    </button>
-                                  </>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ) : activeTab === "delivery" ? (
-                  <div className="space-y-6">
-                    {/* Delivery Deductions Table using parent's menuTypes */}
-                    <div className="bg-white rounded-lg border overflow-hidden mb-4">
-                      <h3 className="text-lg font-medium p-4">
-                        Modify Delivery Percentage Deduction
-                      </h3>
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              App Name
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Percentage
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Actions
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {menuTypes
+                        <tbody>
+                          {sortedMenuTypes
                             .filter((app) => app.id !== 1)
-                            .map((app) => {
+                            .map((app, index) => {
                               const isEditing = editingDeliveryId === app.id;
                               return (
-                                <tr key={app.id}>
-                                  <td className="px-6 py-4 whitespace-nowrap">
+                                <tr
+                                  key={app.id}
+                                  className={`${
+                                    index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                                  } border-b hover:bg-gray-200 group`}
+                                >
+                                  <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
                                     {app.name}
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
+                                  <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900 relative">
                                     {isEditing ? (
-                                      <input
-                                        type="text"
-                                        className="border rounded-md px-2 py-1"
-                                        value={editingDeliveryPercentage}
-                                        onChange={(e) =>
-                                          setEditingDeliveryPercentage(
-                                            e.target.value
-                                          )
-                                        }
-                                        placeholder={(
-                                          (app.deduction_percentage ||
-                                            app.percentage) * 100
-                                        ).toFixed(2)}
-                                      />
-                                    ) : (
-                                      (
-                                        (app.deduction_percentage ||
-                                          app.percentage) * 100
-                                      ).toFixed(2) + "%"
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {isEditing ? (
-                                      <>
-                                        <button
-                                          onClick={() =>
-                                            setEditingDeliveryId(null)
+                                      <div className="flex items-center">
+                                        <input
+                                          type="text"
+                                          className="w-24 px-3 py-2 border rounded-md"
+                                          value={editingDeliveryPercentage}
+                                          onChange={(e) =>
+                                            setEditingDeliveryPercentage(
+                                              e.target.value
+                                            )
                                           }
-                                          className="text-red-600 hover:text-red-800 p-1"
-                                        >
-                                          Cancel
-                                        </button>
-                                        <button
-                                          onClick={() =>
-                                            handleSaveEditDelivery(app.id)
-                                          }
-                                          className="text-green-600 hover:text-green-800 p-1"
-                                        >
-                                          Save
-                                        </button>
-                                      </>
+                                        />
+                                        <div className="ml-2 flex">
+                                          <button
+                                            onClick={() =>
+                                              setEditingDeliveryId(null)
+                                            }
+                                            className="text-red-500 hover:text-red-700 p-1"
+                                          >
+                                            <FaTimes />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              handleSaveEditDelivery(app.id)
+                                            }
+                                            disabled={isSubmittingDelivery}
+                                            className={`text-green-500 hover:text-green-600 p-1 min-w-[24px] min-h-[24px] flex items-center justify-center ${
+                                              isSubmittingDelivery
+                                                ? "opacity-70 cursor-not-allowed"
+                                                : ""
+                                            }`}
+                                          >
+                                            {isSubmittingDelivery &&
+                                            editingDeliveryId === app.id ? (
+                                              <span className="text-green-500 leading-none">
+                                                {".".repeat(
+                                                  Math.floor(Date.now() / 500) %
+                                                    4
+                                                )}
+                                              </span>
+                                            ) : (
+                                              <FaCheck />
+                                            )}
+                                          </button>
+                                        </div>
+                                      </div>
                                     ) : (
-                                      <>
+                                      <div className="flex items-center">
+                                        <span className="mr-2">
+                                          {Math.round(
+                                            (app.deduction_percentage ||
+                                              app.percentage) * 100
+                                          ) + "%"}
+                                        </span>
                                         <button
                                           onClick={() => {
                                             setEditingDeliveryId(app.id);
                                             setEditingDeliveryPercentage(
-                                              (
-                                                app.deduction_percentage ??
-                                                app.percentage ??
-                                                0
+                                              Math.round(
+                                                (app.deduction_percentage ||
+                                                  app.percentage ||
+                                                  0) * 100
                                               ).toString()
-                                            ); // Ensure it's a valid string
+                                            );
                                           }}
-                                          className="text-blue-600 hover:text-blue-800 p-1"
+                                          className="text-[#CC5500] hover:text-[#B34500] ml-2"
                                         >
-                                          Edit
+                                          <FaPencilAlt />
                                         </button>
-                                      </>
+                                      </div>
                                     )}
                                   </td>
                                 </tr>
@@ -512,113 +438,279 @@ const OrderEssentials = ({
                       </table>
                     </div>
                   </div>
-                ) : activeTab === "payments" ? (
-                  <div className="space-y-6">
-                    {/* Payment Methods Form and Table (unchanged) */}
-                    <div className="bg-white p-4 rounded-lg border">
-                      <h3 className="text-lg font-medium mb-4">
-                        Add Payment Method
-                      </h3>
-                      <div className="flex space-x-4 mb-4">
-                        <div className="flex-1">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Payment Method
-                          </label>
+                </div>
+              ) : activeTab === "discounts" ? (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {/* Fixed Input Area for Discounts */}
+                  <div className="bg-white p-4 border-b">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Discount Type
+                        </label>
+                        <div className="relative">
                           <input
                             type="text"
-                            className="w-full px-3 py-2 border rounded-md"
-                            placeholder="e.g. Cash, Credit Card"
-                            value={newPaymentMethod}
+                            className="w-full px-3 py-2 pr-10 border rounded-md"
+                            placeholder="Enter discount type"
+                            value={
+                              editingDiscountId
+                                ? editedDiscountType
+                                : newDiscountType
+                            }
                             onChange={(e) =>
-                              setNewPaymentMethod(e.target.value)
+                              editingDiscountId
+                                ? setEditedDiscountType(e.target.value)
+                                : setNewDiscountType(e.target.value)
                             }
                           />
-                        </div>
-                        <div className="flex items-end">
-                          <button
-                            onClick={handleAddPaymentMethod}
-                            className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
-                          >
-                            Add
-                          </button>
+                          {(editingDiscountId
+                            ? editedDiscountType
+                            : newDiscountType) && (
+                            <button
+                              onClick={() => {
+                                if (editingDiscountId) {
+                                  handleCancelEdit();
+                                } else {
+                                  setNewDiscountType("");
+                                  setNewDiscountPercentage("");
+                                }
+                              }}
+                              className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-white rounded-full w-6 h-6 flex items-center justify-center"
+                            >
+                              <IoMdClose size={16} />
+                            </button>
+                          )}
                         </div>
                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Percentage (%)
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border rounded-md"
+                          placeholder="Enter percentage"
+                          value={
+                            editingDiscountId
+                              ? editedDiscountPercentage
+                              : newDiscountPercentage
+                          }
+                          onChange={(e) =>
+                            editingDiscountId
+                              ? setEditedDiscountPercentage(e.target.value)
+                              : setNewDiscountPercentage(e.target.value)
+                          }
+                        />
+                      </div>
                     </div>
-                    <div className="bg-white rounded-lg border overflow-hidden">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                    <div className="flex justify-end space-x-2">
+                      {!editingDiscountId ? (
+                        <button
+                          onClick={handleAddDiscount}
+                          disabled={isSubmittingDiscount}
+                          className={`bg-green-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
+                            isSubmittingDiscount
+                              ? "opacity-70 cursor-not-allowed"
+                              : "hover:bg-green-600"
+                          }`}
+                        >
+                          {addingDiscountText}
+                        </button>
+                      ) : (
+                        <div className="w-full flex justify-between">
+                          <button
+                            onClick={handleDeleteDiscount.bind(
+                              null,
+                              editingDiscountId
+                            )}
+                            disabled={isDeletingDiscount}
+                            className={`bg-red-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
+                              isDeletingDiscount
+                                ? "opacity-70 cursor-not-allowed"
+                                : "hover:bg-red-600"
+                            }`}
+                          >
+                            {isDeletingDiscount
+                              ? `Deleting${deletingDiscountDots}`
+                              : "Delete"}
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleSaveEditDiscount(editingDiscountId)
+                            }
+                            disabled={isSubmittingDiscount}
+                            className={`bg-green-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
+                              isSubmittingDiscount
+                                ? "opacity-70 cursor-not-allowed"
+                                : "hover:bg-green-600"
+                            }`}
+                          >
+                            {updatingDiscountText}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Scrollable Discounts Table */}
+                  <div className="flex-1 overflow-hidden p-4">
+                    <div className="h-full overflow-y-auto">
+                      <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+                        <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Payment Method
+                            <th scope="col" className="px-6 py-3 font-medium">
+                              DISCOUNT TYPE
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Actions
+                            <th scope="col" className="px-6 py-3 font-medium">
+                              PERCENTAGE
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {paymentMethods.map((method) => (
-                            <tr key={method.id}>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {editingPaymentId === method.id ? (
-                                  <input
-                                    type="text"
-                                    className="border rounded-md px-2 py-1"
-                                    placeholder={method.name}
-                                    value={editedPaymentName}
-                                    onChange={(e) =>
-                                      setEditedPaymentName(e.target.value)
-                                    }
-                                  />
-                                ) : (
-                                  method.name
-                                )}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {editingPaymentId === method.id ? (
-                                  <>
-                                    <button
-                                      onClick={handleCancelEditPayment}
-                                      className="text-red-600 hover:text-red-800 p-1"
-                                    >
-                                      Cancel
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        handleSaveEditPayment(method.id)
-                                      }
-                                      className="text-green-600 hover:text-green-800 p-1 ml-2"
-                                    >
-                                      Save
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() =>
-                                        handleDeletePayment(method.id)
-                                      }
-                                      className="text-red-600 hover:text-red-800 p-1 ml-2"
-                                    >
-                                      Delete
-                                    </button>
-                                    <button
-                                      onClick={() => handleEditPayment(method)}
-                                      className="text-blue-600 hover:text-blue-800 p-1"
-                                    >
-                                      Edit
-                                    </button>
-                                  </>
-                                )}
+                        <tbody>
+                          {sortedDiscounts.length > 0 ? (
+                            sortedDiscounts.map((discount, index) => (
+                              <tr
+                                key={discount.id}
+                                className={`${
+                                  index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                                } border-b hover:bg-gray-200 group cursor-pointer`}
+                                onClick={() => handleEditDiscount(discount)}
+                              >
+                                <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                  {discount.type}
+                                </td>
+                                <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                  {(discount.percentage * 100).toFixed(0) + "%"}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr className="bg-white border-b">
+                              <td
+                                colSpan="2"
+                                className="px-6 py-4 text-center font-normal text-gray-500 italic"
+                              >
+                                No Discounts Available
                               </td>
                             </tr>
-                          ))}
+                          )}
                         </tbody>
                       </table>
                     </div>
                   </div>
-                ) : null}
-              </div>
+                </div>
+              ) : activeTab === "unliwings" ? (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  {/* Unli Wings Base Amount Table */}
+                  <div className="flex-1 overflow-hidden p-4">
+                    <div className="h-full overflow-y-auto">
+                      <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+                        <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 font-medium">
+                              CATEGORY NAME
+                            </th>
+                            <th scope="col" className="px-6 py-3 font-medium">
+                              BASE AMOUNT
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {instore_categories
+                            ?.filter((category) => category.id === 2)
+                            .map((category, index) => {
+                              const isEditing =
+                                editingUnliWingsId === category.id;
+                              return (
+                                <tr
+                                  key={category.id}
+                                  className={`${
+                                    index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                                  } border-b hover:bg-gray-200 group`}
+                                >
+                                  <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                    {category.name}
+                                  </td>
+                                  <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900 relative">
+                                    {isEditing ? (
+                                      <div className="flex items-center">
+                                        <input
+                                          type="text"
+                                          className="w-24 px-3 py-2 border rounded-md"
+                                          value={editingBaseAmount}
+                                          onChange={(e) =>
+                                            setEditingBaseAmount(e.target.value)
+                                          }
+                                        />
+                                        <div className="ml-2 flex">
+                                          <button
+                                            onClick={() =>
+                                              setEditingUnliWingsId(null)
+                                            }
+                                            className="text-red-500 hover:text-red-700 p-1"
+                                          >
+                                            <FaTimes />
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              handleSaveUnliWingsBaseAmount(
+                                                category.id
+                                              )
+                                            }
+                                            disabled={isSubmittingBaseAmount}
+                                            className={`text-green-500 hover:text-green-600 p-1 min-w-[24px] min-h-[24px] flex items-center justify-center ${
+                                              isSubmittingBaseAmount
+                                                ? "opacity-70 cursor-not-allowed"
+                                                : ""
+                                            }`}
+                                          >
+                                            {isSubmittingBaseAmount &&
+                                            editingUnliWingsId ===
+                                              category.id ? (
+                                              <span className="text-green-500 leading-none">
+                                                {".".repeat(
+                                                  Math.floor(Date.now() / 500) %
+                                                    4
+                                                )}
+                                              </span>
+                                            ) : (
+                                              <FaCheck />
+                                            )}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center">
+                                        <span className="mr-2">
+                                          ₱
+                                          {category.base_amount?.toFixed(2) ||
+                                            "0.00"}
+                                        </span>
+                                        <button
+                                          onClick={() => {
+                                            setEditingUnliWingsId(category.id);
+                                            setEditingBaseAmount(
+                                              category.base_amount?.toString() ||
+                                                "0"
+                                            );
+                                          }}
+                                          className="text-[#CC5500] hover:text-[#B34500] ml-2"
+                                        >
+                                          <FaPencilAlt />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

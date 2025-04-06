@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 import base64
 import io
 from django.utils.timezone import now
-from .utils.conversion import convert_value
+from .utils.conversion import convert_value, CONVERSION_FACTORS
 import uuid
 import  mimetypes
 from io import BytesIO
@@ -1342,99 +1342,110 @@ def fetch_stockin_page_data(request):
 @permission_classes([AllowAny])
 def fetch_menu_data(request):
     """
-    Specialized endpoint for Menu.jsx that fetches only menu-related data
-    to optimize performance.
+    Optimized endpoint for Menu.jsx that fetches menu-related data
+    with improved performance.
     """
     try:
-        # Fetch menu categories (needed by all menu components)
-        menu_categories_response = supabase_anon.table("menu_category") \
-            .select("id, name") \
-            .execute()
-        menu_categories = menu_categories_response.data if menu_categories_response.data else []
-
-        # Fetch menu statuses (needed for showing availability)
-        menu_statuses_response = supabase_anon.table("menu_status") \
-            .select("id, name") \
-            .execute()
-        menu_statuses = menu_statuses_response.data if menu_statuses_response.data else []
-
-        # Fetch menu types (needed for filtering in Menu.jsx)
-        menu_types_response = supabase_anon.table("menu_type") \
-            .select("id, name") \
-            .execute()
-        menu_types = menu_types_response.data if menu_types_response.data else []
-
-        # Fetch measurement units (needed for recipes)
-        units_response = supabase_anon.table("unit_of_measurement") \
-            .select("id, symbol, unit_category") \
-            .execute()
-        units = units_response.data if units_response.data else []
-
-        # Fetch inventory for recipe selection
-        # Only fetch relevant fields needed for recipe creation/editing
-        inventory_response = supabase_anon.table("inventory") \
-            .select("id, item, quantity, items(id, name)") \
-            .execute()
+        # Fetch all data in parallel to save time on network requests
+        # Let's use multiple tasks to fetch different pieces of data simultaneously
         
-        inventory_data = inventory_response.data if inventory_response.data else []
+        # 1. Fetch static reference data and menus in parallel
+        menu_categories_task = supabase_anon.table("menu_category").select("id, name").execute()
+        menu_statuses_task = supabase_anon.table("menu_status").select("id, name").execute()
+        menu_types_task = supabase_anon.table("menu_type").select("id, name").execute()
+        units_task = supabase_anon.table("unit_of_measurement").select("id, symbol, unit_category").execute()
+        menus_task = supabase_anon.table("menu_items").select("id, name, type_id, price, image, status_id, category_id").execute()
         
-        # Format inventory with item details for easier frontend usage
-        formatted_inventory = []
-        for inventory in inventory_data:
-            item_data = inventory.get("items", {})
-            if item_data:
-                formatted_inventory.append({
-                    "id": inventory.get("id"),
-                    "item": item_data.get("id"),
-                    "name": item_data.get("name", "Unknown Item"),
-                    "quantity": inventory.get("quantity", 0)
-                })
-
-        # Fetch menus with their ingredients
-        menus_response = supabase_anon.table("menu_items") \
-            .select("id, name, type_id, price, image, status_id, category_id") \
-            .execute()
-        menus = menus_response.data if menus_response.data else []
-
-        # Get menu ingredients for each menu item
+        # 2. Extract results
+        menu_categories = menu_categories_task.data if menu_categories_task.data else []
+        menu_statuses = menu_statuses_task.data if menu_statuses_task.data else []
+        menu_types = menu_types_task.data if menu_types_task.data else []
+        units = units_task.data if units_task.data else []
+        menus = menus_task.data if menus_task.data else []
+        
+        # 3. Get all menu IDs for bulk ingredient query
+        menu_ids = [menu["id"] for menu in menus]
+        
+        # 4. Fetch all menu ingredients in a single query
+        all_ingredients = []
+        inventory_ids = set()
+        unit_ids = set()
+        ingredients_by_menu = {}
+        
+        if menu_ids:
+            menu_ingredients_response = supabase_anon.table("menu_ingredients").select("*").in_("menu_id", menu_ids).execute()
+            all_ingredients = menu_ingredients_response.data if menu_ingredients_response.data else []
+            
+            # Group ingredients by menu_id and collect inventory/unit IDs
+            for ingredient in all_ingredients:
+                menu_id = ingredient.get("menu_id")
+                inventory_id = ingredient.get("inventory_id")
+                unit_id = ingredient.get("unit_id")
+                
+                if inventory_id:
+                    inventory_ids.add(inventory_id)
+                
+                if unit_id:
+                    unit_ids.add(unit_id)
+                    
+                if menu_id not in ingredients_by_menu:
+                    ingredients_by_menu[menu_id] = []
+                    
+                ingredients_by_menu[menu_id].append(ingredient)
+        
+        # 5. Fetch only needed inventory items in bulk
+        inventory_data = {}
+        if inventory_ids:
+            inventory_response = supabase_anon.table("inventory").select("id, item, items(id, name)").in_("id", list(inventory_ids)).execute()
+            
+            # Process inventory data
+            for inv in inventory_response.data or []:
+                item_data = inv.get("items", {})
+                if item_data:
+                    inventory_data[inv.get("id")] = {
+                        "id": inv.get("id"),
+                        "item": item_data.get("id"),
+                        "name": item_data.get("name", "Unknown Item"),
+                        "quantity": inv.get("quantity", 0)
+                    }
+        
+        # 6. Create fast lookup maps
+        unit_map = {unit["id"]: unit["symbol"] for unit in units if "id" in unit and "symbol" in unit}
+        
+        # 7. Build formatted menu items with all their ingredients
         formatted_menus = []
         for menu in menus:
-            # Generate public URL for the image
+            # Handle image URL
             image_url = None
             if menu["image"]:
                 try:
                     image_url = supabase_anon.storage.from_("menu-images").get_public_url(menu["image"])
                 except Exception as e:
                     print(f"Error generating URL for image {menu['image']}: {e}")
-
-            # Fetch this menu's ingredients
-            menu_ingredients_response = supabase_anon.table("menu_ingredients") \
-                .select("id, menu_id, inventory_id, quantity, unit_id") \
-                .eq("menu_id", menu["id"]) \
-                .execute()
             
+            # Process this menu's ingredients
             menu_ingredients = []
-            if menu_ingredients_response.data:
-                for ingredient in menu_ingredients_response.data:
-                    # Find inventory item for display purposes
-                    inventory_item = next((item for item in formatted_inventory 
-                                           if item["id"] == ingredient["inventory_id"]), None)
-                    
-                    # Find unit for display purposes
-                    unit = next((unit for unit in units 
-                                if unit["id"] == ingredient["unit_id"]), None)
-                    
-                    menu_ingredients.append({
-                        "id": ingredient["id"],
-                        "menu_id": ingredient["menu_id"],
-                        "inventory_id": ingredient["inventory_id"],
-                        "quantity": ingredient["quantity"],
-                        "unit_id": ingredient["unit_id"],
-                        # Include these for display in EditMenuModal
-                        "item_name": inventory_item["name"] if inventory_item else "Unknown",
-                        "unit": unit["symbol"] if unit else ""
-                    })
-
+            for ingredient in ingredients_by_menu.get(menu["id"], []):
+                inventory_id = ingredient["inventory_id"]
+                unit_id = ingredient["unit_id"]
+                
+                # Get inventory item info from our cache
+                inventory_item = inventory_data.get(inventory_id, {})
+                item_name = inventory_item.get("name", "Unknown")
+                
+                # Get unit symbol from our cache
+                unit_symbol = unit_map.get(unit_id, "")
+                
+                menu_ingredients.append({
+                    "id": ingredient["id"],
+                    "menu_id": ingredient["menu_id"],
+                    "inventory_id": inventory_id,
+                    "quantity": ingredient["quantity"],
+                    "unit_id": unit_id,
+                    "item_name": item_name,
+                    "unit": unit_symbol
+                })
+            
             formatted_menus.append({
                 "id": menu["id"],
                 "name": menu["name"],
@@ -1445,13 +1456,14 @@ def fetch_menu_data(request):
                 "status_id": menu["status_id"],
                 "menu_ingredients": menu_ingredients
             })
-
+        
+        # 8. Return all data in a single response
         return Response({
             "menu_categories": menu_categories,
             "menu_statuses": menu_statuses,
             "menu_types": menu_types,
             "units": units,
-            "inventory": formatted_inventory,
+            "inventory": list(inventory_data.values()),  # Only the inventory items needed
             "menu_items": formatted_menus
         })
     
@@ -2710,106 +2722,6 @@ def fetch_order_data(request, transactionId=None):
     except Exception as e:
         return Response({"error": str(e)}, status=500)
 
-
-@api_view(['POST'])
-@authentication_classes([SupabaseAuthentication])
-@permission_classes([SupabaseIsAdmin])
-def add_payment_method(request):
-    """
-    Handles adding a new payment method to the databae
-    """
-    try:
-        # Authenticate the user and get the authenticated Supabase client
-        auth_data = authenticate_user(request)
-        supabase_client = auth_data["client"]
-
-        data = json.loads(request.body)
-        name = data.get("name")
-
-        if not name:
-            return Response({"error": "All fields are required"}, status=400)
-
-        # Insert new item category
-        insert_response = supabase_client.table("payment_methods").insert({
-            "name": name
-        }).execute()
-
-        if insert_response.data:
-            return Response({
-                "message": "Payment Method added successfully"
-            }, status=201)
-        else:
-            return Response({"error": "Failed to add Payment Method"}, status=500)
-        
-    except Exception as e:
-        return Response({"error" : str(e)}, status=500)
-
-@api_view(['PUT'])
-@authentication_classes([SupabaseAuthentication])
-@permission_classes([SupabaseIsAdmin])
-def edit_payment_method(request, payment_method_id):
-    """
-    Handles updating an existing payment_method name
-    """
-    try:
-        # Authenticate the user and get the authenticated Supabase client
-        auth_data = authenticate_user(request)
-        supabase_client = auth_data["client"]
-
-        data = json.loads(request.body)
-        new_name = data.get("name")
-
-        if not new_name:
-            return Response({"error": "Name is required."}, status=400)
-
-        # Check if payment method exists
-        payment_method_response = supabase_client.table("payment_methods").select("*").eq("id", payment_method_id).execute()
-        if not payment_method_response.data:
-            return Response({"error": "Payment Method not found."}, status=404)
-
-        # Update payment method name
-        update_response = supabase_client.table("payment_methods").update({
-            "name": new_name
-        }).eq("id", payment_method_id).execute()
-
-        if update_response.data:
-            return Response({"message": "Payment Method updated successfully."}, status=200)
-        else:
-            return Response({"error": "Failed to update Payment Method."}, status=500)
-
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
-
-
-@api_view(['DELETE'])
-@authentication_classes([SupabaseAuthentication])  # Use appropriate authentication
-@permission_classes([SupabaseIsAdmin])  # Ensure only admins can delete categories
-def delete_payment_method(request, payment_method_id):
-    """
-    This view handles the deletion of an existing payment method
-    """
-    try:
-        # Authenticate the user and get the authenticated Supabase client
-        auth_data = authenticate_user(request)
-        supabase_client = auth_data["client"]
-
-        # Verify payment method exists
-        payment_method_response = supabase_client.table("payment_methods").select("*").eq("id", payment_method_id).execute()
-        if not payment_method_response.data:
-            return Response({"error": "Payment method not found."}, status=404)
-
-        # Delete category
-        delete_response = supabase_client.table("payment_methods").delete().eq("id", payment_method_id).execute()
-
-        if delete_response.data:
-            return Response({"message": "Payment Method deleted successfully."}, status=200)
-        else:
-            return Response({"error": "Failed to delete Payment Method."}, status=500)
-    
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
-    
-
 @api_view(['POST'])
 @authentication_classes([SupabaseAuthentication])
 @permission_classes([SupabaseIsAdmin])
@@ -2945,6 +2857,42 @@ def edit_delivery_deduction(request, delivery_id):
             return Response({"message": "Delivery deduction percentage updated successfully."}, status=200)
         else:
             return Response({"error": "Failed to update delivery deduction percentage."}, status=500)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['PUT'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def edit_unli_wings_base_amount(request, category_id):
+    """
+    Handles updating the base amount for Unli Wings category
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        data = json.loads(request.body)
+        new_base_amount = data.get("base_amount")
+
+        if new_base_amount is None:
+            return Response({"error": "Base amount is required."}, status=400)
+
+        # Check if category exists
+        response = supabase_client.table("instore_category").select("*").eq("id", category_id).execute()
+        if not response.data:
+            return Response({"error": "Category not found."}, status=404)
+
+        # Update base amount
+        update_response = supabase_client.table("instore_category").update({
+            "base_amount": new_base_amount
+        }).eq("id", category_id).execute()
+
+        if update_response.data:
+            return Response({"message": "Unli Wings base amount updated successfully."}, status=200)
+        else:
+            return Response({"error": "Failed to update Unli Wings base amount."}, status=500)
 
     except Exception as e:
         return Response({"error": str(e)}, status=500)
@@ -3776,20 +3724,68 @@ def update_order_status(request, transaction_id):
 def update_menu_availability(request):
     debug_steps = []
     updated_items = []
+    conversion_errors = []
     
     try:
         debug_steps.append("Starting menu availability check")
         
-        # Get all active menu items
+        # 1. Fetch all menu items with their ingredients in a single query
         menu_items_response = supabase_anon.table("menu_items").select("*").execute()
-        
         if not menu_items_response.data:
             return Response({"message": "No menu items found", "debug": debug_steps}, status=200)
         
         menu_items = menu_items_response.data
         debug_steps.append(f"Found {len(menu_items)} menu items to check")
         
-        # Process each menu item
+        # 2. Fetch all menu ingredients in one query
+        all_menu_ingredients = supabase_anon.table("menu_ingredients").select("*").execute().data
+        
+        # 3. Create a lookup dictionary for menu ingredients by menu_id
+        menu_ingredient_map = {}
+        menu_ids = []
+        inventory_ids = []
+        
+        for ingredient in all_menu_ingredients:
+            menu_id = ingredient.get('menu_id')
+            inventory_id = ingredient.get('inventory_id')
+            
+            if menu_id and inventory_id:
+                menu_ids.append(menu_id)
+                inventory_ids.append(inventory_id)
+                
+                if menu_id not in menu_ingredient_map:
+                    menu_ingredient_map[menu_id] = []
+                    
+                menu_ingredient_map[menu_id].append(ingredient)
+        
+        # 4. Prefetch all inventory records needed
+        inventory_records = {}
+        if inventory_ids:
+            inventory_response = supabase_anon.table("inventory").select("*").in_("id", inventory_ids).execute()
+            for inv in inventory_response.data:
+                inventory_records[inv.get('id')] = inv
+        
+        # 5. Prefetch all item records
+        item_ids = [inv.get('item') for inv in inventory_records.values() if inv.get('item')]
+        items_response = supabase_anon.table("items").select("*").in_("id", item_ids).execute()
+        item_records = {item.get('id'): item for item in items_response.data}
+        
+        # 6. Prefetch all unit measurements
+        unit_ids = [item.get('measurement') for item in item_records.values() if item.get('measurement')]
+        for ingredient in all_menu_ingredients:
+            unit_id = ingredient.get('unit_id')
+            if unit_id:
+                unit_ids.append(unit_id)
+                
+        units_response = supabase_anon.table("unit_of_measurement").select("*").in_("id", unit_ids).execute()
+        unit_records = {unit.get('id'): unit for unit in units_response.data}
+        
+        # 7. Get unit categories
+        unit_category_ids = [unit.get('unit_category') for unit in unit_records.values() if unit.get('unit_category')]
+        unit_categories_response = supabase_anon.table("um_category").select("*").in_("id", unit_category_ids).execute()
+        unit_category_records = {cat.get('id'): cat for cat in unit_categories_response.data}
+        
+        # 8. Process each menu item
         for menu_item in menu_items:
             try:
                 menu_id = menu_item.get('id')
@@ -3798,16 +3794,12 @@ def update_menu_availability(request):
                 
                 debug_steps.append(f"Checking menu item: {menu_id} - {menu_name}")
                 
-                # Get ingredients for this menu item
-                ingredients_response = supabase_anon.table("menu_ingredients").select(
-                    "id, quantity, inventory_id, unit_id, menu_id"
-                ).eq("menu_id", menu_id).execute()
-                
-                if not ingredients_response.data:
+                # Skip if this menu has no ingredients
+                if menu_id not in menu_ingredient_map:
                     debug_steps.append(f"No ingredients found for menu item {menu_id}")
                     continue
                 
-                ingredients = ingredients_response.data
+                ingredients = menu_ingredient_map[menu_id]
                 debug_steps.append(f"Found {len(ingredients)} ingredients for menu item {menu_id}")
                 
                 # Check each ingredient
@@ -3824,87 +3816,102 @@ def update_menu_availability(request):
                             debug_steps.append(f"Skipping ingredient with null inventory_id for menu {menu_id}")
                             continue
                         
-                        # Get current inventory record
-                        inventory_response = supabase_anon.table("inventory").select("*").eq("id", inventory_id).execute()
-                        
-                        if not inventory_response.data:
+                        # Get inventory from prefetched data
+                        if inventory_id not in inventory_records:
                             debug_steps.append(f"Inventory record not found for id {inventory_id}")
                             has_insufficient_ingredients = True
                             break
                         
-                        current_inventory = inventory_response.data[0]
+                        current_inventory = inventory_records[inventory_id]
                         current_quantity = current_inventory.get('quantity', 0)
                         item_id = current_inventory.get('item')
                         
-                        # Handle case where item_id is None
-                        if item_id is None:
-                            debug_steps.append(f"Inventory {inventory_id} has no associated item")
-                            has_insufficient_ingredients = True
-                            break
-                        
-                        # Get item details to find the unit information
-                        item_response = supabase_anon.table("items").select("*, unit:unit_of_measurement(*)").eq("id", item_id).execute()
-                        
-                        if not item_response.data:
+                        # Skip if item_id is None
+                        if item_id is None or item_id not in item_records:
                             debug_steps.append(f"Item not found for inventory {inventory_id}")
                             has_insufficient_ingredients = True
                             break
                         
-                        item = item_response.data[0]
-                        item_unit = item.get('unit', {})
-                        inventory_unit_id = item.get('unit_id')
-                        inventory_unit_symbol = item_unit.get('symbol') if item_unit else None
+                        item = item_records[item_id]
+                        measurement_id = item.get('measurement')
                         
-                        # Skip conversion if no unit information
-                        if menu_ingredient_unit_id is None or inventory_unit_symbol is None:
-                            debug_steps.append(f"Missing unit information for ingredient, using direct comparison")
-                            required_quantity_converted = float(required_quantity)
-                        else:
-                            # Get menu ingredient unit details
-                            menu_unit_response = supabase_anon.table("unit_of_measurement").select("*").eq("id", menu_ingredient_unit_id).execute()
-                            menu_unit = menu_unit_response.data[0] if menu_unit_response.data else None
-                            menu_unit_symbol = menu_unit.get('symbol') if menu_unit else None
-                            menu_unit_category = menu_unit.get('unit_category') if menu_unit else None
+                        if measurement_id not in unit_records:
+                            debug_steps.append(f"Measurement unit not found for item {item_id}")
+                            has_insufficient_ingredients = True
+                            break
                             
-                            # Get unit category information
-                            if menu_unit_category:
-                                category_response = supabase_anon.table("um_category").select("name").eq("id", menu_unit_category).execute()
-                                category_name = category_response.data[0].get('name') if category_response.data else None
-                            else:
-                                category_name = None
+                        inventory_unit = unit_records[measurement_id]
+                        inventory_unit_symbol = inventory_unit.get('symbol')
+                        
+                        # Default to direct comparison
+                        required_quantity_converted = float(required_quantity)
+                        conversion_performed = False
+                        
+                        # Get unit information for menu ingredient if available
+                        if menu_ingredient_unit_id is not None and menu_ingredient_unit_id in unit_records:
+                            menu_unit = unit_records[menu_ingredient_unit_id]
+                            menu_unit_symbol = menu_unit.get('symbol')
+                            menu_unit_category_id = menu_unit.get('unit_category')
                             
-                            # Required quantity for one menu item
-                            required_quantity_converted = float(required_quantity)
-                            
-                            # Convert units if necessary
+                            # Try to convert units if necessary
                             if (menu_unit_symbol and inventory_unit_symbol and 
                                 menu_unit_symbol != inventory_unit_symbol and 
-                                category_name in ["Weight", "Volume"]):
-                                try:
-                                    required_quantity_converted = convert_value(
-                                        float(required_quantity),
-                                        menu_unit_symbol,
-                                        inventory_unit_symbol,
-                                        category_name
-                                    )
-                                    debug_steps.append(f"Converted {required_quantity} {menu_unit_symbol} to {required_quantity_converted} {inventory_unit_symbol}")
-                                except Exception as e:
-                                    debug_steps.append(f"Conversion error: {str(e)}")
+                                menu_unit_category_id is not None and
+                                menu_unit_category_id in unit_category_records):
+                                
+                                category = unit_category_records[menu_unit_category_id]
+                                category_name = category.get('name')
+                                
+                                if category_name in ["Weight", "Volume"]:
+                                    try:
+                                        # Check if both units are in the conversion factors
+                                        from_unit_supported = menu_unit_symbol in CONVERSION_FACTORS.get(category_name, {})
+                                        to_unit_supported = inventory_unit_symbol in CONVERSION_FACTORS.get(category_name, {})
+                                        
+                                        if from_unit_supported and to_unit_supported:
+                                            required_quantity_converted = convert_value(
+                                                float(required_quantity),
+                                                menu_unit_symbol,
+                                                inventory_unit_symbol,
+                                                category_name
+                                            )
+                                            conversion_performed = True
+                                            debug_steps.append(
+                                                f"Converted {required_quantity} {menu_unit_symbol} to {required_quantity_converted} {inventory_unit_symbol}"
+                                            )
+                                    except Exception as e:
+                                        error_msg = f"Conversion error for {menu_name}: {str(e)}"
+                                        debug_steps.append(error_msg)
+                                        conversion_errors.append({
+                                            "menu_id": menu_id,
+                                            "menu_name": menu_name,
+                                            "error": error_msg
+                                        })
+                        else:
+                            # Log when using direct comparison due to missing unit information
+                            debug_steps.append(f"Using direct comparison for {menu_name}, ingredient {inventory_id}: missing unit information")
                         
                         # Check if enough inventory
                         current_quantity = float(current_quantity)
                         if current_quantity < required_quantity_converted:
-                            inventory_name = current_inventory.get('name', 'Unknown')
+                            # Use your existing fix for inventory_name
+                            inventory_name = current_inventory.get('name', item.get('name', 'Unknown'))
                             debug_steps.append(f"Insufficient inventory for {menu_name}: {inventory_name} has {current_quantity}, needs {required_quantity_converted}")
                             has_insufficient_ingredients = True
                             break
+                        else:
+                            # Also add this else clause to define inventory_name for successful cases as in your code
+                            inventory_name = current_inventory.get('name', item.get('name', 'Unknown'))
+                            debug_steps.append(f"Sufficient inventory for {menu_name}: {inventory_name} has {current_quantity}, needs {required_quantity_converted}")
+                            
                     except Exception as ingredient_error:
-                        debug_steps.append(f"Error processing ingredient: {str(ingredient_error)}")
+                        error_msg = f"Error processing ingredient for {menu_name}: {str(ingredient_error)}"
+                        debug_steps.append(error_msg)
                         has_insufficient_ingredients = True
                         break
                 
                 # Update menu item status if needed
-                new_status_id = 2 if has_insufficient_ingredients else 1  # 2=Unavailable, 1=Available
+                new_status_id = 2 if has_insufficient_ingredients else 1
                 
                 if new_status_id != current_status:
                     try:
@@ -3928,11 +3935,11 @@ def update_menu_availability(request):
                     debug_steps.append(f"No status change needed for menu item {menu_name}")
             except Exception as menu_error:
                 debug_steps.append(f"Error processing menu item {menu_item.get('name', 'Unknown')}: {str(menu_error)}")
-                # Continue with the next menu item
         
         return Response({
             "message": f"Updated availability status for {len(updated_items)} menu items",
             "updated_items": updated_items,
+            "conversion_errors": conversion_errors,
             "debug": debug_steps
         }, status=200)
     

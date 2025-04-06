@@ -51,7 +51,7 @@ const StockOut = () => {
     <div className="h-screen bg-[#fcf4dc] flex flex-col p-6">
       {loading ? (
         <div className="w-full flex justify-center items-center">
-          <LoadingScreen />
+          <LoadingScreen message="Loading disposed items" />
         </div>
       ) : (
         <TableWithDatePicker

@@ -267,76 +267,196 @@ const OrderTable = () => {
 
       <div className="mt-4">
         {showPopup && <ChooseOrder onClose={() => setShowPopup(false)} />}
-        <OrderEssentials
-          isOpen={isOrderEssentialsOpen}
-          onClose={closeOrderEssentialsModal}
-          menuTypes={orderData.menu_types}
-          discountsData={orderData.discounts}
-          paymentMethods={orderData.payment_methods}
-          fetchOrderData={fetchOrderData}
-        />
 
         {/* Table with built-in scrolling */}
         <Table
           columns={[
             "Transaction ID",
             "Date",
+            "Order Type",
             "Order Summary",
             "Total Amount",
             "Order Status",
           ]}
-          data={filteredTransactions.map((order) => {
-            const orderSummary =
-              order.order_details?.map(
-                (order_details) =>
-                  `${order_details.quantity}x - ${order_details.menu_item?.name}`
-              ) || [];
+          data={filteredTransactions
+            .sort((a, b) => {
+              // Define status priority
+              const getStatusPriority = (status) => {
+                if (status === "Pending") return 1;
+                if (status === "Completed") return 2;
+                if (status === "Cancelled") return 3;
+                return 4; // Any other status
+              };
 
-            let formattedOrderSummary;
-            if (orderSummary.length === 1) {
-              formattedOrderSummary = orderSummary[0];
-            } else if (orderSummary.length === 2) {
-              formattedOrderSummary = (
-                <>
-                  {orderSummary[0]} <br />
-                  {orderSummary[1]}
-                </>
-              );
-            } else if (orderSummary.length > 2) {
-              formattedOrderSummary = (
-                <>
-                  {orderSummary[0]} <br />
-                  {orderSummary[1]} ...
-                </>
-              );
-            } else {
-              formattedOrderSummary = "N/A";
-            }
+              const statusA = a.order_status?.name || "";
+              const statusB = b.order_status?.name || "";
 
-            return [
-              order.id || "N/A",
-              formatDate(order.date) || "N/A",
-              formattedOrderSummary,
-              `₱${
-                order.order_details
-                  ?.reduce(
-                    (total, order_details) =>
-                      total +
-                      order_details.quantity *
-                        (order_details.menu_item?.price || 0),
-                    0
-                  )
-                  .toFixed(2) || "0.00"
-              }`,
-              order.order_status?.name || "N/A",
-            ];
-          })}
+              // Compare by status priority first
+              const priorityDiff =
+                getStatusPriority(statusA) - getStatusPriority(statusB);
+              if (priorityDiff !== 0) return priorityDiff;
+
+              // If same status, sort by date
+              const dateA = new Date(a.date);
+              const dateB = new Date(b.date);
+
+              // For Pending and Cancelled: earliest to latest
+              if (statusA === "Pending" || statusA === "Cancelled") {
+                return dateA - dateB;
+              }
+              // For Completed: latest to earliest
+              else if (statusA === "Completed") {
+                return dateB - dateA;
+              }
+
+              // Default sort by date ascending
+              return dateA - dateB;
+            })
+            .map((order) => {
+              const orderSummary =
+                order.order_details?.map(
+                  (order_details) =>
+                    `${order_details.quantity}x - ${order_details.menu_item?.name}`
+                ) || [];
+
+              let formattedOrderSummary;
+              if (orderSummary.length === 1) {
+                formattedOrderSummary = orderSummary[0];
+              } else if (orderSummary.length === 2) {
+                formattedOrderSummary = (
+                  <>
+                    {orderSummary[0]} <br />
+                    {orderSummary[1]}
+                  </>
+                );
+              } else if (orderSummary.length > 2) {
+                formattedOrderSummary = (
+                  <>
+                    {orderSummary[0]} <br />
+                    {orderSummary[1]} ...
+                  </>
+                );
+              } else {
+                formattedOrderSummary = "N/A";
+              }
+
+              // Get the appropriate color for the status
+              let statusColor = "text-gray-700";
+              const status = order.order_status?.name || "N/A";
+
+              if (status === "Pending") {
+                statusColor = "text-yellow-400 font-medium";
+              } else if (status === "Completed") {
+                statusColor = "text-green-500 font-medium";
+              } else if (status === "Cancelled") {
+                statusColor = "text-red-500 font-medium";
+              }
+
+              // Determine order type and its color
+              const orderTypeId = order.order_details?.[0]?.menu_item?.type_id;
+              const orderTypeObj = orderData.menu_types.find(
+                (type) => type.id === orderTypeId
+              );
+              const orderType = orderTypeObj?.name || "Unknown";
+
+              // Set color based on order type
+              let orderTypeColor = "text-gray-700";
+              if (orderType === "In-Store") {
+                orderTypeColor = "text-[#CC5500] font-medium";
+              } else if (orderType === "Grab") {
+                orderTypeColor = "text-green-500 font-medium";
+              } else if (orderType === "FoodPanda") {
+                orderTypeColor = "text-pink-500 font-medium";
+              }
+
+              // Calculate total with discount
+              const calculateTotalWithDiscount = () => {
+                const orderDetails = order.order_details || [];
+
+                // For In-Store orders
+                if (
+                  orderDetails.length > 0 &&
+                  orderDetails[0].menu_item?.type_id === 1
+                ) {
+                  // Group by unli wings orders
+                  const unliWingsOrders = orderDetails.filter(
+                    (detail) => Number(detail.instore_category?.id) === 2
+                  );
+                  const alaCarteOrders = orderDetails.filter(
+                    (detail) =>
+                      Number(detail.instore_category?.id) === 1 ||
+                      !detail.instore_category
+                  );
+
+                  // Calculate ala carte total with discounts
+                  const alaCarteTotal = alaCarteOrders.reduce((sum, detail) => {
+                    const quantity = detail?.quantity || 0;
+                    const price = detail?.menu_item?.price || 0;
+                    const discountPercentage =
+                      detail?.discount?.percentage || 0;
+                    return sum + quantity * price * (1 - discountPercentage);
+                  }, 0);
+
+                  // Get unique unli wings groups to calculate base amount
+                  const uniqueGroups = [
+                    ...new Set(unliWingsOrders.map((d) => d.unli_wings_group)),
+                  ];
+                  const unliWingsTotal =
+                    uniqueGroups.length * (unliWingsCategory?.base_amount || 0);
+
+                  return (alaCarteTotal + unliWingsTotal).toFixed(2);
+                }
+                // For delivery orders (Grab/FoodPanda)
+                else {
+                  const subtotal = orderDetails.reduce((sum, detail) => {
+                    const quantity = detail?.quantity || 0;
+                    const price = detail?.menu_item?.price || 0;
+                    return sum + quantity * price;
+                  }, 0);
+
+                  // Find the menu type for deduction percentage
+                  const menuTypeId = orderDetails[0]?.menu_item?.type_id;
+                  const menuTypeData = orderData.menu_types.find(
+                    (type) => type.id === menuTypeId
+                  );
+                  const deductionPercentage =
+                    menuTypeData?.deduction_percentage || 0;
+
+                  // Only deduct for delivery apps
+                  const total =
+                    menuTypeId !== 1
+                      ? subtotal * (1 - deductionPercentage)
+                      : subtotal;
+
+                  return total.toFixed(2);
+                }
+              };
+
+              return [
+                order.id || "N/A",
+                formatDate(order.date) || "N/A",
+                <span className={orderTypeColor}>{orderType}</span>,
+                formattedOrderSummary,
+                `₱${calculateTotalWithDiscount()}`,
+                <span className={statusColor}>{status}</span>,
+              ];
+            })}
           rowOnClick={(rowIndex) =>
             openTransactionModal(filteredTransactions[rowIndex])
           }
           maxHeight="500px"
         />
       </div>
+
+      <OrderEssentials
+        isOpen={isOrderEssentialsOpen}
+        onClose={closeOrderEssentialsModal}
+        menuTypes={orderData.menu_types}
+        discountsData={orderData.discounts}
+        paymentMethods={orderData.payment_methods}
+        instore_categories={orderData.instore_categories}
+        fetchOrderData={fetchOrderData}
+      />
 
       <TransactionModal
         isOpen={isTransactionModalOpen}

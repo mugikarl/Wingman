@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { FaTrash } from "react-icons/fa";
+import { IoMdClose } from "react-icons/io";
 
 const NewMenuCategory = ({
   isOpen,
@@ -12,6 +14,54 @@ const NewMenuCategory = ({
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [addingText, setAddingText] = useState("Add");
+  const [updatingText, setUpdatingText] = useState("Update");
+  const [deletingDots, setDeletingDots] = useState("");
+  const [localCategories, setLocalCategories] = useState([]);
+
+  // Copy menuCategories to localCategories for local management
+  useEffect(() => {
+    if (menuCategories.length > 0) {
+      setLocalCategories([...menuCategories]);
+    }
+  }, [menuCategories]);
+
+  // Sort categories alphabetically by name
+  const sortedCategories = [...localCategories].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
+
+  // Handle loading text animations
+  useEffect(() => {
+    let loadingInterval;
+
+    if (isSubmitting || isDeleting) {
+      let dotCount = 0;
+      loadingInterval = setInterval(() => {
+        const dots = ".".repeat(dotCount % 4);
+
+        if (isSubmitting && !isEditing) {
+          setAddingText(`Adding${dots}`);
+        } else if (isSubmitting && isEditing) {
+          setUpdatingText(`Updating${dots}`);
+        }
+
+        if (isDeleting) {
+          setDeletingDots(dots);
+        }
+
+        dotCount++;
+      }, 500);
+    } else {
+      setAddingText("Add");
+      setUpdatingText("Update");
+      setDeletingDots("");
+    }
+
+    return () => {
+      if (loadingInterval) clearInterval(loadingInterval);
+    };
+  }, [isSubmitting, isEditing, isDeleting]);
 
   const handleAddMenuCategory = async () => {
     if (!menuCategoryName.trim()) return;
@@ -19,7 +69,7 @@ const NewMenuCategory = ({
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem("access_token");
-      await axios.post(
+      const response = await axios.post(
         "http://127.0.0.1:8000/add-menu-category/",
         { name: menuCategoryName },
         {
@@ -28,8 +78,20 @@ const NewMenuCategory = ({
           },
         }
       );
-      fetchItemData();
+
+      // Add new category to local state immediately
+      if (response.data && response.data.id) {
+        const newCategory = response.data;
+        setLocalCategories((prev) => [...prev, newCategory]);
+      }
+
+      // Reset form
       setMenuCategoryName("");
+
+      // Trigger background fetch without waiting for it
+      setTimeout(() => {
+        fetchItemData();
+      }, 0);
     } catch (error) {
       console.error("Error adding menu category:", error);
     } finally {
@@ -44,7 +106,7 @@ const NewMenuCategory = ({
 
     setIsSubmitting(true);
 
-    const menuCategoryId = menuCategories[selectedIndex]?.id;
+    const menuCategoryId = sortedCategories[selectedIndex]?.id;
 
     if (!menuCategoryId) {
       console.error("Error: No Menu Category ID found!");
@@ -67,11 +129,25 @@ const NewMenuCategory = ({
           },
         }
       );
-      alert("Menu Category updated successfully!");
-      fetchItemData();
+
+      // Update category in local state immediately
+      const updatedCategories = localCategories.map((cat) =>
+        cat.id === menuCategoryId ? { ...cat, name: menuCategoryName } : cat
+      );
+      setLocalCategories(updatedCategories);
+
+      // Reset form
       setMenuCategoryName("");
       setIsEditing(false);
       setSelectedIndex(null);
+
+      // Show success message
+      alert("Menu Category updated successfully!");
+
+      // Trigger background fetch without waiting for it
+      setTimeout(() => {
+        fetchItemData();
+      }, 0);
     } catch (error) {
       console.error("Error updating menu category:", error);
       alert("Failed to update menu category.");
@@ -89,18 +165,32 @@ const NewMenuCategory = ({
     setIsDeleting(true);
     try {
       const token = localStorage.getItem("access_token");
+      const categoryId = sortedCategories[selectedIndex].id;
+
       await axios.delete(
-        `http://127.0.0.1:8000/delete-menu-category/${menuCategories[selectedIndex].id}/`,
+        `http://127.0.0.1:8000/delete-menu-category/${categoryId}/`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }
       );
-      fetchItemData();
+
+      // Remove category from local state immediately
+      const updatedCategories = localCategories.filter(
+        (cat) => cat.id !== categoryId
+      );
+      setLocalCategories(updatedCategories);
+
+      // Reset form
       setMenuCategoryName("");
       setIsEditing(false);
       setSelectedIndex(null);
+
+      // Trigger background fetch without waiting for it
+      setTimeout(() => {
+        fetchItemData();
+      }, 0);
     } catch (error) {
       console.error("Error deleting menu category:", error);
     } finally {
@@ -116,7 +206,7 @@ const NewMenuCategory = ({
 
   return isOpen ? (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg w-96 h-[500px] flex flex-col">
+      <div className="bg-white rounded-lg shadow-lg w-[480px] h-[500px] flex flex-col">
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-lg font-medium">Manage Menu Categories</h2>
@@ -129,66 +219,71 @@ const NewMenuCategory = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {/* Fixed Input Area */}
           <div className="flex items-center space-x-2 p-4 bg-white border-b">
-            <input
-              type="text"
-              placeholder="Enter category"
-              value={menuCategoryName}
-              onChange={(e) => setMenuCategoryName(e.target.value)}
-              className="w-1/2 p-2 border rounded-lg"
-            />
+            <div className="relative flex-grow">
+              <input
+                type="text"
+                placeholder="Enter Category"
+                value={menuCategoryName}
+                onChange={(e) => setMenuCategoryName(e.target.value)}
+                className="w-full p-2 pr-10 border rounded-lg"
+                style={{ paddingRight: "2.5rem" }}
+              />
+              {menuCategoryName && (
+                <button
+                  onClick={handleCancelEdit}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-white rounded-full w-6 h-6 flex items-center justify-center"
+                >
+                  <IoMdClose size={16} />
+                </button>
+              )}
+            </div>
             {!isEditing ? (
               <button
                 onClick={handleAddMenuCategory}
                 disabled={isSubmitting}
-                className={`bg-[#CC5500] text-white px-3 py-2 rounded-lg ${
+                className={`bg-green-500 text-white px-3 py-2 rounded-lg h-10 w-24 flex-shrink-0 ${
                   isSubmitting
                     ? "opacity-70 cursor-not-allowed"
-                    : "hover:bg-[#b34600]"
+                    : "hover:bg-green-600"
                 }`}
               >
-                {isSubmitting ? "Adding..." : "Add"}
+                {addingText}
               </button>
             ) : (
               <>
                 <button
-                  onClick={handleCancelEdit}
-                  disabled={isSubmitting}
-                  className="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-300"
-                >
-                  Cancel
-                </button>
-                <button
                   onClick={handleEditMenuCategory}
                   disabled={isSubmitting}
-                  className={`bg-[#CC5500] text-white px-3 py-2 rounded-lg ${
+                  className={`bg-green-500 text-white px-3 py-2 rounded-lg h-10 w-28 flex-shrink-0 ${
                     isSubmitting
                       ? "opacity-70 cursor-not-allowed"
-                      : "hover:bg-[#b34600]"
+                      : "hover:bg-green-600"
                   }`}
                 >
-                  {isSubmitting ? "Updating..." : "Update"}
+                  {updatingText}
                 </button>
                 <button
                   onClick={handleDeleteMenuCategory}
                   disabled={isDeleting}
-                  className={`bg-red-500 text-white px-3 py-2 rounded-lg ${
+                  className={`bg-red-500 text-white w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     isDeleting
                       ? "opacity-70 cursor-not-allowed"
                       : "hover:bg-red-600"
                   }`}
+                  title="Delete"
                 >
-                  {isDeleting ? "Deleting..." : "Delete"}
+                  {isDeleting ? deletingDots : <FaTrash className="w-4 h-4" />}
                 </button>
               </>
             )}
           </div>
 
           {/* Scrollable Table Area */}
-          <div className="relative overflow-x-auto shadow-md sm:rounded-sm flex-1 p-4">
-            <div className="overflow-y-auto max-h-[calc(100%_-_80px)]">
+          <div className="flex-1 overflow-hidden p-4">
+            <div className="h-full overflow-y-auto">
               <table className="w-full text-sm text-left rtl:text-right text-gray-500">
                 <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
                   <tr>
@@ -198,8 +293,8 @@ const NewMenuCategory = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {(menuCategories || []).length > 0 ? (
-                    menuCategories.map((category, index) => (
+                  {sortedCategories.length > 0 ? (
+                    sortedCategories.map((category, index) => (
                       <tr
                         key={index}
                         className={`${
@@ -219,7 +314,7 @@ const NewMenuCategory = ({
                   ) : (
                     <tr className="bg-white border-b">
                       <td
-                        colSpan="2"
+                        colSpan="1"
                         className="px-6 py-4 text-center font-normal text-gray-500 italic"
                       >
                         No Categories Available

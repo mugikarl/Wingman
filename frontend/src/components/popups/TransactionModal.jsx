@@ -66,6 +66,30 @@ const TransactionModal = ({
   // New state to control the editing modal visibility.
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  // Add this to the state variables at the top of the TransactionModal component
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [loadingDots, setLoadingDots] = useState("");
+
+  // Add this useEffect for the loading animation
+  useEffect(() => {
+    let loadingInterval;
+
+    if (isUpdatingStatus) {
+      let dotCount = 0;
+      loadingInterval = setInterval(() => {
+        const dots = ".".repeat(dotCount % 4);
+        setLoadingDots(dots);
+        dotCount++;
+      }, 500);
+    } else {
+      setLoadingDots("");
+    }
+
+    return () => {
+      if (loadingInterval) clearInterval(loadingInterval);
+    };
+  }, [isUpdatingStatus]);
+
   // Add this effect to update orderStatus when transaction changes
   useEffect(() => {
     if (transaction) {
@@ -265,6 +289,7 @@ const TransactionModal = ({
     console.log("Create new Unli Wings Order Group");
   };
 
+  // Update the updateStatus function to use the loading state
   const updateStatus = async (newStatus) => {
     // Map status names to their IDs in the database
     const getStatusId = (statusName) => {
@@ -282,10 +307,12 @@ const TransactionModal = ({
 
     if (newStatus === "Cancelled") {
       if (window.confirm("Switching to Cancelled. Are you sure?")) {
+        setIsUpdatingStatus(true);
         // Update local UI state
         setOrderStatus(newStatus);
         // Call API to update backend
-        updateOrderStatus(transaction.id, getStatusId(newStatus));
+        await updateOrderStatus(transaction.id, getStatusId(newStatus));
+        setIsUpdatingStatus(false);
       }
     } else if (newStatus === "Completed") {
       if (
@@ -293,16 +320,20 @@ const TransactionModal = ({
           "Switching to Completed. This will deduct the quantity from the inventory. Are you sure?"
         )
       ) {
+        setIsUpdatingStatus(true);
         // Update local UI state
         setOrderStatus(newStatus);
         // Call API to update backend
-        updateOrderStatus(transaction.id, getStatusId(newStatus));
+        await updateOrderStatus(transaction.id, getStatusId(newStatus));
+        setIsUpdatingStatus(false);
       }
     } else {
       // For Pending status
+      setIsUpdatingStatus(true);
       setOrderStatus(newStatus);
       // Call API to update backend
-      updateOrderStatus(transaction.id, getStatusId(newStatus));
+      await updateOrderStatus(transaction.id, getStatusId(newStatus));
+      setIsUpdatingStatus(false);
     }
     setIsStatusDropdownOpen(false);
   };
@@ -395,18 +426,18 @@ const TransactionModal = ({
                   <div className="relative inline-block text-left">
                     <button
                       onClick={() => {
-                        if (!isOrderNonEditable) {
+                        if (!isOrderNonEditable && !isUpdatingStatus) {
                           setIsStatusDropdownOpen(!isStatusDropdownOpen);
                         }
                       }}
                       className={`flex items-center ${getOrderStatusClass(
                         orderStatus
                       )} rounded-md shadow-md ${
-                        !isOrderNonEditable
+                        !isOrderNonEditable && !isUpdatingStatus
                           ? "hover:opacity-90 active:scale-95"
                           : "opacity-90 cursor-default"
                       } transition-transform duration-150 w-40 overflow-hidden`}
-                      disabled={isOrderNonEditable}
+                      disabled={isOrderNonEditable || isUpdatingStatus}
                     >
                       <div
                         className={`flex items-center justify-center ${getStatusLeftBg(
@@ -416,10 +447,11 @@ const TransactionModal = ({
                         <FaClipboardList className="w-5 h-5 text-white" />
                       </div>
                       <span className="flex-1 text-left px-2 text-white text-sm">
-                        {orderStatus}
+                        {isUpdatingStatus ? loadingDots : orderStatus}
                       </span>
                       <div className="flex items-center justify-center p-2">
                         {!isOrderNonEditable &&
+                          !isUpdatingStatus &&
                           (isStatusDropdownOpen ? (
                             <FaChevronUp className="w-4 h-4 text-white" />
                           ) : (

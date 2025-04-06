@@ -1,10 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { IoMdClose } from "react-icons/io";
 
 const EditMenuModal = ({
   item,
   onClose,
   onSave,
+  onDelete,
   categories,
   menuTypes,
   inventory,
@@ -29,6 +31,28 @@ const EditMenuModal = ({
     quantity: "",
     unit_id: "",
   });
+
+  // Add loading states
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [loadingDots, setLoadingDots] = useState("");
+
+  // Add useEffect for loading dots animation
+  useEffect(() => {
+    let dotsInterval;
+    if (isSaving || isDeleting) {
+      dotsInterval = setInterval(() => {
+        setLoadingDots((prev) => {
+          if (prev.length >= 3) return "";
+          return prev + ".";
+        });
+      }, 300);
+    }
+
+    return () => {
+      if (dotsInterval) clearInterval(dotsInterval);
+    };
+  }, [isSaving, isDeleting]);
 
   // Toggle editing mode
   const toggleEditing = () => {
@@ -71,6 +95,8 @@ const EditMenuModal = ({
       return;
     }
 
+    setIsSaving(true); // Start saving animation
+
     const formData = new FormData();
 
     // Only append new image if it's a File object
@@ -111,12 +137,14 @@ const EditMenuModal = ({
       );
 
       alert("Menu updated successfully!");
-      onSave(response.data);
-      fetchMenus();
-      setIsEditing(false);
+
+      if (typeof onSave === "function") {
+        onSave(response.data); // This will handle closing and refreshing
+      }
     } catch (error) {
       console.error("Error updating menu item:", error.response?.data || error);
       alert("Failed to update menu item.");
+      setIsSaving(false); // Only reset if there's an error
     }
   };
 
@@ -125,6 +153,9 @@ const EditMenuModal = ({
     if (!window.confirm("Are you sure you want to delete this menu item?")) {
       return;
     }
+
+    setIsDeleting(true); // Start deleting animation
+
     const token = localStorage.getItem("access_token");
     try {
       await axios.delete(`http://127.0.0.1:8000/delete-menu/${item.id}/`, {
@@ -132,12 +163,19 @@ const EditMenuModal = ({
           Authorization: `Bearer ${token}`,
         },
       });
+
       alert("Menu deleted successfully!");
-      fetchMenus();
-      onClose();
+
+      // Use the onDelete prop to handle closing and refreshing
+      if (typeof onDelete === "function") {
+        onDelete();
+      } else {
+        onClose(); // Fallback if onDelete is not provided
+      }
     } catch (error) {
       console.error("Error deleting menu item:", error.response?.data || error);
       alert("Failed to delete menu item.");
+      setIsDeleting(false); // Only reset if there's an error
     }
   };
 
@@ -203,10 +241,13 @@ const EditMenuModal = ({
             {/* Edit/Cancel Edit Button */}
             <button
               onClick={toggleEditing}
+              disabled={isSaving || isDeleting}
               className={`px-4 py-2 rounded-md ${
                 isEditing
                   ? "bg-gray-200 text-gray-700"
                   : "bg-[#CC5500] text-white hover:bg-[#b34600]"
+              } ${
+                isSaving || isDeleting ? "opacity-50 cursor-not-allowed" : ""
               }`}
             >
               {isEditing ? "Cancel Edit" : "Edit"}
@@ -215,15 +256,23 @@ const EditMenuModal = ({
             {/* Delete Button */}
             <button
               onClick={handleDelete}
-              className="px-4 py-2 rounded-md bg-red-500 text-white hover:bg-red-600"
+              disabled={isDeleting}
+              className={`w-24 px-4 py-2 rounded-md ${
+                isDeleting
+                  ? "bg-red-500/80 text-white cursor-not-allowed"
+                  : "bg-red-500 text-white hover:bg-red-600"
+              }`}
             >
-              Delete
+              {isDeleting ? `Deleting${loadingDots}` : "Delete"}
             </button>
 
             {/* Close Button */}
             <button
               onClick={onClose}
-              className="p-1 rounded-full hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
+              disabled={isSaving || isDeleting}
+              className={`p-1 rounded-full hover:bg-gray-100 w-8 h-8 flex items-center justify-center ${
+                isSaving || isDeleting ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
               &times;
             </button>
@@ -231,11 +280,11 @@ const EditMenuModal = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
-          <div className="grid grid-cols-2 gap-6">
+        <div className="flex-1 p-6 overflow-hidden">
+          <div className="grid grid-cols-2 gap-6 h-full">
             {/* Menu Details Section - Left Column */}
-            <div className="h-full">
-              <div className="bg-white p-4 rounded-lg border h-full flex flex-col">
+            <div className="h-full overflow-auto pr-1">
+              <div className="bg-white p-4 rounded-lg border">
                 <h3 className="text-lg font-medium mb-4">Menu Item Details</h3>
 
                 {/* Upload Photo Section */}
@@ -437,76 +486,27 @@ const EditMenuModal = ({
             </div>
 
             {/* Ingredients Section - Right Column */}
-            <div className="flex flex-col space-y-4">
-              {/* Add Recipe Section */}
-              <div
-                className={`bg-white p-4 rounded-lg border ${
-                  !isEditing ? "opacity-75" : ""
-                }`}
-              >
-                <h3 className="text-lg font-medium mb-4">Add Ingredients</h3>
-                <div className="grid grid-cols-1 gap-3 mb-3">
-                  {/* Item Dropdown */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Item
-                    </label>
-                    <select
-                      value={currentRecipe.inventory_id}
-                      onChange={(e) =>
-                        setCurrentRecipe({
-                          ...currentRecipe,
-                          inventory_id: e.target.value,
-                        })
-                      }
-                      className={`w-full px-3 py-2 border rounded-md ${
-                        !isEditing ? "bg-gray-100" : ""
-                      }`}
-                      disabled={!isEditing}
-                    >
-                      <option value="">Select Item</option>
-                      {inventory.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Quantity Input */}
+            <div className="h-full overflow-auto pr-1">
+              <div className="flex flex-col space-y-4">
+                {/* Add Recipe Section */}
+                <div
+                  className={`bg-white p-4 rounded-lg border ${
+                    !isEditing ? "opacity-75" : ""
+                  }`}
+                >
+                  <h3 className="text-lg font-medium mb-4">Add Ingredients</h3>
+                  <div className="grid grid-cols-1 gap-3 mb-3">
+                    {/* Item Dropdown */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Quantity
-                      </label>
-                      <input
-                        type="number"
-                        value={currentRecipe.quantity}
-                        onChange={(e) =>
-                          setCurrentRecipe({
-                            ...currentRecipe,
-                            quantity: e.target.value,
-                          })
-                        }
-                        placeholder="Enter quantity"
-                        className={`w-full px-3 py-2 border rounded-md ${
-                          !isEditing ? "bg-gray-100" : ""
-                        }`}
-                        disabled={!isEditing}
-                      />
-                    </div>
-
-                    {/* Unit Dropdown */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Unit
+                        Item
                       </label>
                       <select
-                        value={currentRecipe.unit_id}
+                        value={currentRecipe.inventory_id}
                         onChange={(e) =>
                           setCurrentRecipe({
                             ...currentRecipe,
-                            unit_id: e.target.value,
+                            inventory_id: e.target.value,
                           })
                         }
                         className={`w-full px-3 py-2 border rounded-md ${
@@ -514,96 +514,163 @@ const EditMenuModal = ({
                         }`}
                         disabled={!isEditing}
                       >
-                        <option value="">Select Unit</option>
-                        {units.map((unit) => (
-                          <option key={unit.id} value={unit.id}>
-                            {unit.symbol}
+                        <option value="">Select Item</option>
+                        {inventory.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
                           </option>
                         ))}
                       </select>
                     </div>
-                  </div>
 
-                  {/* Add Recipe Button */}
-                  <div className="flex justify-end">
-                    <button
-                      onClick={handleAddRecipe}
-                      className={`bg-[#CC5500] text-white px-4 py-2 rounded-md ${
-                        isEditing
-                          ? "hover:bg-[#b34600]"
-                          : "opacity-50 cursor-not-allowed"
-                      }`}
-                      disabled={!isEditing}
-                    >
-                      Add Ingredient
-                    </button>
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Quantity Input */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Quantity
+                        </label>
+                        <input
+                          type="number"
+                          value={currentRecipe.quantity}
+                          onChange={(e) =>
+                            setCurrentRecipe({
+                              ...currentRecipe,
+                              quantity: e.target.value,
+                            })
+                          }
+                          placeholder="Enter quantity"
+                          className={`w-full px-3 py-2 border rounded-md ${
+                            !isEditing ? "bg-gray-100" : ""
+                          }`}
+                          disabled={!isEditing}
+                        />
+                      </div>
+
+                      {/* Unit Dropdown */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Unit
+                        </label>
+                        <select
+                          value={currentRecipe.unit_id}
+                          onChange={(e) =>
+                            setCurrentRecipe({
+                              ...currentRecipe,
+                              unit_id: e.target.value,
+                            })
+                          }
+                          className={`w-full px-3 py-2 border rounded-md ${
+                            !isEditing ? "bg-gray-100" : ""
+                          }`}
+                          disabled={!isEditing}
+                        >
+                          <option value="">Select Unit</option>
+                          {units.map((unit) => (
+                            <option key={unit.id} value={unit.id}>
+                              {unit.symbol}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Add Recipe Button */}
+                    <div className="flex justify-end">
+                      <button
+                        onClick={handleAddRecipe}
+                        className={`bg-[#CC5500] text-white px-4 py-2 rounded-md ${
+                          isEditing
+                            ? "hover:bg-[#b34600]"
+                            : "opacity-50 cursor-not-allowed"
+                        }`}
+                        disabled={!isEditing}
+                      >
+                        Add Ingredient
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Recipe Table */}
-              <div className="bg-white p-4 rounded-lg border flex-grow overflow-hidden">
-                <h3 className="text-lg font-medium mb-4">Ingredients List</h3>
-                <div className="overflow-y-auto" style={{ maxHeight: "250px" }}>
-                  {recipes.length > 0 ? (
-                    <table className="w-full text-sm text-left rtl:text-right text-gray-500">
-                      <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
-                        <tr>
-                          <th className="px-4 py-2 font-medium">ITEM NAME</th>
-                          <th className="px-4 py-2 font-medium">QTY</th>
-                          <th className="px-4 py-2 font-medium">UNIT</th>
-                          {isEditing && (
-                            <th className="px-4 py-2 text-right font-medium">
-                              ACTION
-                            </th>
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {recipes.map((recipe, index) => (
-                          <tr
-                            key={index}
-                            className={`${
-                              index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                            } 
-                                border-b hover:bg-gray-200 group`}
-                          >
-                            <td className="px-4 py-2 font-normal text-gray-700 group-hover:text-gray-900">
-                              {recipe.inventory_name ||
-                                inventory.find(
-                                  (i) => i.id === Number(recipe.inventory_id)
-                                )?.name ||
-                                "Unknown"}
-                            </td>
-                            <td className="px-4 py-2 font-normal text-gray-700 group-hover:text-gray-900">
-                              {recipe.quantity}
-                            </td>
-                            <td className="px-4 py-2 font-normal text-gray-700 group-hover:text-gray-900">
-                              {recipe.unit ||
-                                units.find(
-                                  (u) => u.id === Number(recipe.unit_id)
-                                )?.symbol ||
-                                "Unknown"}
-                            </td>
+                {/* Recipe Table */}
+                <div className="bg-white p-4 rounded-lg border">
+                  <h3 className="text-lg font-medium mb-4">Ingredients List</h3>
+                  <div className="shadow-md sm:rounded-sm w-full">
+                    {recipes.length > 0 ? (
+                      <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+                        <thead className="text-sm text-white uppercase bg-[#CC5500]">
+                          <tr>
+                            <th className="px-6 py-4 font-medium">ITEM NAME</th>
+                            <th className="px-6 py-4 font-medium">QTY</th>
+                            <th className="px-6 py-4 font-medium">UNIT</th>
                             {isEditing && (
-                              <td className="px-4 py-2 text-right font-normal text-gray-700 group-hover:text-gray-900">
-                                <button
-                                  onClick={() => handleDeleteRecipe(index)}
-                                  className="text-red-600 hover:text-red-800"
-                                >
-                                  Remove
-                                </button>
-                              </td>
+                              <th className="px-6 py-4 font-medium"></th>
                             )}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div className="text-center py-4 text-gray-500 italic">
-                      No ingredients added yet
-                    </div>
-                  )}
+                        </thead>
+                        <tbody>
+                          {recipes.map((recipe, index) => (
+                            <tr
+                              key={index}
+                              className={`${
+                                index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                              } border-b hover:bg-gray-200 group`}
+                            >
+                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                {recipe.inventory_name ||
+                                  inventory.find(
+                                    (i) => i.id === Number(recipe.inventory_id)
+                                  )?.name ||
+                                  "Unknown"}
+                              </td>
+                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                {recipe.quantity}
+                              </td>
+                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                {recipe.unit ||
+                                  units.find(
+                                    (u) => u.id === Number(recipe.unit_id)
+                                  )?.symbol ||
+                                  "Unknown"}
+                              </td>
+                              {isEditing && (
+                                <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900 text-right">
+                                  <button
+                                    onClick={() => handleDeleteRecipe(index)}
+                                    className="text-red-500 hover:text-red-700 p-1 rounded-full"
+                                  >
+                                    <IoMdClose size={18} />
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+                        <thead className="text-sm text-white uppercase bg-[#CC5500]">
+                          <tr>
+                            <th className="px-6 py-4 font-medium">ITEM NAME</th>
+                            <th className="px-6 py-4 font-medium">QTY</th>
+                            <th className="px-6 py-4 font-medium">UNIT</th>
+                            {isEditing && (
+                              <th className="px-6 py-4 font-medium"></th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="bg-white border-b">
+                            <td
+                              className="px-6 py-4 text-center font-normal text-gray-500 italic"
+                              colSpan={isEditing ? 4 : 3}
+                            >
+                              No ingredients added yet
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -614,14 +681,16 @@ const EditMenuModal = ({
         <div className="border-t p-4 flex justify-end space-x-4">
           <button
             onClick={handleSave}
-            className={`px-4 py-2 rounded-md ${
-              isEditing
-                ? "bg-[#CC5500] text-white hover:bg-[#b34600]"
-                : "bg-gray-200 text-gray-700 cursor-not-allowed"
+            disabled={!isEditing || isSaving}
+            className={`w-36 px-4 py-2 rounded-md ${
+              !isEditing
+                ? "bg-gray-200 text-gray-700 cursor-not-allowed"
+                : isSaving
+                ? "bg-green-500/80 text-white cursor-not-allowed"
+                : "bg-green-500 text-white hover:bg-green-600"
             }`}
-            disabled={!isEditing}
           >
-            Save Changes
+            {isSaving ? `Saving${loadingDots}` : "Save Changes"}
           </button>
         </div>
       </div>

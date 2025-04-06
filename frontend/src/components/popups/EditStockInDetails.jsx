@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { IoMdClose } from "react-icons/io";
 
 const EditStockInDetails = ({
   isOpen,
@@ -26,6 +27,32 @@ const EditStockInDetails = ({
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [savingText, setSavingText] = useState("Save Changes");
+  const [deletingText, setDeletingText] = useState("Delete Receipt");
+
+  // Add this useEffect for the loading animations
+  useEffect(() => {
+    let loadingInterval;
+    if (isSubmitting) {
+      let dotCount = 0;
+      loadingInterval = setInterval(() => {
+        const dots = ".".repeat(dotCount % 4);
+        if (isEditing) {
+          setSavingText(`Saving${dots}`);
+        } else {
+          setDeletingText(`Deleting${dots}`);
+        }
+        dotCount++;
+      }, 500);
+    } else {
+      setSavingText("Save Changes");
+      setDeletingText("Delete Receipt");
+    }
+
+    return () => {
+      if (loadingInterval) clearInterval(loadingInterval);
+    };
+  }, [isSubmitting, isEditing]);
 
   // On mount or when receipt, unitMeasurements, or suppliers change, initialize local state from props.
   useEffect(() => {
@@ -369,11 +396,19 @@ const EditStockInDetails = ({
 
   // Mark a stock row for deletion.
   const markStockForDeletion = (index) => {
-    setEditedStockData((prev) =>
-      prev.map((stock, i) =>
-        i === index ? { ...stock, to_delete: true } : stock
-      )
-    );
+    const stockItem = editedStockData[index];
+
+    // For newly added items (no ID), completely remove from the array
+    if (!stockItem.id) {
+      setEditedStockData((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      // For existing items, mark as to_delete
+      setEditedStockData((prev) =>
+        prev.map((stock, i) =>
+          i === index ? { ...stock, to_delete: true } : stock
+        )
+      );
+    }
   };
 
   // Cancel deletion mark on a stock row.
@@ -542,13 +577,13 @@ const EditStockInDetails = ({
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className={`bg-green-500 text-white px-4 py-2 rounded-lg shadow ${
+              className={`bg-green-500 text-white px-4 py-2 rounded-lg shadow min-w-[140px] ${
                 isSubmitting
                   ? "opacity-70 cursor-not-allowed"
                   : "hover:bg-green-600"
               }`}
             >
-              {isSubmitting ? "Submitting..." : "Submit"}
+              {savingText}
             </button>
           )}
           {/* Only show Delete Receipt button when NOT editing */}
@@ -556,28 +591,28 @@ const EditStockInDetails = ({
             <button
               onClick={deleteReceiptHandler}
               disabled={isSubmitting}
-              className={`bg-red-700 text-white px-4 py-2 rounded-lg shadow ${
+              className={`bg-red-500 text-white px-4 py-2 rounded-lg shadow min-w-[140px] ${
                 isSubmitting
                   ? "opacity-70 cursor-not-allowed"
-                  : "hover:bg-red-800"
+                  : "hover:bg-red-600"
               }`}
             >
-              {isSubmitting ? "Deleting..." : "Delete Receipt"}
+              {deletingText}
             </button>
           )}
           <button
             onClick={toggleEditMode}
-            className={`px-4 py-2 rounded-lg shadow ${
+            className={`px-4 py-2 rounded-lg shadow min-w-[120px] ${
               isEditing
-                ? "bg-red-500 hover:bg-red-600"
-                : "bg-blue-500 hover:bg-blue-600"
-            } text-white`}
+                ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                : "bg-[#CC5500] hover:bg-[#B34D00] text-white"
+            }`}
           >
-            {isEditing ? "Cancel Edit Receipt" : "Edit Receipt"}
+            {isEditing ? "Cancel Edit" : "Edit Receipt"}
           </button>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+            className="text-gray-500 hover:text-gray-700 text-xl font-bold flex items-center justify-center min-w-[40px]"
           >
             &times;
           </button>
@@ -647,10 +682,9 @@ const EditStockInDetails = ({
                   "ID",
                   "ITEM NAME",
                   "UNIT",
-                  "COST",
                   "QUANTITY",
+                  "COST",
                   "TOTAL COST",
-                  "ACTION",
                 ].map((column, index) => (
                   <th key={index} scope="col" className="px-6 py-4 font-medium">
                     {column}
@@ -684,20 +718,6 @@ const EditStockInDetails = ({
                       {isEditing ? (
                         <input
                           type="number"
-                          value={stock.price}
-                          onChange={(e) =>
-                            handleStockChange(index, "price", e.target.value)
-                          }
-                          className="p-1 border rounded w-20"
-                        />
-                      ) : (
-                        stock.price
-                      )}
-                    </td>
-                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                      {isEditing ? (
-                        <input
-                          type="number"
                           value={stock.quantity}
                           onChange={(e) =>
                             handleStockChange(index, "quantity", e.target.value)
@@ -709,40 +729,56 @@ const EditStockInDetails = ({
                       )}
                     </td>
                     <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                      {stock.totalCost}
-                    </td>
-                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                      {stock.to_delete ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            cancelStockDeletion(index);
-                          }}
-                          className="bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
-                        >
-                          Cancel Delete
-                        </button>
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={stock.price}
+                          onChange={(e) =>
+                            handleStockChange(index, "price", e.target.value)
+                          }
+                          className="p-1 border rounded w-20"
+                        />
                       ) : (
-                        <button
-                          disabled={!isEditing}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isEditing) return;
-                            if (
-                              window.confirm(
-                                "Are you sure you want to delete this stock-in detail?"
-                              )
-                            ) {
-                              markStockForDeletion(index);
-                            }
-                          }}
-                          className={`bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 ${
-                            !isEditing ? "opacity-50 cursor-not-allowed" : ""
-                          }`}
-                        >
-                          Delete
-                        </button>
+                        stock.price
                       )}
+                    </td>
+
+                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                      <div className="flex items-center justify-between">
+                        <span>{stock.totalCost}</span>
+                        {isEditing && !stock.to_delete && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!stock.id) {
+                                // For newly added items (no ID), remove without confirmation
+                                markStockForDeletion(index);
+                              } else if (
+                                window.confirm(
+                                  "Are you sure you want to delete this stock-in detail?"
+                                )
+                              ) {
+                                // For existing items, confirm before marking
+                                markStockForDeletion(index);
+                              }
+                            }}
+                            className="text-red-500 hover:text-red-700 p-1 rounded-full ml-2"
+                          >
+                            <IoMdClose size={18} />
+                          </button>
+                        )}
+                        {stock.to_delete && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              cancelStockDeletion(index);
+                            }}
+                            className="text-gray-500 hover:text-gray-700 p-1 rounded-full ml-2"
+                          >
+                            <IoMdClose size={18} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -790,16 +826,6 @@ const EditStockInDetails = ({
                   <td className="px-6 py-4 font-normal text-gray-700">
                     <input
                       type="number"
-                      placeholder="Cost/Unit"
-                      className="p-1 border rounded w-full"
-                      name="price"
-                      value={selectedStock.price}
-                      onChange={handleStockInputChange}
-                    />
-                  </td>
-                  <td className="px-6 py-4 font-normal text-gray-700">
-                    <input
-                      type="number"
                       placeholder="Quantity"
                       className="p-1 border rounded w-full"
                       name="quantity"
@@ -808,16 +834,23 @@ const EditStockInDetails = ({
                     />
                   </td>
                   <td className="px-6 py-4 font-normal text-gray-700">
-                    {/* Total Cost (calculated after adding) */}
+                    <input
+                      type="number"
+                      placeholder="Cost/Unit"
+                      className="p-1 border rounded w-full"
+                      name="price"
+                      value={selectedStock.price}
+                      onChange={handleStockInputChange}
+                    />
                   </td>
                   <td className="px-6 py-4 font-normal text-gray-700">
                     <button
                       onClick={handleAddStock}
                       disabled={isAdding}
-                      className={`bg-blue-500 text-white px-2 py-1 rounded ${
+                      className={`bg-[#CC5500] text-white px-2 py-1 rounded min-w-[80px] ${
                         isAdding
                           ? "opacity-70 cursor-not-allowed"
-                          : "hover:bg-blue-600"
+                          : "hover:bg-[#b34600]"
                       }`}
                     >
                       {isAdding ? "Adding..." : "Add"}

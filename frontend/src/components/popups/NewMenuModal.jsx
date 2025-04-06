@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { PiArrowsClockwiseLight } from "react-icons/pi";
+import { IoMdClose } from "react-icons/io";
 
 const NewMenuModal = ({
   onClose,
@@ -27,6 +28,27 @@ const NewMenuModal = ({
     unit_id: "",
   });
 
+  // Add a new state for loading
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingDots, setLoadingDots] = useState("");
+
+  // Add useEffect for loading dots animation
+  useEffect(() => {
+    let dotsInterval;
+    if (isLoading) {
+      dotsInterval = setInterval(() => {
+        setLoadingDots((prev) => {
+          if (prev.length >= 3) return "";
+          return prev + ".";
+        });
+      }, 300);
+    }
+
+    return () => {
+      if (dotsInterval) clearInterval(dotsInterval);
+    };
+  }, [isLoading]);
+
   // Handle image upload
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -49,22 +71,22 @@ const NewMenuModal = ({
       return;
     }
 
+    setIsLoading(true); // Start button loading
+
     const formData = new FormData();
-    formData.append("image", image); // Append the image file
+    formData.append("image", image);
     formData.append("name", itemName);
     formData.append("price", price);
-    formData.append("category_id", categoryId); // Category ID
-    formData.append("type_id", typeId); // Type ID
+    formData.append("category_id", categoryId);
+    formData.append("type_id", typeId);
     formData.append("status_id", isAvailable ? "1" : "2");
 
-    // Prepare menu_items payload (only include inventory_id, quantity, and unit_id)
     const menuItemsPayload = recipes.map((recipe) => ({
       inventory_id: recipe.inventory_id,
       quantity: recipe.quantity,
-      unit_id: recipe.unit_id, // Ensure unit_id is passed here
+      unit_id: recipe.unit_id,
     }));
 
-    // Add selected recipes to form data
     formData.append("menu_ingredients", JSON.stringify(menuItemsPayload));
 
     const token = localStorage.getItem("access_token");
@@ -76,17 +98,21 @@ const NewMenuModal = ({
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data", // Important for handling file uploads
+            "Content-Type": "multipart/form-data",
           },
         }
       );
 
       alert("Menu added successfully!");
-      fetchMenus();
-      onClose();
+
+      // Use onSave to handle closing and refreshing
+      if (typeof onSave === "function") {
+        onSave(response.data);
+      }
     } catch (error) {
       console.error("Error saving menu item:", error.response?.data || error);
       alert("Failed to add menu item.");
+      setIsLoading(false); // Only reset loading state if there's an error
     }
   };
 
@@ -153,11 +179,11 @@ const NewMenuModal = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
-          <div className="grid grid-cols-2 gap-6">
+        <div className="flex-1 p-6 overflow-hidden">
+          <div className="grid grid-cols-2 gap-6 h-full">
             {/* Menu Details Section - Left Column */}
-            <div className="h-full">
-              <div className="bg-white p-4 rounded-lg border h-full flex flex-col">
+            <div className="h-full overflow-auto pr-1">
+              <div className="bg-white p-4 rounded-lg border">
                 <h3 className="text-lg font-medium mb-4">Menu Item Details</h3>
 
                 {/* Upload Photo Section */}
@@ -319,143 +345,159 @@ const NewMenuModal = ({
             </div>
 
             {/* Ingredients Section - Right Column */}
-            <div className="flex flex-col space-y-4">
-              {/* Add Recipe Section */}
-              <div className="bg-white p-4 rounded-lg border">
-                <h3 className="text-lg font-medium mb-4">Add Ingredients</h3>
-                <div className="grid grid-cols-1 gap-3 mb-3">
-                  {/* Item Dropdown */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Item
-                    </label>
-                    <select
-                      value={currentRecipe.inventory_id}
-                      onChange={(e) =>
-                        setCurrentRecipe({
-                          ...currentRecipe,
-                          inventory_id: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border rounded-md"
-                    >
-                      <option value="">Select Item</option>
-                      {inventory.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Quantity Input */}
+            <div className="h-full overflow-auto pr-1">
+              <div className="flex flex-col space-y-4">
+                {/* Add Recipe Section */}
+                <div className="bg-white p-4 rounded-lg border">
+                  <h3 className="text-lg font-medium mb-4">Add Ingredients</h3>
+                  <div className="grid grid-cols-1 gap-3 mb-3">
+                    {/* Item Dropdown */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Quantity
-                      </label>
-                      <input
-                        type="number"
-                        value={currentRecipe.quantity}
-                        onChange={(e) =>
-                          setCurrentRecipe({
-                            ...currentRecipe,
-                            quantity: e.target.value,
-                          })
-                        }
-                        placeholder="Enter quantity"
-                        className="w-full px-3 py-2 border rounded-md"
-                      />
-                    </div>
-
-                    {/* Unit Dropdown */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Unit
+                        Item
                       </label>
                       <select
-                        value={currentRecipe.unit_id}
+                        value={currentRecipe.inventory_id}
                         onChange={(e) =>
                           setCurrentRecipe({
                             ...currentRecipe,
-                            unit_id: e.target.value,
+                            inventory_id: e.target.value,
                           })
                         }
                         className="w-full px-3 py-2 border rounded-md"
                       >
-                        <option value="">Select Unit</option>
-                        {units.map((unit) => (
-                          <option key={unit.id} value={unit.id}>
-                            {unit.symbol}
+                        <option value="">Select Item</option>
+                        {inventory.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
                           </option>
                         ))}
                       </select>
                     </div>
-                  </div>
 
-                  {/* Add Recipe Button */}
-                  <div className="flex justify-end">
-                    <button
-                      onClick={handleAddRecipe}
-                      className="bg-[#CC5500] text-white px-4 py-2 rounded-md hover:bg-[#b34600]"
-                    >
-                      Add Ingredient
-                    </button>
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Quantity Input */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Quantity
+                        </label>
+                        <input
+                          type="number"
+                          value={currentRecipe.quantity}
+                          onChange={(e) =>
+                            setCurrentRecipe({
+                              ...currentRecipe,
+                              quantity: e.target.value,
+                            })
+                          }
+                          placeholder="Enter quantity"
+                          className="w-full px-3 py-2 border rounded-md"
+                        />
+                      </div>
+
+                      {/* Unit Dropdown */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Unit
+                        </label>
+                        <select
+                          value={currentRecipe.unit_id}
+                          onChange={(e) =>
+                            setCurrentRecipe({
+                              ...currentRecipe,
+                              unit_id: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2 border rounded-md"
+                        >
+                          <option value="">Select Unit</option>
+                          {units.map((unit) => (
+                            <option key={unit.id} value={unit.id}>
+                              {unit.symbol}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Add Recipe Button */}
+                    <div className="flex justify-end">
+                      <button
+                        onClick={handleAddRecipe}
+                        className="bg-[#CC5500] text-white px-4 py-2 rounded-md hover:bg-[#b34600]"
+                      >
+                        Add Ingredient
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Recipe Table */}
-              <div className="bg-white p-4 rounded-lg border flex-grow overflow-hidden">
-                <h3 className="text-lg font-medium mb-4">Ingredients List</h3>
-                <div className="overflow-y-auto" style={{ maxHeight: "250px" }}>
-                  {recipes.length > 0 ? (
-                    <table className="w-full text-sm text-left rtl:text-right text-gray-500">
-                      <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
-                        <tr>
-                          <th className="px-4 py-2 font-medium">ITEM NAME</th>
-                          <th className="px-4 py-2 font-medium">QTY</th>
-                          <th className="px-4 py-2 font-medium">UNIT</th>
-                          <th className="px-4 py-2 text-right font-medium">
-                            ACTION
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {recipes.map((recipe, index) => (
-                          <tr
-                            key={index}
-                            className={`${
-                              index % 2 === 0 ? "bg-white" : "bg-gray-50"
-                            } 
-                                border-b hover:bg-gray-200 group`}
-                          >
-                            <td className="px-4 py-2 font-normal text-gray-700 group-hover:text-gray-900">
-                              {recipe.inventory_name}
-                            </td>
-                            <td className="px-4 py-2 font-normal text-gray-700 group-hover:text-gray-900">
-                              {recipe.quantity}
-                            </td>
-                            <td className="px-4 py-2 font-normal text-gray-700 group-hover:text-gray-900">
-                              {recipe.unit}
-                            </td>
-                            <td className="px-4 py-2 text-right font-normal text-gray-700 group-hover:text-gray-900">
-                              <button
-                                onClick={() => handleDeleteRecipe(index)}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                Remove
-                              </button>
+                {/* Recipe Table */}
+                <div className="bg-white p-4 rounded-lg border">
+                  <h3 className="text-lg font-medium mb-4">Ingredients List</h3>
+                  <div className="shadow-md sm:rounded-sm w-full">
+                    {recipes.length > 0 ? (
+                      <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+                        <thead className="text-sm text-white uppercase bg-[#CC5500]">
+                          <tr>
+                            <th className="px-6 py-4 font-medium">ITEM NAME</th>
+                            <th className="px-6 py-4 font-medium">QTY</th>
+                            <th className="px-6 py-4 font-medium">UNIT</th>
+                            <th className="px-6 py-4 font-medium"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recipes.map((recipe, index) => (
+                            <tr
+                              key={index}
+                              className={`${
+                                index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                              } border-b hover:bg-gray-200 group`}
+                            >
+                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                {recipe.inventory_name}
+                              </td>
+                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                {recipe.quantity}
+                              </td>
+                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                {recipe.unit}
+                              </td>
+                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900 text-right">
+                                <button
+                                  onClick={() => handleDeleteRecipe(index)}
+                                  className="text-red-500 hover:text-red-700 p-1 rounded-full"
+                                >
+                                  <IoMdClose size={18} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+                        <thead className="text-sm text-white uppercase bg-[#CC5500]">
+                          <tr>
+                            <th className="px-6 py-4 font-medium">ITEM NAME</th>
+                            <th className="px-6 py-4 font-medium">QTY</th>
+                            <th className="px-6 py-4 font-medium">UNIT</th>
+                            <th className="px-6 py-4 font-medium"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="bg-white border-b">
+                            <td
+                              className="px-6 py-4 text-center font-normal text-gray-500 italic"
+                              colSpan={4}
+                            >
+                              No ingredients added yet
                             </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div className="text-center py-4 text-gray-500 italic">
-                      No ingredients added yet
-                    </div>
-                  )}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -466,9 +508,14 @@ const NewMenuModal = ({
         <div className="border-t p-4 flex justify-end space-x-4">
           <button
             onClick={handleSave}
-            className="px-4 py-2 rounded-md bg-[#CC5500] text-white hover:bg-[#b34600]"
+            disabled={isLoading}
+            className={`w-36 px-4 py-2 rounded-md ${
+              isLoading
+                ? "bg-green-500/80 text-white cursor-not-allowed"
+                : "bg-green-500 text-white hover:bg-green-600"
+            }`}
           >
-            Add Menu Item
+            {isLoading ? `Adding${loadingDots}` : "Add Menu Item"}
           </button>
         </div>
       </div>

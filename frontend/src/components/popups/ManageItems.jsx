@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { FaTrash } from "react-icons/fa";
+import { IoMdClose } from "react-icons/io";
 
 const ManageItems = ({
   isOpen,
@@ -17,24 +19,96 @@ const ManageItems = ({
   const [stockTrigger, setStockTrigger] = useState("");
   const [selectedUnit, setSelectedUnit] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [editingItemId, setEditingItemId] = useState(null);
-  const [editedItemName, setEditedItemName] = useState("");
-  const [editedStockTrigger, setEditedStockTrigger] = useState("");
-  const [editedUnit, setEditedUnit] = useState("");
-  const [editedCategory, setEditedCategory] = useState("");
+  const [selectedItemIndex, setSelectedItemIndex] = useState(null);
+  const [isEditingItem, setIsEditingItem] = useState(false);
+  const [isSubmittingItem, setIsSubmittingItem] = useState(false);
+  const [isDeletingItem, setIsDeletingItem] = useState(false);
+  const [addingItemText, setAddingItemText] = useState("Add Item");
+  const [updatingItemText, setUpdatingItemText] = useState("Update");
+  const [deletingItemDots, setDeletingItemDots] = useState("");
 
   // States for Categories tab
   const [categoryName, setCategoryName] = useState("");
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(null);
   const [isEditingCategory, setIsEditingCategory] = useState(false);
+  const [isSubmittingCategory, setIsSubmittingCategory] = useState(false);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+  const [addingCategoryText, setAddingCategoryText] = useState("Add");
+  const [updatingCategoryText, setUpdatingCategoryText] = useState("Update");
+  const [deletingCategoryDots, setDeletingCategoryDots] = useState("");
 
-  // useEffect(() => {
-  //   if (isOpen) {
-  //     fetchItemData();
-  //   }
-  // }, [isOpen]);
+  // Sort items and categories alphabetically
+  const sortedItems = [...items].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
+
+  const sortedCategories = [...categories].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
+
+  // Loading animations for Items tab
+  useEffect(() => {
+    let loadingInterval;
+
+    if (isSubmittingItem || isDeletingItem) {
+      let dotCount = 0;
+      loadingInterval = setInterval(() => {
+        const dots = ".".repeat(dotCount % 4);
+
+        if (isSubmittingItem && !isEditingItem) {
+          setAddingItemText(`Adding${dots}`);
+        } else if (isSubmittingItem && isEditingItem) {
+          setUpdatingItemText(`Updating${dots}`);
+        }
+
+        if (isDeletingItem) {
+          setDeletingItemDots(dots);
+        }
+
+        dotCount++;
+      }, 500);
+    } else {
+      setAddingItemText("Add Item");
+      setUpdatingItemText("Update");
+      setDeletingItemDots("");
+    }
+
+    return () => {
+      if (loadingInterval) clearInterval(loadingInterval);
+    };
+  }, [isSubmittingItem, isEditingItem, isDeletingItem]);
+
+  // Loading animations for Categories tab
+  useEffect(() => {
+    let loadingInterval;
+
+    if (isSubmittingCategory || isDeletingCategory) {
+      let dotCount = 0;
+      loadingInterval = setInterval(() => {
+        const dots = ".".repeat(dotCount % 4);
+
+        if (isSubmittingCategory && !isEditingCategory) {
+          setAddingCategoryText(`Adding${dots}`);
+        } else if (isSubmittingCategory && isEditingCategory) {
+          setUpdatingCategoryText(`Updating${dots}`);
+        }
+
+        if (isDeletingCategory) {
+          setDeletingCategoryDots(dots);
+        }
+
+        dotCount++;
+      }, 500);
+    } else {
+      setAddingCategoryText("Add");
+      setUpdatingCategoryText("Update");
+      setDeletingCategoryDots("");
+    }
+
+    return () => {
+      if (loadingInterval) clearInterval(loadingInterval);
+    };
+  }, [isSubmittingCategory, isEditingCategory, isDeletingCategory]);
 
   // Item Functions
   const handleAddItem = async () => {
@@ -43,7 +117,7 @@ const ManageItems = ({
       return;
     }
 
-    setLoading(true);
+    setIsSubmittingItem(true);
 
     try {
       const addItemResponse = await axios.post(
@@ -73,44 +147,35 @@ const ManageItems = ({
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      alert("Item added successfully!");
-      setItemName("");
-      setStockTrigger("");
-      setSelectedUnit("");
-      setSelectedCategory("");
       fetchItemData();
+      resetItemForm();
     } catch (error) {
       console.error("Error adding item:", error);
       alert("Failed to add item.");
     } finally {
-      setLoading(false);
+      setIsSubmittingItem(false);
     }
   };
 
-  const handleEditItem = (item) => {
-    setEditingItemId(item.id);
-    setEditedItemName(item.name);
-    setEditedStockTrigger(item.stock_trigger);
-    setEditedUnit(item.measurement);
-    setEditedCategory(item.category);
-  };
-
-  const handleCancelEditItem = () => {
-    setEditingItemId(null);
-    setEditedItemName("");
-    setEditedStockTrigger("");
-    setEditedUnit("");
-    setEditedCategory("");
-  };
-
-  const handleSaveEditItem = async (itemId) => {
+  const handleEditItem = async () => {
     if (
-      !editedItemName ||
-      !editedStockTrigger ||
-      !editedUnit ||
-      !editedCategory
+      !itemName ||
+      !stockTrigger ||
+      !selectedUnit ||
+      !selectedCategory ||
+      selectedItemIndex === null
     ) {
       alert("Please fill in all fields.");
+      return;
+    }
+
+    setIsSubmittingItem(true);
+
+    const itemId = sortedItems[selectedItemIndex]?.id;
+
+    if (!itemId) {
+      console.error("Error: No item ID found!");
+      setIsSubmittingItem(false);
       return;
     }
 
@@ -118,28 +183,35 @@ const ManageItems = ({
       await axios.put(
         `http://127.0.0.1:8000/edit-item/${itemId}/`,
         {
-          name: editedItemName,
-          stock_trigger: editedStockTrigger,
-          measurement: editedUnit,
-          category: editedCategory,
+          name: itemName,
+          stock_trigger: stockTrigger,
+          measurement: selectedUnit,
+          category: selectedCategory,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       alert("Item updated successfully!");
-      handleCancelEditItem();
       fetchItemData();
+      resetItemForm();
     } catch (error) {
       console.error("Error updating item:", error);
       alert("Failed to update item.");
+    } finally {
+      setIsSubmittingItem(false);
     }
   };
 
-  const handleDeleteItem = async (itemId) => {
+  const handleDeleteItem = async () => {
+    if (selectedItemIndex === null) return;
+
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this item?"
     );
     if (!confirmDelete) return;
+
+    setIsDeletingItem(true);
+    const itemId = sortedItems[selectedItemIndex]?.id;
 
     try {
       await axios.delete(`http://127.0.0.1:8000/delete-item/${itemId}/`, {
@@ -148,16 +220,38 @@ const ManageItems = ({
 
       alert("Item deleted successfully!");
       fetchItemData();
+      resetItemForm();
     } catch (error) {
       console.error("Error deleting item:", error);
       alert("Failed to delete item.");
+    } finally {
+      setIsDeletingItem(false);
     }
+  };
+
+  const resetItemForm = () => {
+    setItemName("");
+    setStockTrigger("");
+    setSelectedUnit("");
+    setSelectedCategory("");
+    setSelectedItemIndex(null);
+    setIsEditingItem(false);
+  };
+
+  const selectItem = (item, index) => {
+    setItemName(item.name);
+    setStockTrigger(item.stock_trigger);
+    setSelectedUnit(item.measurement);
+    setSelectedCategory(item.category);
+    setSelectedItemIndex(index);
+    setIsEditingItem(true);
   };
 
   // Category Functions
   const handleAddCategory = async () => {
     if (!categoryName.trim()) return;
 
+    setIsSubmittingCategory(true);
     try {
       await axios.post(
         "http://127.0.0.1:8000/add-category/",
@@ -165,32 +259,25 @@ const ManageItems = ({
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setCategoryName("");
       fetchItemData();
+      setCategoryName("");
     } catch (error) {
       console.error("Error adding category:", error);
       alert("Failed to add category.");
+    } finally {
+      setIsSubmittingCategory(false);
     }
   };
 
-  const handleEditCategory = (category, index) => {
-    setCategoryName(category.name);
-    setSelectedCategoryIndex(index);
-    setIsEditingCategory(true);
-  };
-
-  const handleCancelEditCategory = () => {
-    setCategoryName("");
-    setSelectedCategoryIndex(null);
-    setIsEditingCategory(false);
-  };
-
-  const handleSaveEditCategory = async () => {
+  const handleEditCategory = async () => {
     if (!categoryName.trim() || selectedCategoryIndex === null) return;
 
-    const categoryId = categories[selectedCategoryIndex]?.id;
+    setIsSubmittingCategory(true);
+
+    const categoryId = sortedCategories[selectedCategoryIndex]?.id;
     if (!categoryId) {
       console.error("Error: No category ID found!");
+      setIsSubmittingCategory(false);
       return;
     }
 
@@ -202,36 +289,44 @@ const ManageItems = ({
       );
 
       alert("Category updated successfully!");
-      setCategoryName("");
-      setIsEditingCategory(false);
-      setSelectedCategoryIndex(null);
       fetchItemData();
+      resetCategoryForm();
     } catch (error) {
       console.error("Error updating category:", error);
       alert("Failed to update category.");
+    } finally {
+      setIsSubmittingCategory(false);
     }
   };
 
-  const handleDeleteCategory = async (index) => {
+  const handleDeleteCategory = async () => {
+    if (selectedCategoryIndex === null) return;
+
     const confirmDelete = window.confirm("Delete category?");
     if (!confirmDelete) return;
 
+    setIsDeletingCategory(true);
     try {
+      const categoryId = sortedCategories[selectedCategoryIndex].id;
       await axios.delete(
-        `http://127.0.0.1:8000/delete-category/${categories[index].id}/`,
+        `http://127.0.0.1:8000/delete-category/${categoryId}/`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      if (index === selectedCategoryIndex) {
-        setCategoryName("");
-        setIsEditingCategory(false);
-        setSelectedCategoryIndex(null);
-      }
       fetchItemData();
+      resetCategoryForm();
     } catch (error) {
       console.error("Error deleting category:", error);
       alert("Failed to delete category.");
+    } finally {
+      setIsDeletingCategory(false);
     }
+  };
+
+  const resetCategoryForm = () => {
+    setCategoryName("");
+    setSelectedCategoryIndex(null);
+    setIsEditingCategory(false);
   };
 
   if (!isOpen) return null;
@@ -244,7 +339,7 @@ const ManageItems = ({
           <h2 className="text-lg font-medium">Item Manager</h2>
           <button
             onClick={onClose}
-            className="p-1 rounded-full hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
+            className="p-1 rounded-full hover:bg-white/10 w-8 h-8 flex items-center justify-center"
           >
             &times;
           </button>
@@ -276,233 +371,177 @@ const ManageItems = ({
 
           {/* Main Content */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-1 overflow-auto p-4">
-              {activeTab === "items" ? (
-                <div className="space-y-6">
-                  {/* Items Form */}
-                  <div className="bg-white p-4 rounded-lg border">
-                    <h3 className="text-lg font-medium mb-4">Add Item</h3>
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Item Name
-                        </label>
+            {activeTab === "items" ? (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Fixed Input Area for Items */}
+                <div className="bg-white p-4 border-b">
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Item Name
+                      </label>
+                      <div className="relative">
                         <input
                           type="text"
-                          className="w-full px-3 py-2 border rounded-md"
+                          className="w-full px-3 py-2 pr-10 border rounded-md"
                           placeholder="Enter item name"
                           value={itemName}
                           onChange={(e) => setItemName(e.target.value)}
                         />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Stock Trigger
-                        </label>
-                        <input
-                          type="number"
-                          className="w-full px-3 py-2 border rounded-md"
-                          placeholder="Enter stock trigger"
-                          value={stockTrigger}
-                          onChange={(e) => setStockTrigger(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Unit
-                        </label>
-                        <select
-                          className="w-full px-3 py-2 border rounded-md"
-                          value={selectedUnit}
-                          onChange={(e) => setSelectedUnit(e.target.value)}
-                        >
-                          <option value="">Select Unit</option>
-                          {units.map((unit) => (
-                            <option key={unit.id} value={unit.id}>
-                              {unit.symbol}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Category
-                        </label>
-                        <select
-                          className="w-full px-3 py-2 border rounded-md"
-                          value={selectedCategory}
-                          onChange={(e) => setSelectedCategory(e.target.value)}
-                        >
-                          <option value="">Select Category</option>
-                          {categories.map((category) => (
-                            <option key={category.id} value={category.id}>
-                              {category.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="col-span-2 flex justify-end">
-                        <button
-                          onClick={handleAddItem}
-                          className="px-4 py-2 bg-[#CC5500] text-white rounded-md hover:bg-[#b34600]"
-                          disabled={loading}
-                        >
-                          {loading ? "Adding..." : "Add Item"}
-                        </button>
+                        {itemName && (
+                          <button
+                            onClick={resetItemForm}
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-white rounded-full w-6 h-6 flex items-center justify-center"
+                          >
+                            <IoMdClose size={16} />
+                          </button>
+                        )}
                       </div>
                     </div>
-                    {error && <p className="text-red-500 text-sm">{error}</p>}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Stock Trigger
+                      </label>
+                      <input
+                        type="number"
+                        className="w-full px-3 py-2 border rounded-md"
+                        placeholder="Enter stock trigger"
+                        value={stockTrigger}
+                        onChange={(e) => setStockTrigger(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Unit
+                      </label>
+                      <select
+                        className="w-full px-3 py-2 border rounded-md"
+                        value={selectedUnit}
+                        onChange={(e) => setSelectedUnit(e.target.value)}
+                      >
+                        <option value="">Select Unit</option>
+                        {units.map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.symbol}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Category
+                      </label>
+                      <select
+                        className="w-full px-3 py-2 border rounded-md"
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                      >
+                        <option value="">Select Category</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
+                  <div className="flex justify-end space-x-2">
+                    {!isEditingItem ? (
+                      <button
+                        onClick={handleAddItem}
+                        disabled={isSubmittingItem}
+                        className={`bg-green-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
+                          isSubmittingItem
+                            ? "opacity-70 cursor-not-allowed"
+                            : "hover:bg-green-600"
+                        }`}
+                      >
+                        {addingItemText}
+                      </button>
+                    ) : (
+                      <div className="w-full flex justify-between">
+                        <button
+                          onClick={handleDeleteItem}
+                          disabled={isDeletingItem}
+                          className={`bg-red-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
+                            isDeletingItem
+                              ? "opacity-70 cursor-not-allowed"
+                              : "hover:bg-red-600"
+                          }`}
+                        >
+                          {isDeletingItem
+                            ? `Deleting${deletingItemDots}`
+                            : "Delete Item"}
+                        </button>
+                        <button
+                          onClick={handleEditItem}
+                          disabled={isSubmittingItem}
+                          className={`bg-green-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
+                            isSubmittingItem
+                              ? "opacity-70 cursor-not-allowed"
+                              : "hover:bg-green-600"
+                          }`}
+                        >
+                          {updatingItemText}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-                  {/* Items Table - Updated to match Table.jsx design */}
-                  <div
-                    className="relative overflow-x-auto shadow-md sm:rounded-sm"
-                    style={{ maxHeight: "380px" }}
-                  >
+                {/* Scrollable Items Table */}
+                <div className="flex-1 overflow-hidden p-4">
+                  <div className="h-full overflow-y-auto">
                     <table className="w-full text-sm text-left rtl:text-right text-gray-500">
-                      <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
+                      <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
                         <tr>
-                          <th scope="col" className="px-6 py-4 font-medium">
+                          <th scope="col" className="px-6 py-3 font-medium">
                             ITEM NAME
                           </th>
-                          <th scope="col" className="px-6 py-4 font-medium">
+                          <th scope="col" className="px-6 py-3 font-medium">
                             UNIT
                           </th>
-                          <th scope="col" className="px-6 py-4 font-medium">
+                          <th scope="col" className="px-6 py-3 font-medium">
                             CATEGORY
                           </th>
-                          <th scope="col" className="px-6 py-4 font-medium">
+                          <th scope="col" className="px-6 py-3 font-medium">
                             STOCK TRIGGER
-                          </th>
-                          <th scope="col" className="px-6 py-4 font-medium">
-                            ACTIONS
                           </th>
                         </tr>
                       </thead>
                       <tbody>
-                        {items.length > 0 ? (
-                          items.map((item, rowIndex) => (
+                        {sortedItems.length > 0 ? (
+                          sortedItems.map((item, index) => (
                             <tr
                               key={item.id}
                               className={`${
-                                rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"
-                              } border-b hover:bg-gray-200 group`}
+                                index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                              } border-b hover:bg-gray-200 group cursor-pointer`}
+                              onClick={() => selectItem(item, index)}
                             >
                               <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                                {editingItemId === item.id ? (
-                                  <input
-                                    type="text"
-                                    className="border rounded-md px-2 py-1 w-full"
-                                    value={editedItemName}
-                                    onChange={(e) =>
-                                      setEditedItemName(e.target.value)
-                                    }
-                                  />
-                                ) : (
-                                  item.name
-                                )}
+                                {item.name}
                               </td>
                               <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                                {editingItemId === item.id ? (
-                                  <select
-                                    className="border rounded-md px-2 py-1 w-full"
-                                    value={editedUnit}
-                                    onChange={(e) =>
-                                      setEditedUnit(e.target.value)
-                                    }
-                                  >
-                                    {units.map((unit) => (
-                                      <option key={unit.id} value={unit.id}>
-                                        {unit.symbol}
-                                      </option>
-                                    ))}
-                                  </select>
-                                ) : (
-                                  units.find((u) => u.id === item.measurement)
-                                    ?.symbol || "N/A"
-                                )}
+                                {units.find((u) => u.id === item.measurement)
+                                  ?.symbol || "N/A"}
                               </td>
                               <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                                {editingItemId === item.id ? (
-                                  <select
-                                    className="border rounded-md px-2 py-1 w-full"
-                                    value={editedCategory}
-                                    onChange={(e) =>
-                                      setEditedCategory(e.target.value)
-                                    }
-                                  >
-                                    {categories.map((category) => (
-                                      <option
-                                        key={category.id}
-                                        value={category.id}
-                                      >
-                                        {category.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                ) : (
-                                  categories.find((c) => c.id === item.category)
-                                    ?.name || "N/A"
-                                )}
+                                {categories.find((c) => c.id === item.category)
+                                  ?.name || "N/A"}
                               </td>
                               <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                                {editingItemId === item.id ? (
-                                  <input
-                                    type="number"
-                                    className="border rounded-md px-2 py-1 w-full"
-                                    value={editedStockTrigger}
-                                    onChange={(e) =>
-                                      setEditedStockTrigger(e.target.value)
-                                    }
-                                  />
-                                ) : (
-                                  item.stock_trigger
-                                )}
-                              </td>
-                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                                {editingItemId === item.id ? (
-                                  <>
-                                    <button
-                                      onClick={handleCancelEditItem}
-                                      className="text-red-600 hover:text-red-800 p-1"
-                                    >
-                                      Cancel
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        handleSaveEditItem(item.id)
-                                      }
-                                      className="text-green-600 hover:text-green-800 p-1 ml-2"
-                                    >
-                                      Save
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button
-                                      onClick={() => handleEditItem(item)}
-                                      className="text-blue-600 hover:text-blue-800 p-1"
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      onClick={() => handleDeleteItem(item.id)}
-                                      className="text-red-600 hover:text-red-800 p-1 ml-2"
-                                    >
-                                      Delete
-                                    </button>
-                                  </>
-                                )}
+                                {item.stock_trigger}
                               </td>
                             </tr>
                           ))
                         ) : (
                           <tr className="bg-white border-b">
                             <td
-                              colSpan="5"
+                              colSpan="4"
                               className="px-6 py-4 text-center font-normal text-gray-500 italic"
                             >
-                              No Data Available
+                              No Items Available
                             </td>
                           </tr>
                         )}
@@ -510,97 +549,123 @@ const ManageItems = ({
                     </table>
                   </div>
                 </div>
-              ) : activeTab === "categories" ? (
-                <div className="space-y-6">
-                  {/* Categories Form */}
-                  <div className="bg-white p-4 rounded-lg border">
-                    <h3 className="text-lg font-medium mb-4">
-                      {isEditingCategory ? "Edit" : "Add"} Category
-                    </h3>
-                    <div className="flex space-x-4 mb-4">
-                      <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Category Name
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full px-3 py-2 border rounded-md"
-                          placeholder="Enter category name"
-                          value={categoryName}
-                          onChange={(e) => setCategoryName(e.target.value)}
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        {!isEditingCategory ? (
-                          <button
-                            onClick={handleAddCategory}
-                            className="px-4 py-2 bg-[#CC5500] text-white rounded-md hover:bg-[#b34600]"
-                          >
-                            Add
-                          </button>
-                        ) : (
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={handleCancelEditCategory}
-                              className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={handleSaveEditCategory}
-                              className="px-4 py-2 bg-[#CC5500] text-white rounded-md hover:bg-[#b34600]"
-                            >
-                              Update
-                            </button>
-                          </div>
-                        )}
-                      </div>
+              </div>
+            ) : activeTab === "categories" ? (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Fixed Input Area for Categories */}
+                <div className="bg-white p-4 border-b">
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Item Category
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder="Enter Category"
+                        value={categoryName}
+                        onChange={(e) => setCategoryName(e.target.value)}
+                        className="w-full p-2 pr-10 border rounded-md"
+                      />
+                      {categoryName && (
+                        <button
+                          onClick={resetCategoryForm}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-white rounded-full w-6 h-6 flex items-center justify-center"
+                        >
+                          <IoMdClose size={16} />
+                        </button>
+                      )}
                     </div>
                   </div>
+                  <div className="flex justify-end space-x-2">
+                    {!isEditingCategory ? (
+                      <button
+                        onClick={handleAddCategory}
+                        disabled={isSubmittingCategory}
+                        className={`bg-green-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
+                          isSubmittingCategory
+                            ? "opacity-70 cursor-not-allowed"
+                            : "hover:bg-green-600"
+                        }`}
+                      >
+                        {addingCategoryText}
+                      </button>
+                    ) : (
+                      <div className="w-full flex justify-between">
+                        <button
+                          onClick={handleDeleteCategory}
+                          disabled={isDeletingCategory}
+                          className={`bg-red-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
+                            isDeletingCategory
+                              ? "opacity-70 cursor-not-allowed"
+                              : "hover:bg-red-600"
+                          }`}
+                        >
+                          {isDeletingCategory
+                            ? `Deleting${deletingCategoryDots}`
+                            : "Delete Category"}
+                        </button>
+                        <button
+                          onClick={handleEditCategory}
+                          disabled={isSubmittingCategory}
+                          className={`bg-green-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
+                            isSubmittingCategory
+                              ? "opacity-70 cursor-not-allowed"
+                              : "hover:bg-green-600"
+                          }`}
+                        >
+                          {updatingCategoryText}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-                  {/* Categories Table */}
-                  <div className="bg-white rounded-lg border overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
+                {/* Scrollable Categories Table */}
+                <div className="flex-1 overflow-hidden p-4">
+                  <div className="h-full overflow-y-auto">
+                    <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+                      <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Category Name
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
+                          <th scope="col" className="px-6 py-3 font-medium">
+                            CATEGORY
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {categories.map((category, index) => (
-                          <tr key={category.id || index}>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {category.name}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              <button
-                                onClick={() =>
-                                  handleEditCategory(category, index)
-                                }
-                                className="text-blue-600 hover:text-blue-800 p-1"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteCategory(index)}
-                                className="text-red-600 hover:text-red-800 p-1 ml-2"
-                              >
-                                Delete
-                              </button>
+                      <tbody>
+                        {sortedCategories.length > 0 ? (
+                          sortedCategories.map((category, index) => (
+                            <tr
+                              key={category.id}
+                              className={`${
+                                index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                              } border-b hover:bg-gray-200 group cursor-pointer`}
+                              onClick={() => {
+                                setCategoryName(category.name);
+                                setSelectedCategoryIndex(index);
+                                setIsEditingCategory(true);
+                              }}
+                            >
+                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                {category.name}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr className="bg-white border-b">
+                            <td
+                              colSpan="1"
+                              className="px-6 py-4 text-center font-normal text-gray-500 italic"
+                            >
+                              No Categories Available
                             </td>
                           </tr>
-                        ))}
+                        )}
                       </tbody>
                     </table>
                   </div>
                 </div>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

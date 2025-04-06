@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import Table from "../../components/tables/Table";
+import { IoMdClose } from "react-icons/io";
 
 const AddStockInDetails = ({
   isOpen,
@@ -9,13 +10,13 @@ const AddStockInDetails = ({
   fetchReceipts,
   items,
   inventory,
-  suppliers, // New prop for suppliers
+  suppliers,
 }) => {
   if (!isOpen) return null;
 
   const [newStockIn, setNewStockIn] = useState({
     receipt_no: "",
-    supplier_id: "", // Changed from supplier_name to supplier_id
+    supplier_id: "",
     date: "",
     stock_ins: [],
   });
@@ -31,6 +32,26 @@ const AddStockInDetails = ({
   const [loading, setLoading] = useState(false);
   const [stockInPayload, setStockInPayload] = useState([]);
   const [stockInRows, setStockInRows] = useState([]);
+  const [loadingText, setLoadingText] = useState("Submit");
+
+  // Handle loading text animation
+  useEffect(() => {
+    let loadingInterval;
+    if (loading) {
+      let dotCount = 0;
+      loadingInterval = setInterval(() => {
+        const dots = ".".repeat(dotCount % 4);
+        setLoadingText(`Submitting${dots}`);
+        dotCount++;
+      }, 500);
+    } else {
+      setLoadingText("Submit");
+    }
+
+    return () => {
+      if (loadingInterval) clearInterval(loadingInterval);
+    };
+  }, [loading]);
 
   const handleChange = (e) => {
     setNewStockIn({ ...newStockIn, [e.target.name]: e.target.value });
@@ -99,18 +120,38 @@ const AddStockInDetails = ({
     const itemName =
       items.find((item) => Number(item.id) === itemId)?.name || "Unknown Item";
     const totalCost = parseFloat(newEntry.quantity) * parseFloat(newEntry.cost);
-    const displayRow = [
-      stockInPayload.length + 1,
-      itemName,
-      newEntry.unit,
-      newEntry.cost,
-      newEntry.quantity,
-      totalCost,
-    ];
 
+    // Add the new entry to payload
     setStockInPayload([...stockInPayload, entryPayload]);
-    setStockInRows([...stockInRows, displayRow]);
+
+    // Don't create row elements here, just store the raw data
+    setStockInRows([
+      ...stockInRows,
+      {
+        id: stockInRows.length + 1,
+        name: itemName,
+        unit: newEntry.unit,
+        cost: newEntry.cost,
+        quantity: newEntry.quantity,
+        totalCost: totalCost,
+      },
+    ]);
+
     setNewEntry({ item_id: "", unit: "", quantity: "", cost: "" });
+  };
+
+  const handleRemoveEntry = (index) => {
+    setStockInPayload((prevPayload) => {
+      const newPayload = [...prevPayload];
+      newPayload.splice(index, 1);
+      return newPayload;
+    });
+
+    setStockInRows((prevRows) => {
+      const newRows = [...prevRows];
+      newRows.splice(index, 1);
+      return newRows;
+    });
   };
 
   const handleAddReceipt = () => {
@@ -144,6 +185,27 @@ const AddStockInDetails = ({
       setLoading(false);
     }
   };
+
+  // Create table rows with correct indices and delete buttons
+  const tableRows = stockInRows.map((row, index) => [
+    index + 1,
+    row.name,
+    row.unit,
+    row.cost,
+    row.quantity,
+    <div key={`total-${index}`} className="flex items-center justify-between">
+      <span>{row.totalCost}</span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleRemoveEntry(index);
+        }}
+        className="text-red-500 hover:text-red-700 p-1 rounded-full ml-2"
+      >
+        <IoMdClose size={18} />
+      </button>
+    </div>,
+  ]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
@@ -196,7 +258,7 @@ const AddStockInDetails = ({
           {!receiptAdded && (
             <button
               onClick={handleAddReceipt}
-              className="bg-[#CC5500] text-white px-4 py-2 rounded-lg shadow hover:bg-[#b34600]"
+              className="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600"
             >
               Add Receipt
             </button>
@@ -262,16 +324,16 @@ const AddStockInDetails = ({
                   "QUANTITY",
                   "TOTAL COST",
                 ]}
-                data={stockInRows}
+                data={tableRows}
               />
             </div>
             <div className="flex justify-end">
               <button
                 onClick={handleSubmit}
-                className="bg-[#CC5500] text-white px-4 py-2 rounded-lg shadow hover:bg-[#b34600]"
                 disabled={loading}
+                className="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600 w-28"
               >
-                {loading ? "Submitting..." : "Submit"}
+                {loadingText}
               </button>
             </div>
           </div>

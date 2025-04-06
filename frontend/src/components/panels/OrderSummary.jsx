@@ -478,7 +478,26 @@ const OrderSummary = ({
             )}
             <span className="font-medium">
               {menuType?.id === 1
-                ? "₱0.00"
+                ? (() => {
+                    // Calculate total discount for in-store orders
+                    let totalDiscount = 0;
+
+                    // Calculate discount for ala carte items
+                    alaCarteItems.forEach((item) => {
+                      const discountOption = discounts.find(
+                        (d) => d.id === item.discount
+                      );
+                      if (discountOption) {
+                        const discountAmount =
+                          item.price *
+                          item.quantity *
+                          discountOption.percentage;
+                        totalDiscount += discountAmount;
+                      }
+                    });
+
+                    return `- ₱${totalDiscount.toFixed(2)}`;
+                  })()
                 : `₱${(calculateSubtotal() * deduction).toFixed(2)}`}
             </span>
           </div>

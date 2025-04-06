@@ -285,7 +285,7 @@ const StockIn = () => {
       <div className="flex-1" style={{ height: calculatedHeight }}>
         {loading ? (
           <div className="w-full h-full flex justify-center items-center">
-            <LoadingScreen />
+            <LoadingScreen message="Loading stock in receipts" />
           </div>
         ) : (
           <Table
