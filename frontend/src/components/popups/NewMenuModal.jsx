@@ -410,36 +410,36 @@ const NewMenuModal = ({
                 <h3 className="text-lg font-medium mb-4">Ingredients List</h3>
                 <div className="overflow-y-auto" style={{ maxHeight: "250px" }}>
                   {recipes.length > 0 ? (
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50 sticky top-0">
+                    <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+                      <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                            ITEM NAME
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                            QTY
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                            UNIT
-                          </th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-4 py-2 font-medium">ITEM NAME</th>
+                          <th className="px-4 py-2 font-medium">QTY</th>
+                          <th className="px-4 py-2 font-medium">UNIT</th>
+                          <th className="px-4 py-2 text-right font-medium">
                             ACTION
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody>
                         {recipes.map((recipe, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-4 py-2 whitespace-nowrap">
+                          <tr
+                            key={index}
+                            className={`${
+                              index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                            } 
+                                border-b hover:bg-gray-200 group`}
+                          >
+                            <td className="px-4 py-2 font-normal text-gray-700 group-hover:text-gray-900">
                               {recipe.inventory_name}
                             </td>
-                            <td className="px-4 py-2 whitespace-nowrap">
+                            <td className="px-4 py-2 font-normal text-gray-700 group-hover:text-gray-900">
                               {recipe.quantity}
                             </td>
-                            <td className="px-4 py-2 whitespace-nowrap">
+                            <td className="px-4 py-2 font-normal text-gray-700 group-hover:text-gray-900">
                               {recipe.unit}
                             </td>
-                            <td className="px-4 py-2 whitespace-nowrap text-right">
+                            <td className="px-4 py-2 text-right font-normal text-gray-700 group-hover:text-gray-900">
                               <button
                                 onClick={() => handleDeleteRecipe(index)}
                                 className="text-red-600 hover:text-red-800"
@@ -464,12 +464,6 @@ const NewMenuModal = ({
 
         {/* Footer with save button */}
         <div className="border-t p-4 flex justify-end space-x-4">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
-          >
-            Cancel
-          </button>
           <button
             onClick={handleSave}
             className="px-4 py-2 rounded-md bg-[#CC5500] text-white hover:bg-[#b34600]"

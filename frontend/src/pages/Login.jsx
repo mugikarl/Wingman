@@ -22,7 +22,7 @@ const Login = ({ setIsAdmin }) => {
       let dotCount = 0;
       loadingInterval = setInterval(() => {
         const dots = ".".repeat(dotCount % 4);
-        setLoadingText(`Login${dots}`);
+        setLoadingText(`Logging in${dots}`);
         dotCount++;
       }, 500);
     } else {

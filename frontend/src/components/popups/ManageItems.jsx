@@ -7,6 +7,7 @@ const ManageItems = ({
   categories = [],
   units = [],
   fetchItemData,
+  items = [],
 }) => {
   const [activeTab, setActiveTab] = useState("items");
   const token = localStorage.getItem("access_token");
@@ -18,7 +19,6 @@ const ManageItems = ({
   const [selectedCategory, setSelectedCategory] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [items, setItems] = useState([]);
   const [editingItemId, setEditingItemId] = useState(null);
   const [editedItemName, setEditedItemName] = useState("");
   const [editedStockTrigger, setEditedStockTrigger] = useState("");
@@ -30,24 +30,11 @@ const ManageItems = ({
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(null);
   const [isEditingCategory, setIsEditingCategory] = useState(false);
 
-  // Fetch items for the Items tab
-  const fetchItems = async () => {
-    try {
-      const response = await axios.get(
-        "http://127.0.0.1:8000/fetch-items-page-data/"
-      );
-      setItems(response.data.items || []);
-    } catch (error) {
-      console.error("Error fetching items:", error);
-    }
-  };
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchItems();
-      fetchItemData();
-    }
-  }, [isOpen]);
+  // useEffect(() => {
+  //   if (isOpen) {
+  //     fetchItemData();
+  //   }
+  // }, [isOpen]);
 
   // Item Functions
   const handleAddItem = async () => {
@@ -91,7 +78,6 @@ const ManageItems = ({
       setStockTrigger("");
       setSelectedUnit("");
       setSelectedCategory("");
-      fetchItems();
       fetchItemData();
     } catch (error) {
       console.error("Error adding item:", error);
@@ -142,7 +128,6 @@ const ManageItems = ({
 
       alert("Item updated successfully!");
       handleCancelEditItem();
-      fetchItems();
       fetchItemData();
     } catch (error) {
       console.error("Error updating item:", error);
@@ -162,7 +147,6 @@ const ManageItems = ({
       });
 
       alert("Item deleted successfully!");
-      fetchItems();
       fetchItemData();
     } catch (error) {
       console.error("Error deleting item:", error);
@@ -285,7 +269,7 @@ const ManageItems = ({
                 }`}
                 onClick={() => setActiveTab("categories")}
               >
-                Categories
+                Item Categories
               </button>
             </nav>
           </div>
@@ -360,7 +344,7 @@ const ManageItems = ({
                       <div className="col-span-2 flex justify-end">
                         <button
                           onClick={handleAddItem}
-                          className="px-4 py-2 bg-[#E88504] text-white rounded-md hover:bg-[#D87A03]"
+                          className="px-4 py-2 bg-[#CC5500] text-white rounded-md hover:bg-[#b34600]"
                           disabled={loading}
                         >
                           {loading ? "Adding..." : "Add Item"}
@@ -370,137 +354,158 @@ const ManageItems = ({
                     {error && <p className="text-red-500 text-sm">{error}</p>}
                   </div>
 
-                  {/* Items Table */}
-                  <div className="bg-white rounded-lg border overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
+                  {/* Items Table - Updated to match Table.jsx design */}
+                  <div
+                    className="relative overflow-x-auto shadow-md sm:rounded-sm"
+                    style={{ maxHeight: "380px" }}
+                  >
+                    <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+                      <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Name
+                          <th scope="col" className="px-6 py-4 font-medium">
+                            ITEM NAME
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Stock Trigger
+                          <th scope="col" className="px-6 py-4 font-medium">
+                            UNIT
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Unit
+                          <th scope="col" className="px-6 py-4 font-medium">
+                            CATEGORY
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Category
+                          <th scope="col" className="px-6 py-4 font-medium">
+                            STOCK TRIGGER
                           </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
+                          <th scope="col" className="px-6 py-4 font-medium">
+                            ACTIONS
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {items.map((item) => (
-                          <tr key={item.id}>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {editingItemId === item.id ? (
-                                <input
-                                  type="text"
-                                  className="border rounded-md px-2 py-1 w-full"
-                                  value={editedItemName}
-                                  onChange={(e) =>
-                                    setEditedItemName(e.target.value)
-                                  }
-                                />
-                              ) : (
-                                item.name
-                              )}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {editingItemId === item.id ? (
-                                <input
-                                  type="number"
-                                  className="border rounded-md px-2 py-1 w-full"
-                                  value={editedStockTrigger}
-                                  onChange={(e) =>
-                                    setEditedStockTrigger(e.target.value)
-                                  }
-                                />
-                              ) : (
-                                item.stock_trigger
-                              )}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {editingItemId === item.id ? (
-                                <select
-                                  className="border rounded-md px-2 py-1 w-full"
-                                  value={editedUnit}
-                                  onChange={(e) =>
-                                    setEditedUnit(e.target.value)
-                                  }
-                                >
-                                  {units.map((unit) => (
-                                    <option key={unit.id} value={unit.id}>
-                                      {unit.symbol}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                units.find((u) => u.id === item.measurement)
-                                  ?.symbol || "N/A"
-                              )}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {editingItemId === item.id ? (
-                                <select
-                                  className="border rounded-md px-2 py-1 w-full"
-                                  value={editedCategory}
-                                  onChange={(e) =>
-                                    setEditedCategory(e.target.value)
-                                  }
-                                >
-                                  {categories.map((category) => (
-                                    <option
-                                      key={category.id}
-                                      value={category.id}
+                      <tbody>
+                        {items.length > 0 ? (
+                          items.map((item, rowIndex) => (
+                            <tr
+                              key={item.id}
+                              className={`${
+                                rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"
+                              } border-b hover:bg-gray-200 group`}
+                            >
+                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                {editingItemId === item.id ? (
+                                  <input
+                                    type="text"
+                                    className="border rounded-md px-2 py-1 w-full"
+                                    value={editedItemName}
+                                    onChange={(e) =>
+                                      setEditedItemName(e.target.value)
+                                    }
+                                  />
+                                ) : (
+                                  item.name
+                                )}
+                              </td>
+                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                {editingItemId === item.id ? (
+                                  <select
+                                    className="border rounded-md px-2 py-1 w-full"
+                                    value={editedUnit}
+                                    onChange={(e) =>
+                                      setEditedUnit(e.target.value)
+                                    }
+                                  >
+                                    {units.map((unit) => (
+                                      <option key={unit.id} value={unit.id}>
+                                        {unit.symbol}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  units.find((u) => u.id === item.measurement)
+                                    ?.symbol || "N/A"
+                                )}
+                              </td>
+                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                {editingItemId === item.id ? (
+                                  <select
+                                    className="border rounded-md px-2 py-1 w-full"
+                                    value={editedCategory}
+                                    onChange={(e) =>
+                                      setEditedCategory(e.target.value)
+                                    }
+                                  >
+                                    {categories.map((category) => (
+                                      <option
+                                        key={category.id}
+                                        value={category.id}
+                                      >
+                                        {category.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  categories.find((c) => c.id === item.category)
+                                    ?.name || "N/A"
+                                )}
+                              </td>
+                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                {editingItemId === item.id ? (
+                                  <input
+                                    type="number"
+                                    className="border rounded-md px-2 py-1 w-full"
+                                    value={editedStockTrigger}
+                                    onChange={(e) =>
+                                      setEditedStockTrigger(e.target.value)
+                                    }
+                                  />
+                                ) : (
+                                  item.stock_trigger
+                                )}
+                              </td>
+                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
+                                {editingItemId === item.id ? (
+                                  <>
+                                    <button
+                                      onClick={handleCancelEditItem}
+                                      className="text-red-600 hover:text-red-800 p-1"
                                     >
-                                      {category.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                categories.find((c) => c.id === item.category)
-                                  ?.name || "N/A"
-                              )}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {editingItemId === item.id ? (
-                                <>
-                                  <button
-                                    onClick={handleCancelEditItem}
-                                    className="text-red-600 hover:text-red-800 p-1"
-                                  >
-                                    Cancel
-                                  </button>
-                                  <button
-                                    onClick={() => handleSaveEditItem(item.id)}
-                                    className="text-green-600 hover:text-green-800 p-1 ml-2"
-                                  >
-                                    Save
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button
-                                    onClick={() => handleEditItem(item)}
-                                    className="text-blue-600 hover:text-blue-800 p-1"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteItem(item.id)}
-                                    className="text-red-600 hover:text-red-800 p-1 ml-2"
-                                  >
-                                    Delete
-                                  </button>
-                                </>
-                              )}
+                                      Cancel
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleSaveEditItem(item.id)
+                                      }
+                                      className="text-green-600 hover:text-green-800 p-1 ml-2"
+                                    >
+                                      Save
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => handleEditItem(item)}
+                                      className="text-blue-600 hover:text-blue-800 p-1"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteItem(item.id)}
+                                      className="text-red-600 hover:text-red-800 p-1 ml-2"
+                                    >
+                                      Delete
+                                    </button>
+                                  </>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr className="bg-white border-b">
+                            <td
+                              colSpan="5"
+                              className="px-6 py-4 text-center font-normal text-gray-500 italic"
+                            >
+                              No Data Available
                             </td>
                           </tr>
-                        ))}
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -529,7 +534,7 @@ const ManageItems = ({
                         {!isEditingCategory ? (
                           <button
                             onClick={handleAddCategory}
-                            className="px-4 py-2 bg-[#E88504] text-white rounded-md hover:bg-[#D87A03]"
+                            className="px-4 py-2 bg-[#CC5500] text-white rounded-md hover:bg-[#b34600]"
                           >
                             Add
                           </button>
@@ -543,7 +548,7 @@ const ManageItems = ({
                             </button>
                             <button
                               onClick={handleSaveEditCategory}
-                              className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
+                              className="px-4 py-2 bg-[#CC5500] text-white rounded-md hover:bg-[#b34600]"
                             >
                               Update
                             </button>

@@ -11,8 +11,8 @@ const EditMenuModal = ({
   units,
   fetchMenus,
 }) => {
-  // State for edit mode
-  const [isEditMode, setIsEditMode] = useState(false);
+  // Add editing mode state
+  const [isEditing, setIsEditing] = useState(false);
 
   // State for form data
   const [image, setImage] = useState(item.image || null);
@@ -24,41 +24,40 @@ const EditMenuModal = ({
 
   // State for recipe data
   const [recipes, setRecipes] = useState(item.menu_ingredients || []);
-
-  // State for new recipe row
-  const [newRecipe, setNewRecipe] = useState({
+  const [currentRecipe, setCurrentRecipe] = useState({
     inventory_id: "",
     quantity: "",
     unit_id: "",
   });
 
+  // Toggle editing mode
+  const toggleEditing = () => {
+    if (isEditing) {
+      // Reset form to original values when canceling edit
+      setItemName(item.name || "");
+      setPrice(item.price || "");
+      setCategoryId(item.category_id || "");
+      setTypeId(item.type_id || "");
+      setIsAvailable(item.status_id === 1);
+      setImage(item.image || null);
+      setRecipes(item.menu_ingredients || []);
+    }
+    setIsEditing(!isEditing);
+  };
+
   // Handle image upload
   const handleImageUpload = (e) => {
-    if (!isEditMode) return;
+    if (!isEditing) return;
+
     const file = e.target.files[0];
     if (file) {
       setImage(file);
     }
   };
 
-  // Toggle edit mode
-  const toggleEditMode = () => {
-    setIsEditMode(!isEditMode);
-    if (isEditMode) {
-      // Reset form data when canceling edit mode
-      setImage(item.image || null);
-      setItemName(item.name || "");
-      setPrice(item.price || "");
-      setCategoryId(item.category_id || "");
-      setTypeId(item.type_id || "");
-      setIsAvailable(item.status_id === 1);
-      setRecipes(item.menu_ingredients || []);
-    }
-  };
-
   // Handle save
   const handleSave = async () => {
-    if (!isEditMode) return;
+    if (!isEditing) return;
 
     if (
       !itemName ||
@@ -73,7 +72,14 @@ const EditMenuModal = ({
     }
 
     const formData = new FormData();
-    formData.append("image", typeof image === "string" ? image : image);
+
+    // Only append new image if it's a File object
+    if (image instanceof File) {
+      formData.append("image", image);
+    } else {
+      formData.append("image", image);
+    }
+
     formData.append("name", itemName);
     formData.append("price", price);
     formData.append("category_id", categoryId);
@@ -107,7 +113,7 @@ const EditMenuModal = ({
       alert("Menu updated successfully!");
       onSave(response.data);
       fetchMenus();
-      onClose();
+      setIsEditing(false);
     } catch (error) {
       console.error("Error updating menu item:", error.response?.data || error);
       alert("Failed to update menu item.");
@@ -135,435 +141,378 @@ const EditMenuModal = ({
     }
   };
 
-  // Handle recipe deletion
-  const handleDeleteRecipe = (index) => {
-    if (!isEditMode) return;
-    const updatedRecipes = recipes.filter((_, i) => i !== index);
-    setRecipes(updatedRecipes);
-  };
-
-  // Handle adding a new recipe row
+  // Handle adding a new recipe
   const handleAddRecipe = () => {
-    if (!isEditMode) return;
-    if (!newRecipe.inventory_id || !newRecipe.quantity || !newRecipe.unit_id) {
-      alert("Please fill in all fields for the new recipe item.");
+    if (!isEditing) return;
+
+    if (
+      !currentRecipe.inventory_id ||
+      !currentRecipe.quantity ||
+      !currentRecipe.unit_id
+    ) {
+      alert("Please enter valid item, quantity, and unit of measurement.");
       return;
     }
 
-    // Find the item name for display
+    // Find the item name for display purposes
     const selectedItem = inventory.find(
-      (item) => item.id === Number.parseInt(newRecipe.inventory_id)
+      (inventory) => inventory.id === parseInt(currentRecipe.inventory_id)
     );
 
-    // Find the unit symbol for display
+    // Find the unit symbol for display purposes
     const selectedUnit = units.find(
-      (unit) => unit.id === Number.parseInt(newRecipe.unit_id)
+      (unit) => unit.id === parseInt(currentRecipe.unit_id)
     );
 
     // Create the new recipe object
-    const recipeToAdd = {
-      id: null, // New item doesn't have an ID yet
-      inventory_id: newRecipe.inventory_id,
-      item_name: selectedItem ? selectedItem.name : "",
-      quantity: newRecipe.quantity,
-      unit_id: newRecipe.unit_id,
-      unit: selectedUnit ? selectedUnit.symbol : "",
+    const newRecipe = {
+      inventory_id: currentRecipe.inventory_id,
+      inventory_name: selectedItem ? selectedItem.name : "", // For display only
+      quantity: currentRecipe.quantity,
+      unit_id: currentRecipe.unit_id, // Ensure unit_id is part of the new recipe
+      unit: selectedUnit ? selectedUnit.symbol : "", // For display only
+      price: selectedItem ? selectedItem.price : 0, // Use item price for cost
     };
 
-    // Add to recipes array
-    setRecipes([...recipes, recipeToAdd]);
+    // Add the new recipe to the recipes list
+    setRecipes([...recipes, newRecipe]);
 
-    // Reset new recipe form
-    setNewRecipe({
+    // Reset the current recipe state after adding
+    setCurrentRecipe({
       inventory_id: "",
       quantity: "",
       unit_id: "",
     });
   };
 
-  // Handle recipe field change
-  const handleRecipeChange = (index, field, value) => {
-    if (!isEditMode) return;
+  // Handle recipe deletion
+  const handleDeleteRecipe = (index) => {
+    if (!isEditing) return;
 
-    const updatedRecipes = [...recipes];
-
-    if (field === "inventory_id") {
-      // When item changes, update item_name and reset unit if needed
-      const selectedItem = inventory.find(
-        (item) => item.id === Number.parseInt(value)
-      );
-      updatedRecipes[index] = {
-        ...updatedRecipes[index],
-        inventory_id: value,
-        item_name: selectedItem ? selectedItem.name : "",
-      };
-    } else if (field === "unit_id") {
-      // When unit changes, update unit display value
-      const selectedUnit = units.find(
-        (unit) => unit.id === Number.parseInt(value)
-      );
-      updatedRecipes[index] = {
-        ...updatedRecipes[index],
-        unit_id: value,
-        unit: selectedUnit ? selectedUnit.symbol : "",
-      };
-    } else {
-      // For other fields, just update the value
-      updatedRecipes[index] = {
-        ...updatedRecipes[index],
-        [field]: value,
-      };
-    }
-
+    const updatedRecipes = recipes.filter((_, i) => i !== index);
     setRecipes(updatedRecipes);
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-3 sm:p-4 rounded-lg shadow-lg w-[90%] sm:w-[80%] md:w-[65%] lg:w-[50%] max-w-2xl mx-auto">
-        {/* Modal Header */}
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-bold">Edit Menu</h2>
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl h-[600px] flex flex-col">
+        {/* Header with all buttons */}
+        <div className="flex justify-between items-center p-4 border-b">
+          <h2 className="text-lg font-medium">Menu Item Details</h2>
           <div className="flex items-center space-x-2">
+            {/* Edit/Cancel Edit Button */}
             <button
-              onClick={toggleEditMode}
-              className={`text-xs px-3 py-1 rounded-lg ${
-                isEditMode ? "bg-red-500 text-white" : "bg-blue-500 text-white"
+              onClick={toggleEditing}
+              className={`px-4 py-2 rounded-md ${
+                isEditing
+                  ? "bg-gray-200 text-gray-700"
+                  : "bg-[#CC5500] text-white hover:bg-[#b34600]"
               }`}
             >
-              {isEditMode ? "Cancel Edit" : "Edit"}
+              {isEditing ? "Cancel Edit" : "Edit"}
             </button>
+
+            {/* Delete Button */}
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 rounded-md bg-red-500 text-white hover:bg-red-600"
+            >
+              Delete
+            </button>
+
+            {/* Close Button */}
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              className="p-1 rounded-full hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
             >
               &times;
             </button>
           </div>
         </div>
 
-        {/* Modal Content */}
-        <div className="flex flex-col">
-          {/* Upload Photo Section */}
-          <div className="relative group h-48 border-2 border-dashed border-gray-300 mb-3 w-full">
-            {image ? (
-              <>
-                <img
-                  src={
-                    typeof image === "string"
-                      ? image
-                      : URL.createObjectURL(image)
-                  }
-                  alt="Menu Item"
-                  className="w-full h-full object-cover"
-                />
-                {isEditMode && (
-                  <div
-                    onClick={() =>
-                      document.getElementById("image-upload").click()
-                    }
-                    className="absolute inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 cursor-pointer"
-                  >
-                    <span className="text-white text-lg">Change Pic</span>
-                  </div>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="image-upload"
-                  disabled={!isEditMode}
-                />
-              </>
-            ) : (
-              <div className="flex flex-col items-center">
-                <span className="text-2xl">📷</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  id="image-upload"
-                  disabled={!isEditMode}
-                />
-                <label
-                  htmlFor="image-upload"
-                  className={`text-sm ${
-                    isEditMode
-                      ? "text-blue-500 cursor-pointer"
-                      : "text-gray-400 cursor-not-allowed"
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          <div className="grid grid-cols-2 gap-6">
+            {/* Menu Details Section - Left Column */}
+            <div className="h-full">
+              <div className="bg-white p-4 rounded-lg border h-full flex flex-col">
+                <h3 className="text-lg font-medium mb-4">Menu Item Details</h3>
+
+                {/* Upload Photo Section */}
+                <div
+                  className={`relative group h-48 border-2 border-dashed border-gray-300 mb-4 w-full ${
+                    !isEditing ? "opacity-75" : ""
                   }`}
                 >
-                  Upload Photo
-                </label>
-              </div>
-            )}
-          </div>
-
-          {/* Form Fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-            {/* Item Name */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700">
-                Item Name
-              </label>
-              <input
-                type="text"
-                value={itemName}
-                onChange={(e) => isEditMode && setItemName(e.target.value)}
-                className={`mt-1 p-1.5 text-sm border rounded-lg w-full ${
-                  !isEditMode ? "bg-gray-100 cursor-not-allowed" : ""
-                }`}
-                disabled={!isEditMode}
-              />
-            </div>
-
-            {/* Price */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700">
-                Price
-              </label>
-              <input
-                type="number"
-                value={price}
-                onChange={(e) => isEditMode && setPrice(e.target.value)}
-                className={`mt-1 p-1.5 text-sm border rounded-lg w-full ${
-                  !isEditMode ? "bg-gray-100 cursor-not-allowed" : ""
-                }`}
-                disabled={!isEditMode}
-              />
-            </div>
-
-            {/* Category Dropdown */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700">
-                Category
-              </label>
-              <select
-                value={categoryId}
-                onChange={(e) => isEditMode && setCategoryId(e.target.value)}
-                className={`mt-1 p-1.5 text-sm border rounded-lg w-full ${
-                  !isEditMode ? "bg-gray-100 cursor-not-allowed" : ""
-                }`}
-                disabled={!isEditMode}
-              >
-                <option value="">Select Category</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Type Dropdown */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700">
-                Menu Type
-              </label>
-              <select
-                value={typeId}
-                onChange={(e) => isEditMode && setTypeId(e.target.value)}
-                className={`mt-1 p-1.5 text-sm border rounded-lg w-full ${
-                  !isEditMode ? "bg-gray-100 cursor-not-allowed" : ""
-                }`}
-                disabled={!isEditMode}
-              >
-                <option value="">Select Type</option>
-                {menuTypes.map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Availability */}
-          <div className="mb-3">
-            <label className="block text-xs font-medium text-gray-700">
-              Availability
-            </label>
-            <div className="flex space-x-4 mt-1">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={isAvailable}
-                  onChange={() => isEditMode && setIsAvailable(true)}
-                  className="mr-1"
-                  disabled={!isEditMode}
-                />
-                <span className="text-sm">Available</span>
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={!isAvailable}
-                  onChange={() => isEditMode && setIsAvailable(false)}
-                  className="mr-1"
-                  disabled={!isEditMode}
-                />
-                <span className="text-sm">Unavailable</span>
-              </label>
-            </div>
-          </div>
-
-          {/* Recipe Table with inline editing */}
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold mb-1">Recipe Items</h3>
-            <div className="border border-gray-200 rounded">
-              {/* Table Header */}
-              <div className="grid grid-cols-4 bg-[#FFCF03] font-semibold text-gray-700 text-xs">
-                <div className="px-2 py-1 border-r border-gray-200">
-                  ITEM NAME
-                </div>
-                <div className="px-2 py-1 border-r border-gray-200">QTY</div>
-                <div className="px-2 py-1 border-r border-gray-200">UNIT</div>
-                <div className="px-2 py-1">ACTION</div>
-              </div>
-
-              {/* Table Body - Scrollable */}
-              <div className="max-h-20 overflow-y-auto">
-                {recipes.length > 0 ? (
-                  recipes.map((recipe, index) => (
-                    <div
-                      key={index}
-                      className="grid grid-cols-4 border-t border-gray-200 hover:bg-gray-100 text-xs"
-                    >
-                      <div className="px-2 py-1 border-r border-gray-200">
-                        {isEditMode ? (
-                          <select
-                            value={recipe.inventory_id}
-                            onChange={(e) =>
-                              handleRecipeChange(
-                                index,
-                                "inventory_id",
-                                e.target.value
-                              )
-                            }
-                            className="w-full p-1 text-xs border rounded"
-                          >
-                            <option value="">Select Item</option>
-                            {inventory.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          inventory.find(
-                            (i) => i.id === Number(recipe.inventory_id)
-                          )?.name || "Unknown"
-                        )}
-                      </div>
-                      <div className="px-2 py-1 border-r border-gray-200">
-                        {isEditMode ? (
-                          <input
-                            type="number"
-                            value={recipe.quantity}
-                            onChange={(e) =>
-                              handleRecipeChange(
-                                index,
-                                "quantity",
-                                e.target.value
-                              )
-                            }
-                            className="w-full p-1 text-xs border rounded"
-                          />
-                        ) : (
-                          recipe.quantity
-                        )}
-                      </div>
-                      <div className="px-2 py-1 border-r border-gray-200">
-                        {isEditMode ? (
-                          <select
-                            value={recipe.unit_id}
-                            onChange={(e) =>
-                              handleRecipeChange(
-                                index,
-                                "unit_id",
-                                e.target.value
-                              )
-                            }
-                            className="w-full p-1 text-xs border rounded"
-                          >
-                            <option value="">Select Unit</option>
-                            {units.map((unit) => (
-                              <option key={unit.id} value={unit.id}>
-                                {unit.symbol}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          units.find((i) => i.id === Number(recipe.unit_id))
-                            ?.symbol || "Unknown"
-                        )}
-                      </div>
-                      <div className="px-2 py-1">
-                        {isEditMode && (
-                          <button
-                            onClick={() => handleDeleteRecipe(index)}
-                            className="bg-red-500 text-white px-1.5 py-0.5 rounded text-xs"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-2 text-center text-gray-500 text-xs">
-                    No recipes added yet
-                  </div>
-                )}
-
-                {/* Add new recipe row - only visible in edit mode */}
-                {isEditMode && (
-                  <div className="grid grid-cols-4 border-t border-gray-200 bg-gray-50 text-xs">
-                    <div className="px-2 py-1 border-r border-gray-200">
-                      <select
-                        value={newRecipe.inventory_id}
-                        onChange={(e) =>
-                          setNewRecipe({
-                            ...newRecipe,
-                            inventory_id: e.target.value,
-                          })
+                  {image ? (
+                    <>
+                      <img
+                        src={
+                          typeof image === "string"
+                            ? image
+                            : URL.createObjectURL(image)
                         }
-                        className="w-full p-1 text-xs border rounded"
-                      >
-                        <option value="">Select Item</option>
-                        {inventory.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
+                        alt="Uploaded"
+                        className="w-full h-full object-cover"
+                      />
+                      {isEditing && (
+                        <div
+                          onClick={() =>
+                            document.getElementById("image-upload").click()
+                          }
+                          className="absolute inset-0 bg-gray-800 bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 cursor-pointer"
+                        >
+                          <span className="text-white text-lg">
+                            Change Picture
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div
+                      onClick={() =>
+                        isEditing &&
+                        document.getElementById("image-upload").click()
+                      }
+                      className={`flex items-center justify-center w-full h-full bg-gray-100 ${
+                        isEditing ? "cursor-pointer" : "cursor-not-allowed"
+                      }`}
+                    >
+                      <span className="text-gray-500 text-lg">Add Picture</span>
                     </div>
-                    <div className="px-2 py-1 border-r border-gray-200">
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="image-upload"
+                    disabled={!isEditing}
+                  />
+                </div>
+
+                {/* Item Name */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Item Name
+                  </label>
+                  <input
+                    type="text"
+                    value={itemName}
+                    onChange={(e) => setItemName(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-md ${
+                      !isEditing ? "bg-gray-100" : ""
+                    }`}
+                    placeholder="Enter menu item name"
+                    disabled={!isEditing}
+                  />
+                </div>
+
+                {/* Price */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Price
+                  </label>
+                  <input
+                    type="number"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-md ${
+                      !isEditing ? "bg-gray-100" : ""
+                    }`}
+                    placeholder="Enter price"
+                    disabled={!isEditing}
+                  />
+                </div>
+
+                {/* Category Dropdown */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={categoryId}
+                    onChange={(e) => setCategoryId(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-md ${
+                      !isEditing ? "bg-gray-100" : ""
+                    }`}
+                    disabled={!isEditing}
+                  >
+                    <option value="">Select Category</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Type Dropdown */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Menu Type
+                  </label>
+                  <select
+                    value={typeId}
+                    onChange={(e) => setTypeId(e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-md ${
+                      !isEditing ? "bg-gray-100" : ""
+                    }`}
+                    disabled={!isEditing}
+                  >
+                    <option value="">Select Type</option>
+                    {menuTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Availability */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Availability
+                  </label>
+                  <div className="flex space-x-6">
+                    <label
+                      className={`flex items-center space-x-2 ${
+                        isEditing
+                          ? "cursor-pointer"
+                          : "cursor-not-allowed opacity-75"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        checked={isAvailable}
+                        onChange={() => isEditing && setIsAvailable(true)}
+                        className="hidden"
+                        disabled={!isEditing}
+                      />
+                      <div
+                        className={`w-5 h-5 border rounded-full flex items-center justify-center 
+                          ${
+                            isAvailable
+                              ? "bg-[#CC5500] border-[#b34600]"
+                              : "border-gray-400 bg-white"
+                          }`}
+                      >
+                        {isAvailable && (
+                          <div className="w-3 h-3 bg-white rounded-full"></div>
+                        )}
+                      </div>
+                      <span>Available</span>
+                    </label>
+                    <label
+                      className={`flex items-center space-x-2 ${
+                        isEditing
+                          ? "cursor-pointer"
+                          : "cursor-not-allowed opacity-75"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        checked={!isAvailable}
+                        onChange={() => isEditing && setIsAvailable(false)}
+                        className="hidden"
+                        disabled={!isEditing}
+                      />
+                      <div
+                        className={`w-5 h-5 border rounded-full flex items-center justify-center 
+                          ${
+                            !isAvailable
+                              ? "bg-[#CC5500] border-[#b34600]"
+                              : "border-gray-400 bg-white"
+                          }`}
+                      >
+                        {!isAvailable && (
+                          <div className="w-3 h-3 bg-white rounded-full"></div>
+                        )}
+                      </div>
+                      <span>Unavailable</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Ingredients Section - Right Column */}
+            <div className="flex flex-col space-y-4">
+              {/* Add Recipe Section */}
+              <div
+                className={`bg-white p-4 rounded-lg border ${
+                  !isEditing ? "opacity-75" : ""
+                }`}
+              >
+                <h3 className="text-lg font-medium mb-4">Add Ingredients</h3>
+                <div className="grid grid-cols-1 gap-3 mb-3">
+                  {/* Item Dropdown */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Item
+                    </label>
+                    <select
+                      value={currentRecipe.inventory_id}
+                      onChange={(e) =>
+                        setCurrentRecipe({
+                          ...currentRecipe,
+                          inventory_id: e.target.value,
+                        })
+                      }
+                      className={`w-full px-3 py-2 border rounded-md ${
+                        !isEditing ? "bg-gray-100" : ""
+                      }`}
+                      disabled={!isEditing}
+                    >
+                      <option value="">Select Item</option>
+                      {inventory.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Quantity Input */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Quantity
+                      </label>
                       <input
                         type="number"
-                        value={newRecipe.quantity}
+                        value={currentRecipe.quantity}
                         onChange={(e) =>
-                          setNewRecipe({
-                            ...newRecipe,
+                          setCurrentRecipe({
+                            ...currentRecipe,
                             quantity: e.target.value,
                           })
                         }
-                        placeholder="Qty"
-                        className="w-full p-1 text-xs border rounded"
+                        placeholder="Enter quantity"
+                        className={`w-full px-3 py-2 border rounded-md ${
+                          !isEditing ? "bg-gray-100" : ""
+                        }`}
+                        disabled={!isEditing}
                       />
                     </div>
-                    <div className="px-2 py-1 border-r border-gray-200">
+
+                    {/* Unit Dropdown */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Unit
+                      </label>
                       <select
-                        value={newRecipe.unit_id}
+                        value={currentRecipe.unit_id}
                         onChange={(e) =>
-                          setNewRecipe({
-                            ...newRecipe,
+                          setCurrentRecipe({
+                            ...currentRecipe,
                             unit_id: e.target.value,
                           })
                         }
-                        className="w-full p-1 text-xs border rounded"
+                        className={`w-full px-3 py-2 border rounded-md ${
+                          !isEditing ? "bg-gray-100" : ""
+                        }`}
+                        disabled={!isEditing}
                       >
                         <option value="">Select Unit</option>
                         {units.map((unit) => (
@@ -573,60 +522,107 @@ const EditMenuModal = ({
                         ))}
                       </select>
                     </div>
-                    <div className="px-2 py-1">
-                      <button
-                        onClick={handleAddRecipe}
-                        className="bg-green-500 text-white px-1.5 py-0.5 rounded text-xs"
-                      >
-                        Add
-                      </button>
-                    </div>
                   </div>
-                )}
+
+                  {/* Add Recipe Button */}
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleAddRecipe}
+                      className={`bg-[#CC5500] text-white px-4 py-2 rounded-md ${
+                        isEditing
+                          ? "hover:bg-[#b34600]"
+                          : "opacity-50 cursor-not-allowed"
+                      }`}
+                      disabled={!isEditing}
+                    >
+                      Add Ingredient
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recipe Table */}
+              <div className="bg-white p-4 rounded-lg border flex-grow overflow-hidden">
+                <h3 className="text-lg font-medium mb-4">Ingredients List</h3>
+                <div className="overflow-y-auto" style={{ maxHeight: "250px" }}>
+                  {recipes.length > 0 ? (
+                    <table className="w-full text-sm text-left rtl:text-right text-gray-500">
+                      <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2 font-medium">ITEM NAME</th>
+                          <th className="px-4 py-2 font-medium">QTY</th>
+                          <th className="px-4 py-2 font-medium">UNIT</th>
+                          {isEditing && (
+                            <th className="px-4 py-2 text-right font-medium">
+                              ACTION
+                            </th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recipes.map((recipe, index) => (
+                          <tr
+                            key={index}
+                            className={`${
+                              index % 2 === 0 ? "bg-white" : "bg-gray-50"
+                            } 
+                                border-b hover:bg-gray-200 group`}
+                          >
+                            <td className="px-4 py-2 font-normal text-gray-700 group-hover:text-gray-900">
+                              {recipe.inventory_name ||
+                                inventory.find(
+                                  (i) => i.id === Number(recipe.inventory_id)
+                                )?.name ||
+                                "Unknown"}
+                            </td>
+                            <td className="px-4 py-2 font-normal text-gray-700 group-hover:text-gray-900">
+                              {recipe.quantity}
+                            </td>
+                            <td className="px-4 py-2 font-normal text-gray-700 group-hover:text-gray-900">
+                              {recipe.unit ||
+                                units.find(
+                                  (u) => u.id === Number(recipe.unit_id)
+                                )?.symbol ||
+                                "Unknown"}
+                            </td>
+                            {isEditing && (
+                              <td className="px-4 py-2 text-right font-normal text-gray-700 group-hover:text-gray-900">
+                                <button
+                                  onClick={() => handleDeleteRecipe(index)}
+                                  className="text-red-600 hover:text-red-800"
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 italic">
+                      No ingredients added yet
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Action Buttons */}
-          {isEditMode ? (
-            <div className="flex justify-between mt-2">
-              <div className="flex space-x-2">
-                <button
-                  onClick={onClose}
-                  className="bg-gray-400 text-white px-4 py-2 text-sm rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="bg-red-500 text-white px-4 py-2 text-sm rounded-lg"
-                >
-                  Delete
-                </button>
-              </div>
-              <button
-                onClick={handleSave}
-                className="bg-[#209528] text-white px-4 py-2 text-sm rounded-lg"
-              >
-                Save
-              </button>
-            </div>
-          ) : (
-            <div className="flex justify-between mt-2">
-              <button
-                onClick={handleDelete}
-                className="bg-red-500 text-white px-4 py-2 text-sm rounded-lg"
-              >
-                Delete
-              </button>
-              <button
-                onClick={handleSave}
-                className="bg-[#209528] text-white px-4 py-2 text-sm rounded-lg"
-              >
-                Save
-              </button>
-            </div>
-          )}
+        {/* Footer with Save button (only active in editing mode) */}
+        <div className="border-t p-4 flex justify-end space-x-4">
+          <button
+            onClick={handleSave}
+            className={`px-4 py-2 rounded-md ${
+              isEditing
+                ? "bg-[#CC5500] text-white hover:bg-[#b34600]"
+                : "bg-gray-200 text-gray-700 cursor-not-allowed"
+            }`}
+            disabled={!isEditing}
+          >
+            Save Changes
+          </button>
         </div>
       </div>
     </div>

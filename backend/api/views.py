@@ -1188,29 +1188,53 @@ def fetch_items_page_data(request):
 @authentication_classes([])
 @permission_classes([AllowAny])
 def fetch_inventory_page_data(request):
-    """Specialized endpoint for Inventory.jsx"""
+    """
+    Enhanced endpoint for Inventory.jsx that includes items data
+    """
     try:
-        # Use the correct foreign key relationship in the query
-        # 'item' is the foreign key column in inventory that references 'items' table
-        inventory = supabase_anon.table('inventory').select('*, item:items(*)').execute()
-        categories = supabase_anon.table('item_category').select('*').execute()
-        units = supabase_anon.table('unit_of_measurement').select('*').execute()
-        employees = supabase_anon.table('employee').select('*').execute()
-        disposal_reasons = supabase_anon.table('reason_of_disposal').select('*').execute()
+        # Fetch inventory with related item data
+        inventory_response = supabase_anon.table("inventory") \
+            .select("*, item:items(*)") \
+            .execute()
+        inventory_data = inventory_response.data if inventory_response.data else []
         
-        # Extract data from the response
-        inventory_data = inventory.data
-        categories_data = categories.data
-        units_data = units.data
-        employees_data = employees.data
-        reasons_data = disposal_reasons.data
+        # Fetch units
+        units_response = supabase_anon.table("unit_of_measurement") \
+            .select("*") \
+            .execute()
+        units_data = units_response.data if units_response.data else []
+        
+        # Fetch categories
+        categories_response = supabase_anon.table("item_category") \
+            .select("*") \
+            .execute()
+        categories_data = categories_response.data if categories_response.data else []
+        
+        # Fetch employees
+        employees_response = supabase_anon.table("employee") \
+            .select("id, first_name, last_name") \
+            .execute()
+        employees_data = employees_response.data if employees_response.data else []
+        
+        # Fetch disposal reasons
+        disposal_reason_response = supabase_anon.table("reason_of_disposal") \
+            .select("*") \
+            .execute()
+        disposal_reason_data = disposal_reason_response.data if disposal_reason_response.data else []
+        
+        # Fetch items (previously in fetch_items_page_data)
+        items_response = supabase_anon.table('items') \
+            .select('*') \
+            .execute()
+        items_data = items_response.data if items_response.data else []
         
         return Response({
             'inventory': inventory_data,
-            'categories': categories_data,
             'units': units_data,
+            'categories': categories_data,
             'employees': employees_data,
-            'disposalreason': reasons_data,
+            'disposalreason': disposal_reason_data,
+            'items': items_data  # Added items data
         })
     except Exception as e:
         import traceback

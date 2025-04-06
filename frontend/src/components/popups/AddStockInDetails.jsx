@@ -196,7 +196,7 @@ const AddStockInDetails = ({
           {!receiptAdded && (
             <button
               onClick={handleAddReceipt}
-              className="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600"
+              className="bg-[#CC5500] text-white px-4 py-2 rounded-lg shadow hover:bg-[#b34600]"
             >
               Add Receipt
             </button>
@@ -247,7 +247,7 @@ const AddStockInDetails = ({
               />
               <button
                 onClick={handleAddEntry}
-                className="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600"
+                className="bg-[#CC5500] text-white px-4 py-2 rounded-lg shadow hover:bg-[#b34600]"
               >
                 Add
               </button>
@@ -268,7 +268,7 @@ const AddStockInDetails = ({
             <div className="flex justify-end">
               <button
                 onClick={handleSubmit}
-                className="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600"
+                className="bg-[#CC5500] text-white px-4 py-2 rounded-lg shadow hover:bg-[#b34600]"
                 disabled={loading}
               >
                 {loading ? "Submitting..." : "Submit"}
