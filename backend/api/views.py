@@ -1916,6 +1916,7 @@ def add_stockin_data(request):
     """
     Handles stocking in items and adding it to the inventory.
     Inserts a new item and updates the current quantity of the item in the inventory
+    Also creates an expense entry for the total cost of the stock-in
     """
     try:
         data = json.loads(request.body)
@@ -1945,6 +1946,9 @@ def add_stockin_data(request):
         if not receipt_id:
             return Response({"error": "Receipt ID not returned."}, status=500)
         
+        # Calculate total cost for the expense entry
+        total_cost = 0
+        
         # Process each stock in entry
         for entry in stock_ins:
             inventory_id = entry.get("inventory_id")
@@ -1961,11 +1965,15 @@ def add_stockin_data(request):
             try:
                 quantity_in = int(quantity_in)
                 price = float(price)
+                
+                # Add to total cost (price per unit * quantity)
+                total_cost += price * quantity_in
+                
             except Exception:
                 return Response({"error": "Invalid quantity or price format."}, status=400)
             
             # Insert the Stock In records with the Receipt ID
-            stock_in_response = supabase_anon.table("stockin").insert({\
+            stock_in_response = supabase_anon.table("stockin").insert({
                 "receipt_id": receipt_id,
                 "inventory_id": inventory_id,
                 "item_id": item_id,
@@ -2013,9 +2021,26 @@ def add_stockin_data(request):
                     {"error": f"Failed to update inventory for inventory_id {inventory_id}."},
                     status=500
                 )
+        
+        # Create expense entry for the total stock-in cost
+        expense_data = {
+            "type_id": 1,
+            "stockin_id": receipt_id,
+            "date": date,
+            "cost": total_cost
+        }
+        
+        # Insert expense record
+        expense_response = supabase_service.table("expenses").insert(expense_data).execute()
+        
+        if not expense_response.data:
+            return Response(
+                {"error": "Failed to create expense entry for stock-in."},
+                status=500
+            )
             
         return Response(
-            {"message": "Receipt and stock in entries added; inventory updated successfully."},
+            {"message": "Receipt, stock in entries, and expense record added; inventory updated successfully."},
             status=201
         )
 
@@ -2155,6 +2180,25 @@ def edit_receipt_stockin_data(request, receipt_id):
             .select("*").eq("receipt_id", receipt_id).execute()
         updated_receipt["stock_ins"] = stockins_resp.data if stockins_resp.data else []
 
+        # Calculate new total cost for updated expense entry
+        total_cost = 0
+        stockins_resp = supabase_service.table("stockin") \
+            .select("*").eq("receipt_id", receipt_id).execute()
+        if stockins_resp.data:
+            for stock in stockins_resp.data:
+                quantity = int(stock.get("quantity_in", 0))
+                price = float(stock.get("price", 0))
+                total_cost += price * quantity
+
+        # Update the expense record
+        expense_response = supabase_service.table("expenses") \
+            .update({"cost": total_cost}) \
+            .eq("stockin_id", receipt_id) \
+            .execute()
+
+        if not expense_response.data:
+            return Response({"error": "Failed to update expense record."}, status=500)
+
         return Response({
             "message": "Receipt and stock-in details updated successfully.",
             "receipt": updated_receipt
@@ -2200,10 +2244,16 @@ def delete_receipt(request, receipt_id):
             # Delete all stock-in entries for this receipt.
             supabase_service.table("stockin").delete().eq("receipt_id", receipt_id).execute()
         
+        # Delete the associated expense record
+        expense_response = supabase_service.table("expenses") \
+            .delete() \
+            .eq("stockin_id", receipt_id) \
+            .execute()
+
         # Delete the receipt.
         delete_response = supabase_service.table("receipts").delete().eq("id", receipt_id).execute()
         if delete_response.data:
-            return Response({"message": "Receipt and associated stock-in entries deleted successfully."}, status=200)
+            return Response({"message": "Receipt, associated stock-in entries, and expense record deleted successfully."}, status=200)
         else:
             return Response({"error": "Failed to delete receipt."}, status=500)
     except Exception as e:
