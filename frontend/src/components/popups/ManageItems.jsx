@@ -388,14 +388,6 @@ const ManageItems = ({
                           value={itemName}
                           onChange={(e) => setItemName(e.target.value)}
                         />
-                        {itemName && (
-                          <button
-                            onClick={resetItemForm}
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-white rounded-full w-6 h-6 flex items-center justify-center"
-                          >
-                            <IoMdClose size={16} />
-                          </button>
-                        )}
                       </div>
                     </div>
                     <div>
@@ -460,19 +452,27 @@ const ManageItems = ({
                       </button>
                     ) : (
                       <div className="w-full flex justify-between">
-                        <button
-                          onClick={handleDeleteItem}
-                          disabled={isDeletingItem}
-                          className={`bg-red-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
-                            isDeletingItem
-                              ? "opacity-70 cursor-not-allowed"
-                              : "hover:bg-red-600"
-                          }`}
-                        >
-                          {isDeletingItem
-                            ? `Deleting${deletingItemDots}`
-                            : "Delete Item"}
-                        </button>
+                        <div className="flex gap-x-2">
+                          <button
+                            onClick={resetItemForm}
+                            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg min-w-[120px]"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleDeleteItem}
+                            disabled={isDeletingItem}
+                            className={`bg-red-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
+                              isDeletingItem
+                                ? "opacity-70 cursor-not-allowed"
+                                : "hover:bg-red-600"
+                            }`}
+                          >
+                            {isDeletingItem
+                              ? `Deleting${deletingItemDots}`
+                              : "Delete Item"}
+                          </button>
+                        </div>
                         <button
                           onClick={handleEditItem}
                           disabled={isSubmittingItem}
