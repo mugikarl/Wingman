@@ -2701,7 +2701,7 @@ def fetch_order_data(request, transactionId=None):
         payment_methods = supabase_anon.table("payment_methods").select("id", "name").execute().data or []
         
         # Fetch in-store categories
-        instore_categories = supabase_anon.table("instore_category").select("id", "name", "base_amount").execute().data or []
+        instore_categories = supabase_anon.table("instore_category").select("id, name", "base_amount").execute().data or []
         
         # Fetch Order Status Type
         order_status_types = supabase_anon.table("order_status_type").select("id, name").execute().data or []
@@ -4116,3 +4116,145 @@ def check_menu_inventory(request, menu_id):
         return Response({
             "error": str(e)
         }, status=500)
+
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def fetch_sales_data(request):
+    try:
+        # Fetch all the necessary data first
+        # Fetch menu types
+        menu_types = supabase_anon.table("menu_type").select("id, name, deduction_percentage").execute().data or []
+        
+        # Fetch menu categories
+        menu_categories = supabase_anon.table("menu_category").select("id, name").execute().data or []
+        
+        # Fetch menus with full details
+        menus = supabase_anon.table("menu_items").select("id, name, type_id, price, image, status_id, category_id").execute().data or []
+        
+        formatted_menus = [
+            {
+                "id": menu["id"],
+                "name": menu["name"],
+                "type_id": menu["type_id"],
+                "category_id": menu["category_id"],
+                "price": menu["price"],
+                "image": supabase_anon.storage.from_("menu-images").get_public_url(menu["image"]) if menu["image"] else None,
+                "status_id": menu["status_id"]
+            }
+            for menu in menus
+        ]
+        
+        # Fetch discounts
+        discounts = supabase_anon.table("discounts").select("id, type, percentage").execute().data or []
+        
+        # Fetch payment methods
+        payment_methods = supabase_anon.table("payment_methods").select("id, name").execute().data or []
+        
+        # Fetch in-store categories
+        instore_categories = supabase_anon.table("instore_category").select("id, name, base_amount").execute().data or []
+
+        # Get only completed transactions (order_status = 1)
+        transactions = supabase_anon.table('transaction').select("""
+            id, 
+            date,
+            payment_amount, 
+            reference_id,
+            receipt_image,
+            order_status:order_status_type (
+                id,
+                name
+            ),
+            payment_method:payment_methods (
+                id,
+                name
+            ),
+            employee_id:employee (
+                id,
+                name
+            )
+        """).eq('order_status', 1).execute()
+        
+        # Get order details for completed transactions
+        transaction_ids = [t['id'] for t in transactions.data]
+        
+        order_details = []
+        if transaction_ids:
+            order_details = supabase_anon.table('order_details').select("""
+                id,
+                transaction_id,
+                menu_id,
+                quantity,
+                discount_id,
+                instore_category,
+                unli_wings_group
+            """).in_('transaction_id', transaction_ids).execute()
+
+        # Process transactions with full details
+        processed_transactions = []
+        order_details_by_transaction = {}
+        
+        # Group order details by transaction_id
+        for detail in order_details.data:
+            if detail['transaction_id'] not in order_details_by_transaction:
+                order_details_by_transaction[detail['transaction_id']] = []
+            
+            # Enhance order detail with related data
+            enhanced_detail = {
+                **detail,
+                'menu_item': next((menu for menu in formatted_menus if menu['id'] == detail['menu_id']), None),
+                'discount': next((discount for discount in discounts if discount['id'] == detail['discount_id']), None),
+                'instore_category': next((category for category in instore_categories if category['id'] == detail['instore_category']), None)
+            }
+            order_details_by_transaction[detail['transaction_id']].append(enhanced_detail)
+        
+        # Add enhanced order details to each transaction
+        for transaction in transactions.data:
+            transaction_id = transaction['id']
+            transaction_details = order_details_by_transaction.get(transaction_id, [])
+            
+            processed_transaction = {
+                **transaction,
+                'order_details': transaction_details
+            }
+            processed_transactions.append(processed_transaction)
+
+        # Get expenses with their related data
+        expenses = supabase_anon.table('expenses').select("""
+            id,
+            date,
+            cost,
+            type_id,
+            stockin_id,
+            expenses_type (
+                id,
+                name
+            ),
+            receipts!inner (
+                id,
+                receipt_no,
+                date,
+                image,
+                supplier (
+                    id,
+                    name
+                )
+            )
+        """).execute()
+        
+        response_data = {
+            'transactions': processed_transactions,
+            'expenses': expenses.data,
+            'menu_types': menu_types,
+            'menu_categories': menu_categories,
+            'menu_items': formatted_menus,
+            'discounts': discounts,
+            'payment_methods': payment_methods,
+            'instore_categories': instore_categories
+        }
+        
+        return JsonResponse(response_data)
+    
+    except Exception as e:
+        return JsonResponse({'error': str(e)})
+

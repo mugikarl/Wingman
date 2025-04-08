@@ -223,19 +223,22 @@ const TableWithDatePicker = ({
         )}
       </div>
 
-      {/* Table - with NO top border radius */}
-      <div className="relative shadow-md rounded-b-sm">
-        <table className="w-full text-sm text-left rtl:text-right text-gray-500">
-          <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
+      {/* Table - with sticky header and scrollable content */}
+      <div
+        className="relative shadow-md rounded-b-sm overflow-y-auto"
+        style={{ maxHeight }}
+      >
+        <table className="w-full text-sm text-left rtl:text-right text-gray-500 table-auto">
+          <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
             <tr>
               {columns.map((column, index) => (
                 <th
                   key={index}
                   scope="col"
-                  className="px-6 py-4 font-medium"
+                  className="px-6 py-4 font-medium text-left cursor-pointer"
                   onClick={() => requestSort(index)}
                 >
-                  <div className="flex items-center cursor-pointer">
+                  <div className="flex items-center">
                     {column}
                     {sortConfig.key === index ? (
                       <span className="ml-1.5">
@@ -263,45 +266,42 @@ const TableWithDatePicker = ({
               ))}
             </tr>
           </thead>
-        </table>
-        <div className="overflow-y-auto" style={{ maxHeight }}>
-          <table className="w-full text-sm text-left rtl:text-right text-gray-500">
-            <tbody>
-              {sortedData.length > 0 ? (
-                sortedData.map((row, rowIndex) => (
-                  <tr
-                    key={rowIndex}
-                    className={`
-                      ${rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"} 
-                      border-b hover:bg-gray-200 group
-                      ${rowOnClick ? "cursor-pointer" : ""}
-                    `}
-                    onClick={() => rowOnClick && rowOnClick(rowIndex)}
-                  >
-                    {row.map((cell, cellIndex) => (
-                      <td
-                        key={cellIndex}
-                        className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900"
-                        scope={cellIndex === 0 ? "row" : undefined}
-                      >
-                        {cell}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr className="bg-white border-b">
-                  <td
-                    className="px-6 py-4 text-center font-normal text-gray-500 italic"
-                    colSpan={columns.length}
-                  >
-                    {emptyMessage}
-                  </td>
+          <tbody>
+            {sortedData.length > 0 ? (
+              sortedData.map((row, rowIndex) => (
+                <tr
+                  key={rowIndex}
+                  className={`
+                    ${rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                    border-b hover:bg-gray-200 group ${
+                      rowOnClick ? "cursor-pointer" : ""
+                    }
+                  `}
+                  onClick={() => rowOnClick && rowOnClick(rowIndex)}
+                >
+                  {row.map((cell, cellIndex) => (
+                    <td
+                      key={cellIndex}
+                      className="px-6 py-4 font-normal text-left text-gray-700 group-hover:text-gray-900"
+                      scope={cellIndex === 0 ? "row" : undefined}
+                    >
+                      {cell}
+                    </td>
+                  ))}
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              ))
+            ) : (
+              <tr className="bg-white border-b">
+                <td
+                  className="px-6 py-4 text-center font-normal text-gray-500 italic"
+                  colSpan={columns.length}
+                >
+                  {emptyMessage}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Add CSS to ensure no top rounded borders on the table */}

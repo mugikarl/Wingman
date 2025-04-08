@@ -49,6 +49,7 @@ urlpatterns = [
     path('update-order-status/<int:transaction_id>/', views.update_order_status, name='update_order_status'),
     path('update-menu-availability/', views.update_menu_availability, name='update_menu_availability'),
     path('check-menu-inventory/<int:menu_id>', views.check_menu_inventory, name='check_menu_inventory'),
+    path('fetch-sales-data/', views.fetch_sales_data, name='fetch_sales_data'),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/login/', views.login_view, name='login'),
