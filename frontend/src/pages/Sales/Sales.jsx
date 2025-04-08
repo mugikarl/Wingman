@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import LoadingScreen from "../components/popups/LoadingScreen";
+import LoadingScreen from "../../components/popups/LoadingScreen";
 import {
   FaCalendarAlt,
   FaChartBar,
@@ -7,232 +7,177 @@ import {
   FaPlus,
 } from "react-icons/fa";
 import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
-import ExportSales from "../components/popups/ExportSales";
-import AddExpense from "../components/popups/AddExpense";
+import ExportSales from "../../components/popups/ExportSales";
+import AddExpense from "../../components/popups/AddExpense";
 import { FaSortUp, FaSortDown } from "react-icons/fa";
+import { PiStackPlus } from "react-icons/pi";
 import axios from "axios";
-import DailyTransactions from "../components/popups/DailyTransactions";
+import DailyTransactions from "../../components/popups/DailyTransactions";
+import ExpensesType from "../../components/popups/ExpensesType";
 
 const Sales = () => {
+  // State Management
   const [month, setMonth] = useState(new Date());
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [error, setError] = useState(null);
+  const [salesData, setSalesData] = useState(null);
+  const [data, setData] = useState([]);
   const [filterStatus, setFilterStatus] = useState(1);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+
+  // Modal States
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [isExpenseTypeModalOpen, setIsExpenseTypeModalOpen] = useState(false);
   const [isDailyTransactionsOpen, setIsDailyTransactionsOpen] = useState(false);
   const [selectedDateForTransactions, setSelectedDateForTransactions] =
     useState(null);
-  const [transactionsData, setTransactionsData] = useState([]);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
 
   useEffect(() => {
     setSelectedDate(month);
   }, [month]);
 
-  useEffect(() => {
+  // Data Fetching Function
+  const fetchSalesData = async () => {
     setLoading(true);
+    try {
+      const response = await axios.get(
+        `http://127.0.0.1:8000/fetch-sales-data/`
+      );
+      console.log("Sales data fetched:", response.data);
 
-    // Fetch all sales data without date filtering
-    axios
-      .get(`http://127.0.0.1:8000/fetch-sales-data/`)
-      .then((response) => {
-        if (response.data.error) {
-          console.error("Error fetching data:", response.data.error);
-          setData([]);
-          setTransactionsData([]);
-          return;
-        }
+      if (response.data.error) {
+        setError(response.data.error);
+        setSalesData(null);
+        setData([]);
+        return;
+      }
 
-        // Store all transactions for the DailyTransactions component
-        const allTransactions = response.data.transactions || [];
-        console.log("Raw transaction data:", {
-          firstTransaction: allTransactions[0],
-          hasOrderStatus: allTransactions.some(
-            (t) => t.order_status !== undefined
-          ),
-          statusValues: [
-            ...new Set(allTransactions.map((t) => t.order_status)),
-          ],
-        });
+      // Store all data
+      setSalesData(response.data);
 
-        setTransactionsData(allTransactions);
+      // Process transactions for the current month
+      const selectedYear = month.getFullYear();
+      const selectedMonth = month.getMonth();
 
-        // Filter transactions and expenses for the selected month
-        const selectedYear = month.getFullYear();
-        const selectedMonth = month.getMonth();
-
-        const monthTransactions = allTransactions.filter((transaction) => {
+      const monthTransactions = (response.data.transactions || []).filter(
+        (transaction) => {
           const transactionDate = new Date(transaction.date);
           return (
             transactionDate.getFullYear() === selectedYear &&
             transactionDate.getMonth() === selectedMonth &&
-            transaction.order_status === 1 // Changed from order_status_id
+            transaction.order_status === 2
           );
-        });
-
-        // Filter expenses to include only those in the current month
-        const monthExpenses = (response.data.expenses || []).filter(
-          (expense) => {
-            const expenseDate = new Date(expense.date);
-            return (
-              expenseDate.getFullYear() === selectedYear &&
-              expenseDate.getMonth() === selectedMonth
-            );
-          }
-        );
-
-        // Calculate daily totals for the selected month
-        const dailyTotals = {};
-
-        // Add transaction amounts to daily totals
-        monthTransactions.forEach((transaction) => {
-          const transactionDate = new Date(transaction.date);
-          const dateStr = transactionDate.toLocaleDateString(); // Format: MM/DD/YYYY
-          if (!dailyTotals[dateStr]) {
-            dailyTotals[dateStr] = { date: dateStr, sales: 0, expenses: 0 };
-          }
-          dailyTotals[dateStr].sales += parseFloat(
-            transaction.payment_amount || 0
-          );
-        });
-
-        // Add expense amounts to daily totals
-        monthExpenses.forEach((expense) => {
-          const expenseDate = new Date(expense.date);
-          const dateStr = expenseDate.toLocaleDateString(); // Format: MM/DD/YYYY
-          if (!dailyTotals[dateStr]) {
-            dailyTotals[dateStr] = { date: dateStr, sales: 0, expenses: 0 };
-          }
-          dailyTotals[dateStr].expenses += parseFloat(expense.cost || 0);
-        });
-
-        // Format data for the table based on the selected filter
-        let displayData = [];
-        if (filterStatus === 1) {
-          // Transactions tab - Show only dates with sales
-          displayData = Object.values(dailyTotals)
-            .filter((day) => day.sales > 0)
-            .map((day) => ({
-              date: day.date,
-              sales: day.sales,
-              expenses: 0, // Don't show expenses in transactions tab
-              netIncome: day.sales,
-            }));
-        } else {
-          // Expenses tab - Show only dates with expenses
-          displayData = Object.values(dailyTotals)
-            .filter((day) => day.expenses > 0)
-            .map((day) => ({
-              date: day.date,
-              sales: 0, // Don't show sales in expenses tab
-              expenses: day.expenses,
-              netIncome: -day.expenses,
-            }));
         }
+      );
 
-        // Calculate total values for the filtered data
-        const totalValues = displayData.reduce(
-          (totals, row) => ({
-            sales: totals.sales + row.sales,
-            expenses: totals.expenses + row.expenses,
-            netIncome: totals.netIncome + row.netIncome,
-          }),
-          { sales: 0, expenses: 0, netIncome: 0 }
+      // Process expenses
+      const monthExpenses = (response.data.expenses || []).filter((expense) => {
+        const expenseDate = new Date(expense.date);
+        return (
+          expenseDate.getFullYear() === selectedYear &&
+          expenseDate.getMonth() === selectedMonth
         );
-
-        // Add total row only for footer rendering
-        const formattedData = [
-          ...displayData,
-          {
-            date: "Total",
-            sales: totalValues.sales,
-            expenses: totalValues.expenses,
-            netIncome: totalValues.netIncome,
-          },
-        ];
-
-        setData(formattedData);
-      })
-      .catch((error) => {
-        console.error("Error:", error);
-        setData([]);
-      })
-      .finally(() => {
-        setLoading(false);
       });
+
+      // Calculate daily totals
+      const dailyTotals = {};
+
+      // Process transactions
+      monthTransactions.forEach((transaction) => {
+        const dateStr = new Date(transaction.date).toLocaleDateString();
+        if (!dailyTotals[dateStr]) {
+          dailyTotals[dateStr] = { date: dateStr, sales: 0, expenses: 0 };
+        }
+        dailyTotals[dateStr].sales += parseFloat(
+          transaction.payment_amount || 0
+        );
+      });
+
+      // Process expenses
+      monthExpenses.forEach((expense) => {
+        const dateStr = new Date(expense.date).toLocaleDateString();
+        if (!dailyTotals[dateStr]) {
+          dailyTotals[dateStr] = { date: dateStr, sales: 0, expenses: 0 };
+        }
+        dailyTotals[dateStr].expenses += parseFloat(expense.cost || 0);
+      });
+
+      // Format data based on filter
+      let displayData = [];
+      if (filterStatus === 1) {
+        displayData = Object.values(dailyTotals)
+          .filter((day) => day.sales > 0)
+          .map((day) => ({
+            date: day.date,
+            sales: day.sales,
+            expenses: 0,
+            netIncome: day.sales,
+          }));
+      } else {
+        displayData = Object.values(dailyTotals)
+          .filter((day) => day.expenses > 0)
+          .map((day) => ({
+            date: day.date,
+            sales: 0,
+            expenses: day.expenses,
+            netIncome: -day.expenses,
+          }));
+      }
+
+      // Calculate totals
+      const totalValues = displayData.reduce(
+        (totals, row) => ({
+          sales: totals.sales + row.sales,
+          expenses: totals.expenses + row.expenses,
+          netIncome: totals.netIncome + row.netIncome,
+        }),
+        { sales: 0, expenses: 0, netIncome: 0 }
+      );
+
+      setData([
+        ...displayData,
+        {
+          date: "Total",
+          sales: totalValues.sales,
+          expenses: totalValues.expenses,
+          netIncome: totalValues.netIncome,
+        },
+      ]);
+    } catch (err) {
+      console.error("Error fetching sales data:", err);
+      setError(err.message || "Error fetching data");
+      setSalesData(null);
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSalesData();
   }, [month, filterStatus]);
 
-  const sortedData = React.useMemo(() => {
-    let sortableData = [...data];
-    if (sortConfig.key !== null && sortConfig.direction !== null) {
-      sortableData.sort((a, b) => {
-        if (a.date === "Total") return 1;
-        if (b.date === "Total") return -1;
-        const aValue = a[sortConfig.key];
-        const bValue = b[sortConfig.key];
-        if (aValue < bValue) {
-          return sortConfig.direction === "ascending" ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === "ascending" ? 1 : -1;
-        }
-        return 0;
-      });
-    }
-    return sortableData;
-  }, [data, sortConfig]);
-
-  const requestSort = (key) => {
-    let direction = "ascending";
-    if (sortConfig.key === key) {
-      direction =
-        sortConfig.direction === "ascending"
-          ? "descending"
-          : sortConfig.direction === "descending"
-          ? null
-          : "ascending";
-    }
-    setSortConfig({ key, direction });
-  };
-
-  const formatCurrency = (value) => {
-    return `₱${value.toLocaleString()}`;
-  };
-
-  const handleExportClick = () => {
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-  };
-
+  // Event Handlers
+  const handleExportClick = () => setIsModalOpen(true);
+  const handleAddExpenseClick = () => setIsExpenseModalOpen(true);
+  const handleAddExpenseTypeClick = () => setIsExpenseTypeModalOpen(true);
   const handlePreviousMonth = () => {
     const newMonth = new Date(month);
     newMonth.setMonth(newMonth.getMonth() - 1);
     setMonth(newMonth);
   };
-
   const handleNextMonth = () => {
     const newMonth = new Date(month);
     newMonth.setMonth(newMonth.getMonth() + 1);
     setMonth(newMonth);
   };
-
   const handleMonthChange = (date) => {
     setMonth(date);
     setShowMonthPicker(false);
-  };
-
-  const handleAddExpenseClick = () => {
-    setIsExpenseModalOpen(true);
-  };
-
-  const closeExpenseModal = () => {
-    setIsExpenseModalOpen(false);
   };
 
   const handleRowClick = (row) => {
@@ -243,12 +188,19 @@ const Sales = () => {
     }
   };
 
+  // Utility Functions
+  const formatCurrency = (value) => `₱${value.toLocaleString()}`;
+
   if (loading) {
     return (
       <div className="w-full flex justify-center items-center">
         <LoadingScreen message="Loading sales data" />
       </div>
     );
+  }
+
+  if (error) {
+    return <div className="p-4 text-red-500">Error: {error}</div>;
   }
 
   return (
@@ -288,6 +240,15 @@ const Sales = () => {
             <span className="flex-1 text-left pl-3">Add Expense</span>
           </button>
           <button
+            onClick={handleAddExpenseTypeClick}
+            className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
+          >
+            <div className="flex items-center justify-center border-r p-2">
+              <PiStackPlus className="w-5 h-5 text-[#CC5500]" />
+            </div>
+            <span className="flex-1 text-left pl-3">Add Expense Type</span>
+          </button>
+          <button
             onClick={handleExportClick}
             className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
           >
@@ -298,7 +259,6 @@ const Sales = () => {
           </button>
         </div>
       </div>
-
       {/* Active/Inactive Buttons */}
       <div className="flex mb-0">
         <button
@@ -455,8 +415,8 @@ const Sales = () => {
             </tr>
           </thead>
           <tbody>
-            {sortedData.filter((row) => row.date !== "Total").length > 0 ? (
-              sortedData
+            {data.filter((row) => row.date !== "Total").length > 0 ? (
+              data
                 .filter((row) => row.date !== "Total")
                 .map((row, rowIndex) => (
                   <tr
@@ -495,12 +455,12 @@ const Sales = () => {
       </div>
 
       {/* Footer: TOTAL displayed as footer only */}
-      {sortedData.some((row) => row.date === "Total") && (
+      {data.some((row) => row.date === "Total") && (
         <div className="sticky bottom-0 w-full border-t-2 border-[#CC5500]">
           <table className="w-full text-sm text-left">
             <tfoot>
               <tr className="bg-white">
-                {sortedData
+                {data
                   .filter((row) => row.date === "Total")
                   .map((totalRow, index) => (
                     <React.Fragment key={index}>
@@ -526,16 +486,35 @@ const Sales = () => {
 
       <ExportSales
         isOpen={isModalOpen}
-        onClose={closeModal}
+        onClose={() => setIsModalOpen(false)}
         selectedDate={selectedDate}
       />
-      {isExpenseModalOpen && <AddExpense closePopup={closeExpenseModal} />}
+      {isExpenseModalOpen && (
+        <AddExpense closePopup={() => setIsExpenseModalOpen(false)} />
+      )}
       {isDailyTransactionsOpen && (
         <DailyTransactions
           isOpen={isDailyTransactionsOpen}
           onClose={() => setIsDailyTransactionsOpen(false)}
           date={selectedDateForTransactions}
-          transactionsData={transactionsData}
+          transactionsData={salesData?.transactions || []}
+          menuTypes={salesData?.menu_types || []}
+          discountsData={salesData?.discounts || []}
+          menuItems={salesData?.menu_items || []}
+          menuCategories={salesData?.menu_categories || []}
+          employees={salesData?.employees || []}
+          unliWingsCategory={salesData?.instore_categories?.find(
+            (cat) => cat.id === 2
+          )}
+          fetchOrderData={fetchSalesData}
+        />
+      )}
+      {isExpenseTypeModalOpen && (
+        <ExpensesType
+          isOpen={isExpenseTypeModalOpen}
+          onClose={() => setIsExpenseTypeModalOpen(false)}
+          expensesTypes={salesData?.expenses_types || []}
+          fetchExpensesData={fetchSalesData}
         />
       )}
     </div>

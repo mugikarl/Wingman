@@ -2,13 +2,24 @@ import React, { useState, useEffect } from "react";
 import { MdClose } from "react-icons/md";
 import TableWithDatePicker from "../tables/TablewithDatePicker";
 import LoadingScreen from "./LoadingScreen";
-import TransactionModal from "../popups/TransactionModal"; // Adjust the import path as needed
+import TransactionModal from "../popups/TransactionModal";
 
-const DailyTransactions = ({ isOpen, onClose, date, transactionsData }) => {
+const DailyTransactions = ({
+  isOpen,
+  onClose,
+  date,
+  transactionsData,
+  menuTypes,
+  discountsData,
+  menuItems,
+  menuCategories,
+  employees,
+  unliWingsCategory,
+  fetchSalesData,
+}) => {
   const [selectedDate, setSelectedDate] = useState(date);
   const [loading, setLoading] = useState(false);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
-  // New state for the selected transaction to be shown in TransactionModal
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
   // Update selectedDate when date prop changes
@@ -31,7 +42,7 @@ const DailyTransactions = ({ isOpen, onClose, date, transactionsData }) => {
         const transactionString = transactionDate.toLocaleDateString();
 
         return (
-          transactionString === selectedDate && transaction.order_status === 1 // Completed transactions only
+          transactionString === selectedDate && transaction.order_status === 2
         );
       }) || [];
 
@@ -128,9 +139,7 @@ const DailyTransactions = ({ isOpen, onClose, date, transactionsData }) => {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
         <div className="bg-white rounded-lg w-4/5 max-h-[90vh] flex flex-col">
           <div className="flex justify-between items-center p-4 border-b">
-            <h2 className="text-xl font-semibold text-[#CC5500]">
-              Daily Transactions
-            </h2>
+            <h2 className="text-xl font-semibold">Daily Transactions</h2>
             <button
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700"
@@ -172,8 +181,13 @@ const DailyTransactions = ({ isOpen, onClose, date, transactionsData }) => {
           isOpen={true}
           onClose={() => setSelectedTransaction(null)}
           transaction={selectedTransaction}
-          // Pass additional props as required by TransactionModal,
-          // for example, menuTypes, discountsData, menuItems, etc.
+          menuTypes={menuTypes}
+          discountsData={discountsData}
+          menuItems={menuItems}
+          menuCategories={menuCategories}
+          employees={employees}
+          unliWingsCategory={unliWingsCategory}
+          fetchOrderData={fetchSalesData}
         />
       )}
     </>

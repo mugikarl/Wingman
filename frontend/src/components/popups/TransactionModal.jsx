@@ -93,10 +93,17 @@ const TransactionModal = ({
   // Add this effect to update orderStatus when transaction changes
   useEffect(() => {
     if (transaction) {
+      console.log("Transaction for status:", transaction);
+
+      // First check if order_status is an object with a name property
       if (transaction.order_status?.name) {
         setOrderStatus(transaction.order_status.name);
-      } else {
-        const statusId = Number(transaction.status);
+      }
+      // Check if order_status is a numeric value
+      else if (typeof transaction.order_status === "number") {
+        const statusId = transaction.order_status;
+        console.log("Status ID from transaction.order_status:", statusId);
+
         switch (statusId) {
           case 1:
             setOrderStatus("Pending");
@@ -111,12 +118,28 @@ const TransactionModal = ({
             setOrderStatus("Pending");
         }
       }
+      // Last resort - check status property
+      else if (transaction.status) {
+        const statusId = Number(transaction.status);
+        console.log("Status ID from transaction.status:", statusId);
+
+        switch (statusId) {
+          case 1:
+            setOrderStatus("Pending");
+            break;
+          case 2:
+            setOrderStatus("Completed");
+            break;
+          case 3:
+            setOrderStatus("Cancelled");
+            break;
+          default:
+            setOrderStatus("Pending");
+        }
+      }
+
       // For debugging
-      console.log("Transaction data:", transaction);
-      console.log(
-        "Status from transaction:",
-        transaction.order_status?.name || transaction.status
-      );
+      console.log("Final status set to:", orderStatus);
     }
   }, [transaction]);
 
@@ -267,7 +290,9 @@ const TransactionModal = ({
   // Check if order is non-editable (Completed or Cancelled)
   const isOrderNonEditable =
     orderStatus.toLowerCase() === "completed" ||
-    orderStatus.toLowerCase() === "cancelled";
+    orderStatus.toLowerCase() === "cancelled" ||
+    transaction.order_status === 2 || // Completed
+    transaction.order_status === 3; // Cancelled
 
   // When an Update button is clicked:
   const handleUpdateClick = () => {

@@ -2658,7 +2658,7 @@ def delete_menu_item(request, menu_id):
         return Response({"error": f"Unexpected error: {e}"}, status=500)
 
 @api_view(['GET'])
-@authentication_classes([])  # You can add authentication classes if needed
+@authentication_classes([])
 @permission_classes([AllowAny])   
 def fetch_order_data(request, transactionId=None):
     try:
@@ -4173,7 +4173,7 @@ def fetch_sales_data(request):
                 id,
                 name
             )
-        """).eq('order_status', 1).execute()
+        """).eq('order_status', 2).execute()
         
         # Get order details for completed transactions
         transaction_ids = [t['id'] for t in transactions.data]
@@ -4242,9 +4242,12 @@ def fetch_sales_data(request):
             )
         """).execute()
         
+        expenses_types = supabase_anon.table('expenses_type').select("id, name").execute().data or []
+
         response_data = {
             'transactions': processed_transactions,
             'expenses': expenses.data,
+            'expenses_types': expenses_types,
             'menu_types': menu_types,
             'menu_categories': menu_categories,
             'menu_items': formatted_menus,
@@ -4253,8 +4256,121 @@ def fetch_sales_data(request):
             'instore_categories': instore_categories
         }
         
-        return JsonResponse(response_data)
+        return Response(response_data)
     
     except Exception as e:
-        return JsonResponse({'error': str(e)})
+        return Response({'error': str(e)})
 
+@api_view(['POST'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def add_expense_type(request):
+    """
+    Add a new expense type
+    """
+    try:
+        # Authenticate the user and get the authenticated user's id
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data['client']
+
+        # Get the data from the request
+        data = json.loads(request.body)
+        name = data.get('name')
+
+        if not name:
+            return Response({"error": "Name is required"}, status=400)
+        
+        insert_response = supabase_client.table('expenses_type').insert({
+            'name': name
+        }).execute()
+
+        if insert_response.data:
+            return Response({
+                "message": "Expense type added successfully",
+                "expense_type": insert_response.data[0]
+            }, status=201)
+        else:
+            return Response({
+                "error": "Failed to add expense type"
+            }, status=500)
+        
+    except Exception as e:
+        return Response({
+            "error": "Failed to add expense type"
+        }, status=500)
+        
+@api_view(['PUT'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def edit_expense_type(request, expense_type_id):
+    """
+    Edit an existing expense type
+    """
+    try:
+        # Authenticate the user and get the authenticated user's id
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data['client']
+        
+        data = json.loads(request.body)
+        new_name = data.get('name')
+
+        if not new_name:
+            return Response({"error": "Name is required"}, status=400)
+        
+        expense_response = supabase_client.table('expenses_type').select('*').eq('id', expense_type_id).execute()
+        if not expense_response.data:
+            return Response({
+                "error": "Expense type not found"
+            }, status=404)
+        
+        update_response = supabase_client.table('expenses_type').update({
+            'name': new_name
+        }).eq('id', expense_type_id).execute()
+
+        if not update_response.data:
+            return Response({
+                "error": "Failed to update expense type"
+            }, status=500)
+        
+        return Response({
+            "message": "Expense type updated successfully",
+            "expense_type": update_response.data[0]
+        }, status=200)
+        
+    except Exception as e:
+        return Response({
+            "error": "Failed to update expense type"
+        }, status=500)
+
+@api_view(['DELETE'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def delete_expense_type(request, expense_type_id):
+    """
+    Delete an existing expense type
+    """
+    try:
+        # Authenticate the user and get the authenticated user's id
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data['client']
+        
+        expense_response = supabase_client.table('expenses_type').select('*').eq('id', expense_type_id).execute()
+        if not expense_response.data:
+            return Response({
+                "error": "Expense type not found"
+            }, status=404)
+        
+        delete_response = supabase_client.table('expenses_type').delete().eq('id', expense_type_id).execute()
+        if not delete_response.data:
+            return Response({
+                "error": "Failed to delete expense type"
+            }, status=500)
+        else:
+            return Response({
+                "message": "Expense type deleted successfully"
+            }, status=200)
+        
+    except Exception as e:
+        return Response({
+            "error": "Failed to update expense type"
+        }, status=500)
