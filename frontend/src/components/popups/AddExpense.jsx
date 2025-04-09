@@ -1,143 +1,191 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 
-const AddExpense = ({ closePopup }) => {
+const AddExpense = ({
+  closePopup,
+  expenseTypes = [],
+  onExpenseAdded = () => {},
+  defaultDate = "",
+}) => {
   const [expenseDetails, setExpenseDetails] = useState({
-    expenseId: "",
+    date: defaultDate,
     amount: "",
-    description: "",
-    date: "",
     expenseType: "",
+    note: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingDots, setLoadingDots] = useState("");
+
+  useEffect(() => {
+    if (defaultDate) {
+      setExpenseDetails((prev) => ({
+        ...prev,
+        date: defaultDate,
+      }));
+    }
+  }, [defaultDate]);
+
+  // Loading animation effect
+  useEffect(() => {
+    let interval;
+    if (isSubmitting) {
+      let dotCount = 0;
+      interval = setInterval(() => {
+        setLoadingDots(".".repeat(dotCount % 4));
+        dotCount++;
+      }, 500);
+    } else {
+      setLoadingDots("");
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isSubmitting]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setExpenseDetails({ ...expenseDetails, [name]: value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Logic to save the expense (e.g., making an API call)
-    console.log("Expense Added:", expenseDetails);
-    closePopup(); // Close the popup after submission
+
+    // Validate form - Remove note from required fields
+    if (
+      !expenseDetails.date ||
+      !expenseDetails.amount ||
+      !expenseDetails.expenseType
+    ) {
+      alert("Please fill all required fields.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Send data to the API
+      const response = await axios.post("http://127.0.0.1:8000/add-expense/", {
+        date: expenseDetails.date,
+        cost: expenseDetails.amount,
+        expense_type_id: expenseDetails.expenseType,
+        note: expenseDetails.note || null, // Allow null for note
+      });
+
+      console.log("Expense Added:", response.data);
+
+      // Call the callback to refresh data
+      onExpenseAdded();
+
+      // Close the popup after submission
+      closePopup();
+    } catch (error) {
+      console.error("Error adding expense:", error);
+      alert("Failed to add expense. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-50 flex justify-center items-center z-50">
-      <div className="bg-white p-6 rounded-md w-96 shadow-lg">
-        <h2 className="text-lg font-semibold text-[#CC5500] mb-4">Add Expense</h2>
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-white rounded-lg p-6 w-96">
+        {/* Modal Header */}
+        <div className="flex justify-between items-center border-b pb-2 mb-4">
+          <h2 className="text-xl font-semibold">Add Expense</h2>
+          <button
+            onClick={closePopup}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            &times;
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit}>
-          {/* Expense ID */}
-          <div className="mb-4 flex items-center justify-between">
-            <label
-              htmlFor="expenseId"
-              className="block text-sm font-semibold text-gray-700 w-1/3"
-            >
-              Expense ID
-            </label>
-            <input
-              type="text"
-              id="expenseId"
-              name="expenseId"
-              value={expenseDetails.expenseId}
-              onChange={handleInputChange}
-              className="w-2/3 p-2 border border-gray-300 rounded-md mt-2"
-              required
-            />
-          </div>
-          <div className="mb-4 flex items-center justify-between">
-            <label
-              htmlFor="expenseType"
-              className="block text-sm font-semibold text-gray-700 w-1/3"
-            >
-              Expense Type
-            </label>
-            <select
-              id="expenseType"
-              name="expenseType"
-              value={expenseDetails.expenseType}
-              onChange={handleInputChange}
-              className="w-2/3 p-2 border border-gray-300 rounded-md mt-2"
-              required
-            >
-              <option value="">Select Type</option>
-              <option value="Food">Food</option>
-              <option value="Transport">Transport</option>
-              <option value="Entertainment">Entertainment</option>
-              <option value="Others">Others</option>
-            </select>
-          </div>
-          {/* Amount */}
-          <div className="mb-4 flex items-center justify-between">
-            <label
-              htmlFor="amount"
-              className="block text-sm font-semibold text-gray-700 w-1/3"
-            >
-              Amount
-            </label>
-            <input
-              type="number"
-              id="amount"
-              name="amount"
-              value={expenseDetails.amount}
-              onChange={handleInputChange}
-              className="w-2/3 p-2 border border-gray-300 rounded-md mt-2"
-              required
-            />
-          </div>
-
-          {/* Description */}
-          <div className="mb-4 flex items-center justify-between">
-            <label
-              htmlFor="description"
-              className="block text-sm font-semibold text-gray-700 w-1/3"
-            >
-              Description
-            </label>
-            <input
-              type="text"
-              id="description"
-              name="description"
-              value={expenseDetails.description}
-              onChange={handleInputChange}
-              className="w-2/3 p-2 border border-gray-300 rounded-md mt-2"
-              required
-            />
-          </div>
-
+        {/* Modal Body */}
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Date */}
-          <div className="mb-4 flex items-center justify-between">
-            <label
-              htmlFor="date"
-              className="block text-sm font-semibold text-gray-700 w-1/3"
-            >
-              Date
-            </label>
+          <div>
+            <label className="block text-sm font-medium">Date</label>
             <input
               type="date"
               id="date"
               name="date"
               value={expenseDetails.date}
               onChange={handleInputChange}
-              className="w-2/3 p-2 border border-gray-300 rounded-md mt-2"
+              className="w-full p-2 border rounded-lg"
               required
+              disabled={isSubmitting}
             />
           </div>
 
+          {/* Amount */}
+          <div>
+            <label className="block text-sm font-medium">Amount</label>
+            <input
+              type="number"
+              id="amount"
+              name="amount"
+              value={expenseDetails.amount}
+              onChange={handleInputChange}
+              className="w-full p-2 border rounded-lg"
+              required
+              disabled={isSubmitting}
+            />
+          </div>
 
-          <div className="flex justify-end gap-4">
-            <button
-              type="button"
-              onClick={closePopup}
-              className="px-4 py-2 bg-gray-300 rounded-md text-black hover:bg-gray-400"
+          {/* Expense Type */}
+          <div>
+            <label className="block text-sm font-medium">Expense Type</label>
+            <select
+              id="expenseType"
+              name="expenseType"
+              value={expenseDetails.expenseType}
+              onChange={handleInputChange}
+              className="w-full p-2 border rounded-lg"
+              required
+              disabled={isSubmitting}
             >
-              Cancel
-            </button>
+              <option value="" hidden>
+                Select Type
+              </option>
+              {expenseTypes
+                .filter((type) => type.name !== "Stock In")
+                .map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          {/* Note */}
+          <div>
+            <label className="block text-sm font-medium">Note</label>
+            <input
+              type="text"
+              id="note"
+              name="note"
+              value={expenseDetails.note}
+              onChange={handleInputChange}
+              className="w-full p-2 border rounded-lg"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          {/* Modal Footer */}
+          <div className="flex justify-end mt-4">
             <button
               type="submit"
-              className="px-4 py-2 bg-[#CC5500] text-white rounded-md hover:bg-[#cc4400]"
+              disabled={isSubmitting}
+              className={`bg-green-500 text-white px-4 py-2 rounded-lg w-32 h-10 flex items-center justify-center ${
+                isSubmitting
+                  ? "opacity-70 cursor-not-allowed"
+                  : "hover:bg-green-600"
+              }`}
             >
-              Add Expense
+              <span className="inline-block whitespace-nowrap overflow-hidden text-ellipsis">
+                {isSubmitting ? `Adding${loadingDots}` : "Add Expense"}
+              </span>
             </button>
           </div>
         </form>

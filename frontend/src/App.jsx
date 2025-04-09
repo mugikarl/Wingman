@@ -38,6 +38,7 @@ import EditMenuModal from "./components/popups/EditMenuModal";
 import AdminRedirect from "./components/admin/AdminRedirect";
 import ExportSales from "./components/popups/ExportSales";
 import AddExpense from "./components/popups/AddExpense";
+import DailySales from "./components/popups/DailySales";
 
 // You might have a separate dashboard for employees if needed.
 const EmployeeDashboard = Dashboard; // For this example, we reuse Dashboard
@@ -167,6 +168,10 @@ const App = () => {
               }
             />
             <Route
+              path="/dashboard-admin/daily-sales/:date"
+              element={<DailySales />}
+            />
+            <Route
               path="/dashboard-admin/exportsales"
               element={
                 <AdminRoute>
@@ -291,6 +296,7 @@ const App = () => {
             <Route path="/chooseorder" element={<ChooseOrder />} />
             <Route path="/testconnection" element={<TestConnection />} />
             <Route path="/attendancereview" element={<AttendanceReview />} />
+
             {/* <Route path="/items" element={<Items />} />
             <Route path="/edititem" element={<EditItem />} /> */}
             {/* <Route path="/editinventory" element={<EditInventory />} /> */}

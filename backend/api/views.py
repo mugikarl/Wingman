@@ -4122,16 +4122,45 @@ def check_menu_inventory(request, menu_id):
 @permission_classes([AllowAny])
 def fetch_sales_data(request):
     try:
-        # Fetch all the necessary data first
-        # Fetch menu types
-        menu_types = supabase_anon.table("menu_type").select("id, name, deduction_percentage").execute().data or []
+        # First, fetch only the essential reference data that's needed across components
+        essential_data = {}
         
-        # Fetch menu categories
-        menu_categories = supabase_anon.table("menu_category").select("id, name").execute().data or []
+        # Parallel fetch for reference data (to optimize loading time)
+        menu_types_query = supabase_anon.table("menu_type").select("id, name, deduction_percentage")
+        menu_categories_query = supabase_anon.table("menu_category").select("id, name")
+        expenses_types_query = supabase_anon.table("expenses_type").select("id, name")
+        instore_categories_query = supabase_anon.table("instore_category").select("id, name, base_amount")
+        payment_methods_query = supabase_anon.table("payment_methods").select("id, name")
+        discounts_query = supabase_anon.table("discounts").select("id, type, percentage")
+        unit_measurements_query = supabase_anon.table("unit_of_measurement").select("id, symbol")
+        suppliers_query = supabase_anon.table("supplier").select("id, name")
         
-        # Fetch menus with full details
-        menus = supabase_anon.table("menu_items").select("id, name, type_id, price, image, status_id, category_id").execute().data or []
+        # Execute queries in parallel
+        menu_types_result = menu_types_query.execute()
+        menu_categories_result = menu_categories_query.execute()
+        expenses_types_result = expenses_types_query.execute()
+        instore_categories_result = instore_categories_query.execute()
+        payment_methods_result = payment_methods_query.execute()
+        discounts_result = discounts_query.execute()
+        unit_measurements_result = unit_measurements_query.execute()
+        suppliers_result = suppliers_query.execute()
         
+        # Store results
+        essential_data['menu_types'] = menu_types_result.data or []
+        essential_data['menu_categories'] = menu_categories_result.data or []
+        essential_data['expenses_types'] = expenses_types_result.data or []
+        essential_data['instore_categories'] = instore_categories_result.data or []
+        essential_data['payment_methods'] = payment_methods_result.data or []
+        essential_data['discounts'] = discounts_result.data or []
+        essential_data['unit_measurements'] = unit_measurements_result.data or []
+        essential_data['suppliers'] = suppliers_result.data or []
+        
+        # Fetch menu items (needed for order details and stock-in details)
+        menus = supabase_anon.table("menu_items").select(
+            "id, name, type_id, price, image, status_id, category_id"
+        ).execute().data or []
+        
+        # Format menu images only once
         formatted_menus = [
             {
                 "id": menu["id"],
@@ -4144,42 +4173,29 @@ def fetch_sales_data(request):
             }
             for menu in menus
         ]
+        essential_data['menu_items'] = formatted_menus
         
-        # Fetch discounts
-        discounts = supabase_anon.table("discounts").select("id, type, percentage").execute().data or []
+        # Fetch items (needed for StockInExpense)
+        items = supabase_anon.table('items').select("id, name, measurement, category").execute().data or []
+        essential_data['items'] = items
         
-        # Fetch payment methods
-        payment_methods = supabase_anon.table("payment_methods").select("id, name").execute().data or []
-        
-        # Fetch in-store categories
-        instore_categories = supabase_anon.table("instore_category").select("id, name, base_amount").execute().data or []
-
-        # Get only completed transactions (order_status = 1)
+        # Optimize transaction fetching - only get completed transactions (status = 2)
         transactions = supabase_anon.table('transaction').select("""
             id, 
             date,
             payment_amount, 
             reference_id,
             receipt_image,
-            order_status:order_status_type (
-                id,
-                name
-            ),
-            payment_method:payment_methods (
-                id,
-                name
-            ),
-            employee_id:employee (
-                id,
-                name
-            )
-        """).eq('order_status', 2).execute()
+            order_status,
+            payment_method,
+            employee_id
+        """).eq('order_status', 2).execute().data or []
         
-        # Get order details for completed transactions
-        transaction_ids = [t['id'] for t in transactions.data]
-        
-        order_details = []
-        if transaction_ids:
+        # Only fetch order details for these transactions
+        if transactions:
+            transaction_ids = [t['id'] for t in transactions]
+            
+            # Fetch order details for these transactions in a single query
             order_details = supabase_anon.table('order_details').select("""
                 id,
                 transaction_id,
@@ -4188,77 +4204,128 @@ def fetch_sales_data(request):
                 discount_id,
                 instore_category,
                 unli_wings_group
-            """).in_('transaction_id', transaction_ids).execute()
-
-        # Process transactions with full details
-        processed_transactions = []
-        order_details_by_transaction = {}
-        
-        # Group order details by transaction_id
-        for detail in order_details.data:
-            if detail['transaction_id'] not in order_details_by_transaction:
-                order_details_by_transaction[detail['transaction_id']] = []
+            """).in_('transaction_id', transaction_ids).execute().data or []
             
-            # Enhance order detail with related data
-            enhanced_detail = {
-                **detail,
-                'menu_item': next((menu for menu in formatted_menus if menu['id'] == detail['menu_id']), None),
-                'discount': next((discount for discount in discounts if discount['id'] == detail['discount_id']), None),
-                'instore_category': next((category for category in instore_categories if category['id'] == detail['instore_category']), None)
-            }
-            order_details_by_transaction[detail['transaction_id']].append(enhanced_detail)
-        
-        # Add enhanced order details to each transaction
-        for transaction in transactions.data:
-            transaction_id = transaction['id']
-            transaction_details = order_details_by_transaction.get(transaction_id, [])
+            # Group order details by transaction_id to avoid multiple iterations
+            order_details_by_transaction = {}
+            for detail in order_details:
+                transaction_id = detail['transaction_id']
+                if transaction_id not in order_details_by_transaction:
+                    order_details_by_transaction[transaction_id] = []
+                
+                # Add reference data directly to each detail
+                enhanced_detail = {
+                    **detail,
+                    'menu_item': next((menu for menu in formatted_menus if menu['id'] == detail['menu_id']), None),
+                    'discount': next((discount for discount in essential_data['discounts'] if discount['id'] == detail['discount_id']), None),
+                    'instore_category': next((category for category in essential_data['instore_categories'] if category['id'] == detail['instore_category']), None)
+                }
+                order_details_by_transaction[transaction_id].append(enhanced_detail)
             
-            processed_transaction = {
-                **transaction,
-                'order_details': transaction_details
-            }
-            processed_transactions.append(processed_transaction)
-
-        # Get expenses with their related data
+            # Add order details to each transaction
+            processed_transactions = []
+            for transaction in transactions:
+                transaction_id = transaction['id']
+                transaction_details = order_details_by_transaction.get(transaction_id, [])
+                
+                # Add formatted transaction with its details
+                processed_transaction = {
+                    **transaction,
+                    'order_details': transaction_details
+                }
+                processed_transactions.append(processed_transaction)
+        else:
+            processed_transactions = []
+        
+        # Optimize expense fetching with proper nested structure
         expenses = supabase_anon.table('expenses').select("""
             id,
             date,
             cost,
             type_id,
             stockin_id,
-            expenses_type (
-                id,
-                name
-            ),
-            receipts!inner (
-                id,
-                receipt_no,
-                date,
-                image,
-                supplier (
-                    id,
-                    name
-                )
-            )
-        """).execute()
+            note
+        """).execute().data or []
         
-        expenses_types = supabase_anon.table('expenses_type').select("id, name").execute().data or []
-
+        # Process expenses with stockin_id to include receipt details
+        stockin_expenses = [exp for exp in expenses if exp.get('stockin_id')]
+        
+        if stockin_expenses:
+            # Get unique stockin_ids (receipt ids)
+            receipt_ids = list(set(exp['stockin_id'] for exp in stockin_expenses if exp['stockin_id']))
+            
+            if receipt_ids:
+                # Fetch all relevant receipts in a single query
+                receipts = supabase_anon.table('receipts').select("""
+                    id,
+                    receipt_no,
+                    date,
+                    supplier
+                """).in_('id', receipt_ids).execute().data or []
+                
+                # Create a lookup dictionary for receipts
+                receipts_by_id = {receipt['id']: receipt for receipt in receipts}
+                
+                # Fetch all stock-in items in a single query
+                stockin_items = supabase_anon.table('stockin').select("""
+                    id,
+                    receipt_id,
+                    inventory_id,
+                    item_id,
+                    quantity_in,
+                    price,
+                    inventory:inventory (
+                        id,
+                        quantity,
+                        item:items (
+                            id,
+                            name,
+                            measurement
+                        )
+                    )
+                """).in_('receipt_id', receipt_ids).execute().data or []
+                
+                # Group stock-in items by receipt_id
+                stockin_by_receipt = {}
+                for item in stockin_items:
+                    receipt_id = item.get('receipt_id')
+                    if receipt_id not in stockin_by_receipt:
+                        stockin_by_receipt[receipt_id] = []
+                    stockin_by_receipt[receipt_id].append(item)
+                
+                # Add receipt and stock-in details to each expense
+                for expense in stockin_expenses:
+                    stockin_id = expense.get('stockin_id')
+                    receipt = receipts_by_id.get(stockin_id)
+                    
+                    if receipt:
+                        # Add stock_ins array if available
+                        if stockin_id in stockin_by_receipt:
+                            receipt['stock_ins'] = stockin_by_receipt[stockin_id]
+                        else:
+                            receipt['stock_ins'] = []
+                        
+                        # Add the receipt to the expense
+                        expense['receipt'] = receipt
+                
+        # Add expense types to each expense for easier access
+        for expense in expenses:
+            expense['expenses_type'] = next(
+                (et for et in essential_data['expenses_types'] if et['id'] == expense['type_id']), 
+                None
+            )
+        
+        # Combine all data for the response
         response_data = {
             'transactions': processed_transactions,
-            'expenses': expenses.data,
-            'expenses_types': expenses_types,
-            'menu_types': menu_types,
-            'menu_categories': menu_categories,
-            'menu_items': formatted_menus,
-            'discounts': discounts,
-            'payment_methods': payment_methods,
-            'instore_categories': instore_categories
+            'expenses': expenses,
+            **essential_data  # Include all essential reference data
         }
         
         return Response(response_data)
     
     except Exception as e:
+        print(f"Error in fetch_sales_data: {str(e)}")
         return Response({'error': str(e)})
 
 @api_view(['POST'])
@@ -4373,4 +4440,133 @@ def delete_expense_type(request, expense_type_id):
     except Exception as e:
         return Response({
             "error": "Failed to update expense type"
+        }, status=500)
+
+@api_view(['POST'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def add_expense(request):
+    """
+    Add a new expense
+    """
+    try:
+        # Authenticate the user and get the authenticated user's id
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data['client']
+
+        # Get the data from the request
+        data = json.loads(request.body)
+        date = data.get('date')
+        cost = data.get('cost')
+        expense_type_id = data.get('expense_type_id')
+        note = data.get('note')
+
+        # Validate required fields
+        if not date:
+            return Response({"error": "Date is required"}, status=400)
+        if not cost:
+            return Response({"error": "Amount is required"}, status=400)
+        if not expense_type_id:
+            return Response({"error": "Expense type is required"}, status=400)
+        
+        # Insert the expense record
+        insert_response = supabase_client.table('expenses').insert({
+            'date': date,
+            'cost': cost,
+            'type_id': expense_type_id,
+            'note': note
+        }).execute()
+
+        if insert_response.data:
+            return Response({
+                "message": "Expense added successfully",
+                "expense": insert_response.data[0]
+            }, status=201)
+        else:
+            return Response({
+                "error": "Failed to add expense"
+            }, status=500)
+        
+    except Exception as e:
+        return Response({
+            "error": f"Failed to add expense: {str(e)}"
+        }, status=500)
+
+@api_view(['PUT'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def edit_expense(request, expense_id):
+    """
+    Edit an existing expense
+    """
+    try:
+        # Authenticate the user and get the authenticated user's id
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data['client']
+        
+        data = json.loads(request.body)
+        date = data.get('date')
+        cost = data.get('cost')
+        expense_type_id = data.get('expense_type_id')
+        note = data.get('note')
+
+        # Validate required fields
+        if not date or not cost or not expense_type_id:
+            return Response({"error": "Date, cost, and expense type are required"}, status=400)
+        
+        # Check if expense exists
+        expense_response = supabase_client.table('expenses').select('*').eq('id', expense_id).execute()
+        if not expense_response.data:
+            return Response({"error": "Expense not found"}, status=404)
+        
+        # Update expense
+        update_response = supabase_client.table('expenses').update({
+            'date': date,
+            'cost': cost,
+            'type_id': expense_type_id,
+            'note': note
+        }).eq('id', expense_id).execute()
+
+        if not update_response.data:
+            return Response({"error": "Failed to update expense"}, status=500)
+        
+        return Response({
+            "message": "Expense updated successfully",
+            "expense": update_response.data[0]
+        }, status=200)
+        
+    except Exception as e:
+        return Response({
+            "error": f"Failed to update expense: {str(e)}"
+        }, status=500)
+
+@api_view(['DELETE'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def delete_expense(request, expense_id):
+    """
+    Delete an existing expense
+    """
+    try:
+        # Authenticate the user and get the authenticated user's id
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data['client']
+        
+        # Check if expense exists
+        expense_response = supabase_client.table('expenses').select('*').eq('id', expense_id).execute()
+        if not expense_response.data:
+            return Response({"error": "Expense not found"}, status=404)
+        
+        # Delete expense
+        delete_response = supabase_client.table('expenses').delete().eq('id', expense_id).execute()
+        if not delete_response.data:
+            return Response({"error": "Failed to delete expense"}, status=500)
+        
+        return Response({
+            "message": "Expense deleted successfully"
+        }, status=200)
+        
+    except Exception as e:
+        return Response({
+            "error": f"Failed to delete expense: {str(e)}"
         }, status=500)
