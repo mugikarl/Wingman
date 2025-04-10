@@ -609,6 +609,7 @@ const Sales = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         selectedDate={selectedDate}
+        salesData={salesData}
       />
       {isExpenseTypeModalOpen && (
         <ExpensesType

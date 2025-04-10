@@ -6,7 +6,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # path('', views.home, name='test_jwt'),
+    path('fetch-dashboard-data/', views.fetch_dashboard_data, name='fetch-dashboard-data'),
     path('fetch-employee-data/', views.fetch_employee_data, name='fetch_employee_data'),
     path('fetch-attendance-data/', views.fetch_attendance_data, name='fetch_attendance_data'),
     path('time-in/', views.time_in, name='time_in'),
