@@ -17,7 +17,8 @@ const EditExpense = ({
   const [editMode, setEditMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [loadingDots, setLoadingDots] = useState("");
+  const [savingText, setSavingText] = useState("Save Changes");
+  const [deletingText, setDeletingText] = useState("Delete");
 
   // Initialize form with expense data when component mounts or expense changes
   useEffect(() => {
@@ -40,19 +41,25 @@ const EditExpense = ({
 
   // Loading animation effect
   useEffect(() => {
-    let interval;
+    let loadingInterval;
     if (isSubmitting || isDeleting) {
       let dotCount = 0;
-      interval = setInterval(() => {
-        setLoadingDots(".".repeat(dotCount % 4));
+      loadingInterval = setInterval(() => {
+        const dots = ".".repeat(dotCount % 4);
+        if (isSubmitting) {
+          setSavingText(`Saving${dots}`);
+        } else if (isDeleting) {
+          setDeletingText(`Deleting${dots}`);
+        }
         dotCount++;
       }, 500);
     } else {
-      setLoadingDots("");
+      setSavingText("Save Changes");
+      setDeletingText("Delete");
     }
 
     return () => {
-      if (interval) clearInterval(interval);
+      if (loadingInterval) clearInterval(loadingInterval);
     };
   }, [isSubmitting, isDeleting]);
 
@@ -139,51 +146,44 @@ const EditExpense = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="bg-white rounded-lg p-6 w-[500px] flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg w-[500px] flex flex-col">
         {/* Modal Header */}
-        <div className="flex justify-between items-center border-b pb-3 mb-4">
-          <h2 className="text-xl font-semibold">Expense Details</h2>
-          <div className="flex gap-2">
-            {/* Make Delete button always visible */}
-            <div className="w-[100px]">
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting || isSubmitting}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 w-full h-10 flex items-center justify-center"
-              >
-                <span className="whitespace-nowrap">
-                  {isDeleting ? `Deleting${loadingDots}` : "Delete"}
-                </span>
-              </button>
-            </div>
-            <div>
-              <button
-                onClick={toggleEditMode}
-                disabled={isSubmitting}
-                className={`px-4 py-2 rounded-lg w-full h-10 flex items-center justify-center ${
-                  editMode
-                    ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    : "bg-[#CC5500] text-white hover:bg-[#b34d00]"
-                }`}
-              >
-                <span className="whitespace-nowrap text-sm">
-                  {editMode ? "Cancel Edit" : "Edit"}
-                </span>
-              </button>
-            </div>
+        <div className="flex justify-between items-center p-4 border-b">
+          <h2 className="text-lg font-medium">Expense Details</h2>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={toggleEditMode}
+              className={`px-3 py-1 rounded ${
+                editMode
+                  ? "bg-gray-200 text-gray-700"
+                  : "bg-[#CC5500] text-white"
+              }`}
+            >
+              {editMode ? "Cancel Edit" : "Edit"}
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting || isSubmitting}
+              className={`px-3 py-1 rounded min-w-[100px] text-center ${
+                isDeleting
+                  ? "bg-red-400 text-white cursor-not-allowed"
+                  : "bg-red-500 hover:bg-red-600 text-white"
+              }`}
+            >
+              {deletingText}
+            </button>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 font-bold h-10 w-10 flex items-center justify-center"
-              disabled={isSubmitting || isDeleting}
+              className="p-1 rounded-full hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
             >
               &times;
             </button>
           </div>
         </div>
 
-        {/* Modal Body - no scrolling */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Modal Body */}
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Date */}
           <div>
             <label className="block text-sm font-medium mb-1">Date</label>
@@ -262,26 +262,26 @@ const EditExpense = ({
               disabled={!editMode || isSubmitting || isDeleting}
             />
           </div>
-
-          {/* Modal Footer */}
-          <div className="flex justify-end mt-6 h-10">
-            <div className={`w-[140px] ${editMode ? "block" : "invisible"}`}>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className={`bg-green-500 text-white px-4 py-2 rounded-lg w-full h-full flex items-center justify-center ${
-                  isSubmitting
-                    ? "opacity-70 cursor-not-allowed"
-                    : "hover:bg-green-600"
-                }`}
-              >
-                <span className="inline-block whitespace-nowrap overflow-hidden text-ellipsis">
-                  {isSubmitting ? `Saving${loadingDots}` : "Save Changes"}
-                </span>
-              </button>
-            </div>
-          </div>
         </form>
+
+        {/* Footer with fixed height */}
+        <div className="border-t p-4 flex justify-end items-center h-[64px]">
+          <div className="w-[140px]">
+            <button
+              onClick={handleSubmit}
+              disabled={!editMode || isSubmitting}
+              className={`px-4 py-2 rounded-md w-full text-center ${
+                editMode && !isSubmitting
+                  ? "bg-green-500 hover:bg-green-600 text-white"
+                  : isSubmitting
+                  ? "bg-green-500 opacity-70 text-white cursor-not-allowed"
+                  : "bg-gray-200 text-gray-500 cursor-not-allowed"
+              }`}
+            >
+              {isSubmitting ? savingText : "Save Changes"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

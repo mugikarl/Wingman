@@ -351,28 +351,6 @@ const Sales = () => {
       <div className="flex justify-between mb-4">
         <div className="flex gap-2">
           <button
-            onClick={() => (window.location.href = "/dashboard-admin/sales")}
-            className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
-          >
-            <div className="flex items-center justify-center border-r p-3">
-              <FaChartBar className="w-5 h-5 text-[#CC5500]" />
-            </div>
-            <span className="flex-1 text-left pl-3">Daily</span>
-          </button>
-          <button
-            onClick={() =>
-              (window.location.href = "/dashboard-admin/salescalendar")
-            }
-            className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
-          >
-            <div className="flex items-center justify-center border-r p-3">
-              <FaCalendarAlt className="w-5 h-5 text-[#CC5500]" />
-            </div>
-            <span className="flex-1 text-left pl-3">Calendar</span>
-          </button>
-        </div>
-        <div className="flex gap-2">
-          <button
             onClick={handleAddExpenseTypeClick}
             className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
           >

@@ -1,10 +1,16 @@
 import React, { useState, useEffect, useCallback } from "react";
-import AttendanceSheet from "../../components/tables/AttendanceSheet";
 import TimeIn from "../../components/popups/TimeIn";
 import TimeOut from "../../components/popups/TimeOut";
-import AttendanceReview from "./AttendanceReview";
 import LoadingScreen from "../../components/popups/LoadingScreen";
 import axios from "axios";
+import { Datepicker } from "flowbite-react";
+import { FaSortUp, FaSortDown } from "react-icons/fa";
+import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
+
+// Helper function to convert Date to YYYY-MM-DD string
+const getLocalDateString = (date) => {
+  return date.toLocaleDateString("en-CA");
+};
 
 const Attendance = () => {
   const [isTimeInModalOpen, setIsTimeInModalOpen] = useState(false);
@@ -12,42 +18,59 @@ const Attendance = () => {
   const [attendanceData, setAttendanceData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(
-    new Date().toLocaleDateString("en-CA")
+    getLocalDateString(new Date())
   );
-
-  // Use a cache to store fetched data by date
   const [attendanceCache, setAttendanceCache] = useState({});
+  const [showDatepicker, setShowDatepicker] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
 
-  // Improved fetch function with caching using useCallback to prevent recreating on every render
+  // Format time for display
+  const formatTime = (isoString) => {
+    if (!isoString) return "-";
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  // Display the selected date in a human-friendly format
+  const displayDate = new Date(currentDate).toDateString();
+
+  // Functions to decrement or increment the selected date
+  const decrementDate = () => {
+    const dateObj = new Date(currentDate);
+    dateObj.setDate(dateObj.getDate() - 1);
+    const newDate = getLocalDateString(dateObj);
+    setCurrentDate(newDate);
+    fetchAttendanceData(newDate);
+  };
+
+  const incrementDate = () => {
+    const dateObj = new Date(currentDate);
+    dateObj.setDate(dateObj.getDate() + 1);
+    const newDate = getLocalDateString(dateObj);
+    setCurrentDate(newDate);
+    fetchAttendanceData(newDate);
+  };
+
+  // Fetch attendance data with caching
   const fetchAttendanceData = useCallback(
-    async (date = null) => {
-      const targetDate = date || currentDate;
-
-      // Check if we already have cached data for this date
-      if (attendanceCache[targetDate]) {
-        setAttendanceData(attendanceCache[targetDate]);
+    async (date, bypassCache = false) => {
+      if (!bypassCache && attendanceCache[date]) {
+        setAttendanceData(attendanceCache[date]);
         setLoading(false);
-        return attendanceCache[targetDate];
+        return attendanceCache[date];
       }
 
-      // If not in cache, show loading and fetch
       setLoading(true);
-      let url = "http://127.0.0.1:8000/fetch-attendance-data/";
-
-      if (targetDate) {
-        url += `?date=${targetDate}`;
-        setCurrentDate(targetDate);
-      }
+      const url = `http://127.0.0.1:8000/fetch-attendance-data/?date=${date}`;
 
       try {
-        console.log(`Fetching attendance data for date: ${targetDate}`);
         const response = await axios.get(url);
         const fetchedData = response.data;
 
-        // Update the cache with the new data
         setAttendanceCache((prev) => ({
           ...prev,
-          [targetDate]: fetchedData,
+          [date]: fetchedData,
         }));
 
         setAttendanceData(fetchedData);
@@ -59,112 +82,367 @@ const Attendance = () => {
         setLoading(false);
       }
     },
-    [currentDate, attendanceCache]
+    [attendanceCache]
   );
 
-  // Fetch initial data only once when the component mounts
+  // Function to handle sorting
+  const requestSort = (key) => {
+    let direction = "ascending";
+
+    if (sortConfig.key === key) {
+      direction =
+        sortConfig.direction === "ascending"
+          ? "descending"
+          : sortConfig.direction === "descending"
+          ? null
+          : "ascending";
+    }
+
+    setSortConfig({ key, direction });
+  };
+
+  // Load initial data once
   useEffect(() => {
     fetchAttendanceData(currentDate);
   }, []);
 
-  // Event handlers for modals
+  // Event handlers
   const handleTimeInSuccess = useCallback(() => {
-    // Clear cache for current date and refetch
     setAttendanceCache((prev) => {
       const newCache = { ...prev };
       delete newCache[currentDate];
       return newCache;
     });
-    fetchAttendanceData(currentDate);
-    setIsTimeInModalOpen(false);
+
+    // Force non-cached fetch by passing null to the cache check
+    fetchAttendanceData(currentDate).then(() => {
+      // Only close modal after data is fetched
+      setIsTimeInModalOpen(false);
+    });
   }, [currentDate, fetchAttendanceData]);
 
   const handleTimeOutSuccess = useCallback(() => {
-    // Clear cache for current date and refetch
     setAttendanceCache((prev) => {
       const newCache = { ...prev };
       delete newCache[currentDate];
       return newCache;
     });
-    fetchAttendanceData(currentDate);
-    setIsTimeOutModalOpen(false);
+
+    // Force non-cached fetch by passing null to the cache check
+    fetchAttendanceData(currentDate).then(() => {
+      // Only close modal after data is fetched
+      setIsTimeOutModalOpen(false);
+    });
   }, [currentDate, fetchAttendanceData]);
 
+  // Prepare and sort table data
+  const tableData = attendanceData
+    .sort((a, b) => Number(a.id) - Number(b.id))
+    .map((entry) => [
+      entry.id,
+      entry.name,
+      entry.attendanceStatus,
+      formatTime(entry.timeIn),
+      formatTime(entry.timeOut),
+    ]);
+
+  // Sort data if sort config exists
+  const sortedData = React.useMemo(() => {
+    let sortableData = [...tableData];
+    if (sortConfig.key !== null && sortConfig.direction !== null) {
+      sortableData.sort((a, b) => {
+        // Get values at the specified column index
+        const aValue = a[sortConfig.key];
+        const bValue = b[sortConfig.key];
+
+        // Handle numeric values
+        if (!isNaN(aValue) && !isNaN(bValue)) {
+          return sortConfig.direction === "ascending"
+            ? Number(aValue) - Number(bValue)
+            : Number(bValue) - Number(aValue);
+        }
+
+        // Handle string values
+        if (aValue < bValue) {
+          return sortConfig.direction === "ascending" ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === "ascending" ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableData;
+  }, [tableData, sortConfig]);
+
+  // Custom theme for the date picker
+  const datepickerTheme = {
+    popup: {
+      root: {
+        inner:
+          "inline-block rounded-lg bg-white p-4 shadow-lg dark:bg-yellow-200",
+      },
+    },
+    views: {
+      days: {
+        items: {
+          item: {
+            selected: "bg-[#c27100] text-white hover:bg-[#a95a00]",
+          },
+        },
+      },
+    },
+  };
+
+  // Add this new function in Attendance.jsx
+  const forceRefresh = useCallback(() => {
+    // Clear cache for current date
+    setAttendanceCache((prev) => {
+      const newCache = { ...prev };
+      delete newCache[currentDate];
+      return newCache;
+    });
+
+    // Set loading to true to show loading indicator
+    setLoading(true);
+
+    // Fetch fresh data from server without using cache
+    const url = `http://127.0.0.1:8000/fetch-attendance-data/?date=${currentDate}`;
+    axios
+      .get(url)
+      .then((response) => {
+        const fetchedData = response.data;
+        setAttendanceData(fetchedData);
+
+        // Update cache with new data
+        setAttendanceCache((prev) => ({
+          ...prev,
+          [currentDate]: fetchedData,
+        }));
+      })
+      .catch((error) => {
+        console.error("Error refreshing attendance data:", error);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [currentDate]);
+
   return (
-    <div className="flex-grow p-6 bg-[#E2D6D5] min-h-full">
-      <div className="flex items-start mb-4 space-x-4">
-        <button
-          onClick={() => setIsTimeInModalOpen(true)}
-          className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
-        >
-          <div className="flex items-center justify-center border-r p-3">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-5 h-5 text-[#CC5500]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
-              />
-            </svg>
-          </div>
-          <span className="flex-1 text-left pl-3">Time In</span>
-        </button>
-        <button
-          onClick={() => setIsTimeOutModalOpen(true)}
-          className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
-        >
-          <div className="flex items-center justify-center border-r p-3">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-5 h-5 text-[#CC5500]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
-          </div>
-          <span className="flex-1 text-left pl-3">Time Out</span>
-        </button>
+    <div className="flex-grow p-6 bg-[#fcf4dc] min-h-full">
+      <div className="max-w-[1200px]">
+        <div className="flex items-start mb-4 gap-2">
+          <button
+            onClick={() => setIsTimeInModalOpen(true)}
+            className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
+          >
+            <div className="flex items-center justify-center border-r p-3">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-5 h-5 text-[#CC5500]"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
+                />
+              </svg>
+            </div>
+            <span className="flex-1 text-left pl-3">Time In</span>
+          </button>
+          <button
+            onClick={() => setIsTimeOutModalOpen(true)}
+            className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
+          >
+            <div className="flex items-center justify-center border-r p-3">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-5 h-5 text-[#CC5500]"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+            </div>
+            <span className="flex-1 text-left pl-3">Time Out</span>
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {loading ? (
+            <div className="flex justify-center items-center min-h-[300px]">
+              <LoadingScreen message="Loading attendance" />
+            </div>
+          ) : (
+            <div className="w-full">
+              <div className="flex flex-col">
+                {/* Date picker navigation bar */}
+                <div className="bg-[#cc5500] text-lg font-semibold w-full rounded-t-sm flex justify-between items-center relative shadow-md">
+                  <button
+                    className="px-4 py-2 text-white hover:bg-white hover:text-[#cc5500]"
+                    onClick={decrementDate}
+                  >
+                    <HiChevronLeft className="w-5 h-5" />
+                  </button>
+                  <div
+                    className="absolute left-1/2 transform -translate-x-1/2 cursor-pointer px-2 bg-[#cc5500] text-white text-"
+                    onClick={() => setShowDatepicker(!showDatepicker)}
+                  >
+                    {displayDate}
+                  </div>
+                  <button
+                    className="px-4 py-2 text-white hover:bg-white hover:text-[#cc5500]"
+                    onClick={incrementDate}
+                  >
+                    <HiChevronRight className="w-5 h-5" />
+                  </button>
+                  {showDatepicker && (
+                    <div className="absolute top-10 left-1/2 transform -translate-x-1/2 mt-2 z-10 bg-white shadow-lg">
+                      <Datepicker
+                        inline
+                        value={new Date(currentDate)}
+                        onChange={(date) => {
+                          if (date instanceof Date) {
+                            const newDate = getLocalDateString(date);
+                            setCurrentDate(newDate);
+                            fetchAttendanceData(newDate);
+                            setShowDatepicker(false);
+                          } else if (Array.isArray(date) && date.length > 0) {
+                            const newDate = getLocalDateString(date[0]);
+                            setCurrentDate(newDate);
+                            fetchAttendanceData(newDate);
+                            setShowDatepicker(false);
+                          }
+                        }}
+                        theme={datepickerTheme}
+                        className="bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Table with sorting */}
+                <div
+                  className="relative shadow-md rounded-b-sm overflow-y-auto"
+                  style={{ maxHeight: "700px" }}
+                >
+                  <table className="w-full text-sm text-left rtl:text-right text-gray-500 table-auto">
+                    <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
+                      <tr>
+                        {[
+                          "ID",
+                          "Name",
+                          "Attendance Status",
+                          "Time In",
+                          "Time Out",
+                        ].map((column, index) => (
+                          <th
+                            key={index}
+                            scope="col"
+                            className="px-6 py-4 font-medium text-left cursor-pointer"
+                            onClick={() => requestSort(index)}
+                          >
+                            <div className="flex items-center">
+                              {column}
+                              {sortConfig.key === index ? (
+                                <span className="ml-1.5">
+                                  {sortConfig.direction === "ascending" ? (
+                                    <FaSortUp className="inline h-3 w-3 text-white" />
+                                  ) : (
+                                    <FaSortDown className="inline h-3 w-3 text-white" />
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="ml-1.5 text-gray-300 opacity-30">
+                                  <svg
+                                    className="w-3 h-3"
+                                    aria-hidden="true"
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path d="M8.574 11.024h6.852a2.075 2.075 0 0 0 1.847-1.086 1.9 1.9 0 0 0-.11-1.986L13.736 2.9a2.122 2.122 0 0 0-3.472 0L6.837 7.952a1.9 1.9 0 0 0-.11 1.986 2.074 2.074 0 0 0 1.847 1.086Zm6.852 1.952H8.574a2.072 2.072 0 0 0-1.847 1.087 1.9 1.9 0 0 0 .11 1.985l3.426 5.05a2.123 2.123 0 0 0 3.472 0l3.427-5.05a1.9 1.9 0 0 0 .11-1.985 2.074 2.074 0 0 0-1.846-1.087Z" />
+                                  </svg>
+                                </span>
+                              )}
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedData.length > 0 ? (
+                        sortedData.map((row, rowIndex) => (
+                          <tr
+                            key={rowIndex}
+                            className={`
+                              ${rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                              border-b hover:bg-gray-200 group
+                            `}
+                          >
+                            {row.map((cell, cellIndex) => (
+                              <td
+                                key={cellIndex}
+                                className="px-6 py-4 font-normal text-left text-gray-700 group-hover:text-gray-900"
+                                scope={cellIndex === 0 ? "row" : undefined}
+                              >
+                                {cell}
+                              </td>
+                            ))}
+                          </tr>
+                        ))
+                      ) : (
+                        <tr className="bg-white border-b">
+                          <td
+                            className="px-6 py-4 text-center font-normal text-gray-500 italic"
+                            colSpan={5}
+                          >
+                            No attendance data available
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* CSS for rounded borders */}
+                <style jsx>{`
+                  .rounded-b-sm {
+                    border-bottom-left-radius: 0.125rem;
+                    border-bottom-right-radius: 0.125rem;
+                    border-top-left-radius: 0;
+                    border-top-right-radius: 0;
+                  }
+                `}</style>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="space-y-4">
-        {loading ? (
-          <div className="flex justify-center items-center min-h-[300px]">
-            <LoadingScreen />
-          </div>
-        ) : (
-          <AttendanceReview
-            attendanceData={attendanceData}
-            refreshAttendance={fetchAttendanceData}
-            initialDate={currentDate}
-            loading={loading}
-          />
-        )}
-      </div>
-
-      {/* Show modals when respective states are true */}
+      {/* Modals */}
       {isTimeInModalOpen && (
         <TimeIn
-          refreshAttendance={handleTimeInSuccess}
+          forceRefresh={forceRefresh}
           closeModal={() => setIsTimeInModalOpen(false)}
+          currentDate={currentDate}
         />
       )}
       {isTimeOutModalOpen && (
         <TimeOut
-          refreshAttendance={handleTimeOutSuccess}
+          forceRefresh={forceRefresh}
           closeModal={() => setIsTimeOutModalOpen(false)}
+          currentDate={currentDate}
         />
       )}
     </div>

@@ -543,103 +543,56 @@ def extract_date(timestamp_str):
 @permission_classes([AllowAny])
 def fetch_attendance_data(request):
     """
-    Fetch employees along with:
-      - Their own employee status (from employee_status table)
-      - Attendance details including:
-          • Attendance status (from attendance_status table) – retrieving id and status_name.
-          • Time in and time out (from attendance_time table)
-    
-    If an employee's attendance record for the selected date is missing a time in,
-    update that attendance record to have an attendance_status of Absent ("A", which is id:2).
-    
-    Only active employees (i.e. those with employee_status.status_id equal to 1) are retrieved.
-    This view is public and intended for admin usage.
+    Fetch employees along with their attendance details for a specific date.
+    Handles None cases to avoid 'NoneType' errors.
     """
     try:
         # Retrieve the date parameter (format: YYYY-MM-DD) from the query string or POST data.
         date_str = request.GET.get("date") or request.data.get("date")
         if not date_str:
             date_str = datetime.now().strftime("%Y-%m-%d")
-        print("Filtering attendance for date:", date_str)
-        
-        # Query for employees with joined employee_status and attendance details.
-        # Retrieve status_id along with status_name.
+
+        # Query for active employees and their attendance details for the specified date.
         response = supabase_anon.table("employee").select(
             "id, first_name, last_name, "
-            "employee_status:employee_status(id,status_name), "
-            "attendance:attendance(attendance_status:attendance_status(id,status_name), attendance_time:attendance_time(time_in,time_out))"
-        ).execute()
-        
+            "employee_status:employee_status(id, status_name), "
+            "attendance:attendance(attendance_status:attendance_status(id, status_name), "
+            "attendance_time:attendance_time(time_in, time_out))"
+        ).eq("employee_status.id", 1).execute()
+
         employees = response.data if response.data else []
         attendance_data = []
-        
+
         for emp in employees:
-            # Skip inactive employees.
-            emp_status_obj = emp.get("employee_status")
-            if not emp_status_obj or emp_status_obj.get("id") != 1:
-                continue
+            # Safely get employee_status or default to empty dict
+            emp_status = emp.get("employee_status", {})
+            if not emp_status:
+                continue  # Skip if no employee_status (inactive or invalid)
 
             full_name = f"{emp.get('first_name', '')} {emp.get('last_name', '')}".strip()
-            employee_status = emp_status_obj.get("status_name", "N/A")
-            
-            attendance = emp.get("attendance")
-            current_attendance_status = "N/A"
+            employee_status = emp_status.get("status_name", "N/A")
+            attendance = emp.get("attendance", [])
+
+            # Initialize default values
+            current_attendance_status = "Absent"
             time_in = "-"
             time_out = "-"
-            
-            # Look for an attendance record for the specified date.
-            attendance_record = None
+
+            # Process attendance records if they exist
             if attendance:
                 if isinstance(attendance, list):
                     for record in attendance:
-                        time_obj = record.get("attendance_time")
-                        if time_obj:
-                            t_in = time_obj.get("time_in")
-                            if t_in:
-                                # Extract the date part using our helper function.
-                                record_date = extract_date(t_in)
-                                print(f"Employee {emp.get('id')} record_date: {record_date}")
-                                if record_date == date_str:
-                                    attendance_record = record
-                                    break
-                elif isinstance(attendance, dict):
-                    time_obj = attendance.get("attendance_time")
-                    if time_obj:
+                        time_obj = record.get("attendance_time", {})
                         t_in = time_obj.get("time_in")
-                        if t_in:
-                            record_date = extract_date(t_in)
-                            print(f"Employee {emp.get('id')} record_date: {record_date}")
-                            if record_date == date_str:
-                                attendance_record = attendance
-            
-            if attendance_record:
-                attendance_id = attendance_record.get("id")
-                time_obj = attendance_record.get("attendance_time")
-                status_obj = attendance_record.get("attendance_status")
-                time_in_val = time_obj.get("time_in") if time_obj else None
-                time_out_val = time_obj.get("time_out") if time_obj else None
-                
-                # If the record exists but lacks a time in, update it to Absent (status id:2).
-                if not time_in_val:
-                    update_response = supabase_anon.table("attendance").update(
-                        {"attendance_status": 2}
-                    ).eq("id", attendance_id).execute()
-                    current_attendance_status = "Absent"
-                else:
-                    # Map status id 1 to "Present" and 2 to "Absent".
-                    if status_obj and status_obj.get("id") == 1:
-                        current_attendance_status = "Present"
-                    elif status_obj and status_obj.get("id") == 2:
-                        current_attendance_status = "Absent"
-                    else:
-                        current_attendance_status = "N/A"
-                
-                time_in = time_in_val if time_in_val else "-"
-                time_out = time_out_val if time_out_val else "-"
-            else:
-                # If no attendance record exists for the date, assume the employee is absent.
-                current_attendance_status = "Absent"
-            
+                        if t_in and extract_date(t_in) == date_str:
+                            status_obj = record.get("attendance_status", {})
+                            time_in = t_in
+                            time_out = time_obj.get("time_out", "-")
+                            current_attendance_status = (
+                                "Present" if status_obj.get("id") == 1 else "Absent"
+                            )
+                            break
+
             attendance_data.append({
                 "id": emp.get("id"),
                 "name": full_name,
@@ -648,12 +601,11 @@ def fetch_attendance_data(request):
                 "timeIn": time_in,
                 "timeOut": time_out,
             })
-        
+
         return Response(attendance_data)
-    
+
     except Exception as e:
         return Response({"error": str(e)}, status=500)
-
 
 @api_view(['POST'])
 @authentication_classes([])

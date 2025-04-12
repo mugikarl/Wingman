@@ -570,296 +570,366 @@ const EditStockInDetails = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-3/4 relative">
-        <div className="absolute top-4 right-4 flex space-x-2">
-          {isEditing && (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-5xl h-[600px] flex flex-col">
+        {/* Header - fixed height */}
+        <div className="flex justify-between items-center p-4 border-b">
+          <h2 className="text-lg font-medium">
+            Edit Stock In - Receipt No. {receipt.receipt_no}
+          </h2>
+          <div className="flex items-center space-x-2">
             <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className={`bg-green-500 text-white px-4 py-2 rounded-lg shadow min-w-[140px] ${
-                isSubmitting
-                  ? "opacity-70 cursor-not-allowed"
-                  : "hover:bg-green-600"
+              onClick={toggleEditMode}
+              className={`px-3 py-1 rounded ${
+                isEditing
+                  ? "bg-gray-200 text-gray-700"
+                  : "bg-[#CC5500] text-white"
               }`}
             >
-              {savingText}
+              {isEditing ? "Cancel Edit" : "Edit Receipt"}
             </button>
-          )}
-          {/* Only show Delete Receipt button when NOT editing */}
-          {!isEditing && (
-            <button
-              onClick={deleteReceiptHandler}
-              disabled={isSubmitting}
-              className={`bg-red-500 text-white px-4 py-2 rounded-lg shadow min-w-[140px] ${
-                isSubmitting
-                  ? "opacity-70 cursor-not-allowed"
-                  : "hover:bg-red-600"
-              }`}
-            >
-              {deletingText}
-            </button>
-          )}
-          <button
-            onClick={toggleEditMode}
-            className={`px-4 py-2 rounded-lg shadow min-w-[120px] ${
-              isEditing
-                ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                : "bg-[#CC5500] hover:bg-[#B34D00] text-white"
-            }`}
-          >
-            {isEditing ? "Cancel Edit" : "Edit Receipt"}
-          </button>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-xl font-bold flex items-center justify-center min-w-[40px]"
-          >
-            &times;
-          </button>
-        </div>
-        <h2 className="text-xl font-bold mb-4">
-          Edit Stock In - Receipt No. {receipt.receipt_no}
-        </h2>
-
-        {/* Receipt Details */}
-        <div className="mb-4 flex flex-wrap gap-4">
-          <div className="flex flex-col w-1/4">
-            <label className="font-bold">Receipt No.:</label>
-            <input
-              type="text"
-              name="receipt_no"
-              value={editedReceipt.receipt_no}
-              onChange={handleChange}
-              disabled={!isEditing}
-              className={`p-2 border rounded-lg shadow ${
-                isEditing ? "bg-white" : "bg-gray-200"
-              }`}
-            />
-          </div>
-          <div className="flex flex-col w-1/4">
-            <label className="font-bold">Supplier:</label>
-            {isEditing ? (
-              <select
-                name="supplier_id"
-                value={editedReceipt.supplier_id || ""}
-                onChange={handleChange}
-                className="p-2 border rounded-lg shadow bg-white"
+            {!isEditing && (
+              <button
+                onClick={deleteReceiptHandler}
+                disabled={isSubmitting}
+                className={`px-3 py-1 rounded min-w-[100px] text-center ${
+                  isSubmitting
+                    ? "bg-red-500 opacity-70 text-white cursor-not-allowed"
+                    : "bg-red-500 hover:bg-red-600 text-white"
+                }`}
               >
-                <option value="">Select Supplier</option>
-                {suppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <div className="p-2 border rounded-lg shadow bg-gray-200">
-                {editedReceipt.supplier_name}
-              </div>
+                {deletingText}
+              </button>
             )}
-          </div>
-          <div className="flex flex-col w-1/4">
-            <label className="font-bold">Date:</label>
-            <input
-              type="date"
-              name="date"
-              value={editedReceipt.date}
-              onChange={handleChange}
-              disabled={!isEditing}
-              className={`p-2 border rounded-lg shadow ${
-                isEditing ? "bg-white" : "bg-gray-200"
-              }`}
-            />
+            <button
+              onClick={onClose}
+              className="p-1 rounded-full hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
+            >
+              &times;
+            </button>
           </div>
         </div>
 
-        {/* Table with Editable Rows and Add Row */}
-        <div className="relative overflow-x-auto shadow-md sm:rounded-sm">
-          <table className="w-full text-sm text-left rtl:text-right text-gray-500">
-            <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
-              <tr>
-                {[
-                  "ID",
-                  "ITEM NAME",
-                  "UNIT",
-                  "QUANTITY",
-                  "COST",
-                  "TOTAL COST",
-                ].map((column, index) => (
-                  <th key={index} scope="col" className="px-6 py-4 font-medium">
-                    {column}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {editedStockData.length > 0 ? (
-                editedStockData.map((stock, index) => (
-                  <tr
-                    key={index}
-                    className={`
-                      ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} 
-                      border-b hover:bg-gray-200 group
-                    `}
-                  >
-                    <td
-                      className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900"
-                      scope="row"
-                    >
-                      {stock.id}
-                    </td>
-                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                      {stock.name}
-                    </td>
-                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                      {stock.measurement}
-                    </td>
-                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          value={stock.quantity}
-                          onChange={(e) =>
-                            handleStockChange(index, "quantity", e.target.value)
-                          }
-                          className="p-1 border rounded w-20"
-                        />
-                      ) : (
-                        stock.quantity
-                      )}
-                    </td>
-                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                      {isEditing ? (
-                        <input
-                          type="number"
-                          value={stock.price}
-                          onChange={(e) =>
-                            handleStockChange(index, "price", e.target.value)
-                          }
-                          className="p-1 border rounded w-20"
-                        />
-                      ) : (
-                        stock.price
-                      )}
-                    </td>
-
-                    <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                      <div className="flex items-center justify-between">
-                        <span>{stock.totalCost}</span>
-                        {isEditing && !stock.to_delete && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!stock.id) {
-                                // For newly added items (no ID), remove without confirmation
-                                markStockForDeletion(index);
-                              } else if (
-                                window.confirm(
-                                  "Are you sure you want to delete this stock-in detail?"
-                                )
-                              ) {
-                                // For existing items, confirm before marking
-                                markStockForDeletion(index);
-                              }
-                            }}
-                            className="text-red-500 hover:text-red-700 p-1 rounded-full ml-2"
-                          >
-                            <IoMdClose size={18} />
-                          </button>
-                        )}
-                        {stock.to_delete && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              cancelStockDeletion(index);
-                            }}
-                            className="text-gray-500 hover:text-gray-700 p-1 rounded-full ml-2"
-                          >
-                            <IoMdClose size={18} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr className="bg-white border-b">
-                  <td
-                    className="px-6 py-4 text-center font-normal text-gray-500 italic"
-                    colSpan={7}
-                  >
-                    No Stock Data Available
-                  </td>
-                </tr>
-              )}
-              {/* Add Row */}
-              {isEditing && (
-                <tr className="bg-white border-b">
-                  <td className="px-6 py-4 font-normal text-gray-700">
-                    {/* ID (empty for new entries) */}
-                  </td>
-                  <td className="px-6 py-4 font-normal text-gray-700">
-                    <select
-                      className="p-1 border rounded w-full"
-                      value={selectedStock.name}
-                      name="name"
-                      onChange={handleStockInputChange}
-                    >
-                      <option value="">Select Item</option>
-                      {items.map((item) => (
-                        <option key={item.id} value={item.name}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 font-normal text-gray-700">
+        {/* Content - takes remaining space with fixed height */}
+        <div
+          className="flex-1 p-4 overflow-hidden"
+          style={{ maxHeight: "calc(100% - 128px)" }}
+        >
+          <div className="grid grid-cols-3 gap-6 h-full">
+            {/* Left Column: Receipt Details (1/3 width) */}
+            <div className="h-full flex flex-col space-y-6">
+              {/* Receipt Details */}
+              <div className="bg-white p-4 rounded-lg border">
+                <h3 className="text-lg font-medium mb-4">Receipt Details</h3>
+                <div className="space-y-4">
+                  <div className="flex flex-col">
+                    <label className="font-medium mb-1">Receipt No.:</label>
                     <input
                       type="text"
-                      placeholder="Unit"
-                      className="p-1 border rounded bg-gray-100 w-full"
-                      name="measurement"
-                      value={selectedStock.measurement}
-                      disabled
-                    />
-                  </td>
-                  <td className="px-6 py-4 font-normal text-gray-700">
-                    <input
-                      type="number"
-                      placeholder="Quantity"
-                      className="p-1 border rounded w-full"
-                      name="quantity"
-                      value={selectedStock.quantity}
-                      onChange={handleStockInputChange}
-                    />
-                  </td>
-                  <td className="px-6 py-4 font-normal text-gray-700">
-                    <input
-                      type="number"
-                      placeholder="Cost/Unit"
-                      className="p-1 border rounded w-full"
-                      name="price"
-                      value={selectedStock.price}
-                      onChange={handleStockInputChange}
-                    />
-                  </td>
-                  <td className="px-6 py-4 font-normal text-gray-700">
-                    <button
-                      onClick={handleAddStock}
-                      disabled={isAdding}
-                      className={`bg-[#CC5500] text-white px-2 py-1 rounded min-w-[80px] ${
-                        isAdding
-                          ? "opacity-70 cursor-not-allowed"
-                          : "hover:bg-[#b34600]"
+                      name="receipt_no"
+                      value={editedReceipt.receipt_no}
+                      onChange={handleChange}
+                      disabled={!isEditing}
+                      className={`p-2 border rounded-lg ${
+                        isEditing ? "bg-white" : "bg-gray-200"
                       }`}
-                    >
-                      {isAdding ? "Adding..." : "Add"}
-                    </button>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="font-medium mb-1">Supplier:</label>
+                    {isEditing ? (
+                      <select
+                        name="supplier_id"
+                        value={editedReceipt.supplier_id || ""}
+                        onChange={handleChange}
+                        className="p-2 border rounded-lg bg-white"
+                      >
+                        <option value="">Select Supplier</option>
+                        {suppliers.map((supplier) => (
+                          <option key={supplier.id} value={supplier.id}>
+                            {supplier.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="p-2 border rounded-lg bg-gray-200">
+                        {editedReceipt.supplier_name}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="font-medium mb-1">Date:</label>
+                    <input
+                      type="date"
+                      name="date"
+                      value={editedReceipt.date}
+                      onChange={handleChange}
+                      disabled={!isEditing}
+                      className={`p-2 border rounded-lg ${
+                        isEditing ? "bg-white" : "bg-gray-200"
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Computations */}
+              <div className="bg-white p-4 rounded-lg border">
+                <div className="flex flex-col">
+                  <p className="font-medium text-xl mt-1">
+                    <span>Total Receipt Cost: </span> <br />
+                    <span className="font-bold">
+                      ₱{" "}
+                      {editedStockData
+                        .filter((stock) => !stock.to_delete)
+                        .reduce(
+                          (total, stock) => total + (stock.totalCost || 0),
+                          0
+                        )
+                        .toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Stock Table (2/3 width) */}
+            <div className="col-span-2 h-full">
+              <div className="bg-white p-4 rounded-lg border h-full flex flex-col">
+                <h3 className="text-lg font-medium mb-4">Stock Items</h3>
+
+                {/* Table container */}
+                <div
+                  className="relative"
+                  style={{ height: "calc(100% - 2.5rem)" }}
+                >
+                  {/* Fixed header - position sticky */}
+                  <div className="sticky top-0 z-10 w-full bg-[#CC5500]">
+                    <table className="w-full text-sm text-left text-gray-500">
+                      <thead className="text-sm text-white uppercase">
+                        <tr>
+                          {[
+                            "ID",
+                            "ITEM NAME",
+                            "UNIT",
+                            "QUANTITY",
+                            "COST",
+                            "TOTAL COST",
+                          ].map((column, index) => (
+                            <th
+                              key={index}
+                              scope="col"
+                              className="px-4 py-3 font-medium whitespace-nowrap"
+                            >
+                              {column}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                    </table>
+                  </div>
+
+                  {/* Scrollable area with absolute positioning */}
+                  <div className="absolute top-[43px] left-0 right-0 bottom-0 overflow-y-auto">
+                    <table className="w-full text-sm text-left text-gray-500">
+                      <tbody>
+                        {editedStockData.length > 0 ? (
+                          editedStockData.map((stock, index) => (
+                            <tr
+                              key={index}
+                              className={`
+                                ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} 
+                                border-b hover:bg-gray-200 group
+                                ${stock.to_delete ? "bg-red-100" : ""}
+                              `}
+                            >
+                              <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
+                                {stock.id}
+                              </td>
+                              <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
+                                {stock.name}
+                              </td>
+                              <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
+                                {stock.measurement}
+                              </td>
+                              <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    value={stock.quantity}
+                                    onChange={(e) =>
+                                      handleStockChange(
+                                        index,
+                                        "quantity",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="p-1 border rounded w-20"
+                                  />
+                                ) : (
+                                  stock.quantity
+                                )}
+                              </td>
+                              <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    value={stock.price}
+                                    onChange={(e) =>
+                                      handleStockChange(
+                                        index,
+                                        "price",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="p-1 border rounded w-20"
+                                  />
+                                ) : (
+                                  stock.price
+                                )}
+                              </td>
+                              <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
+                                <div className="flex items-center justify-between">
+                                  <span>{stock.totalCost}</span>
+                                  {isEditing && !stock.to_delete && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (!stock.id) {
+                                          markStockForDeletion(index);
+                                        } else if (
+                                          window.confirm(
+                                            "Are you sure you want to delete this stock-in detail?"
+                                          )
+                                        ) {
+                                          markStockForDeletion(index);
+                                        }
+                                      }}
+                                      className="text-red-500 hover:text-red-700 p-1 rounded-full ml-2"
+                                    >
+                                      <IoMdClose size={18} />
+                                    </button>
+                                  )}
+                                  {stock.to_delete && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        cancelStockDeletion(index);
+                                      }}
+                                      className="text-gray-500 hover:text-gray-700 p-1 rounded-full ml-2"
+                                    >
+                                      <IoMdClose size={18} />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr className="bg-white border-b">
+                            <td
+                              className="px-4 py-3 text-center font-normal text-gray-500 italic"
+                              colSpan={6}
+                            >
+                              No Stock Data Available
+                            </td>
+                          </tr>
+                        )}
+                        {/* Add Row */}
+                        {isEditing && (
+                          <tr className="bg-white border-b">
+                            <td className="px-4 py-3 font-normal text-gray-700">
+                              {/* ID (empty for new entries) */}
+                            </td>
+                            <td className="px-4 py-3 font-normal text-gray-700">
+                              <select
+                                className="p-1 border rounded w-full"
+                                value={selectedStock.name}
+                                name="name"
+                                onChange={handleStockInputChange}
+                              >
+                                <option value="">Select Item</option>
+                                {items.map((item) => (
+                                  <option key={item.id} value={item.name}>
+                                    {item.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-4 py-3 font-normal text-gray-700">
+                              <input
+                                type="text"
+                                placeholder="Unit"
+                                className="p-1 border rounded bg-gray-100 w-full"
+                                name="measurement"
+                                value={selectedStock.measurement}
+                                disabled
+                              />
+                            </td>
+                            <td className="px-4 py-3 font-normal text-gray-700">
+                              <input
+                                type="number"
+                                placeholder="Quantity"
+                                className="p-1 border rounded w-full"
+                                name="quantity"
+                                value={selectedStock.quantity}
+                                onChange={handleStockInputChange}
+                              />
+                            </td>
+                            <td className="px-4 py-3 font-normal text-gray-700">
+                              <input
+                                type="number"
+                                placeholder="Cost/Unit"
+                                className="p-1 border rounded w-full"
+                                name="price"
+                                value={selectedStock.price}
+                                onChange={handleStockInputChange}
+                              />
+                            </td>
+                            <td className="px-4 py-3 font-normal text-gray-700">
+                              <button
+                                onClick={handleAddStock}
+                                disabled={isAdding}
+                                className={`bg-[#CC5500] text-white px-2 py-1 rounded min-w-[80px] ${
+                                  isAdding
+                                    ? "opacity-70 cursor-not-allowed"
+                                    : "hover:bg-[#b34600]"
+                                }`}
+                              >
+                                {isAdding ? "Adding..." : "Add"}
+                              </button>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer - fixed height */}
+        <div className="border-t p-4 flex justify-end items-center h-[64px]">
+          <div className="w-[140px]">
+            {isEditing && (
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className={`px-4 py-2 rounded-md w-full text-center ${
+                  isSubmitting
+                    ? "bg-green-500 opacity-70 text-white cursor-not-allowed"
+                    : "bg-green-500 hover:bg-green-600 text-white"
+                }`}
+              >
+                {savingText}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

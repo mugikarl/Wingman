@@ -159,129 +159,166 @@ const StockInExpense = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-3/4 relative">
-        <div className="absolute top-4 right-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-6xl h-[550px] flex flex-col">
+        {/* Header */}
+        <div className="flex justify-between items-center p-4 border-b">
+          <h2 className="text-lg font-medium">
+            Stock In Expense - Receipt No. {receipt.receipt_no}
+          </h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-xl font-bold ml-2"
+            className="p-1 rounded-full hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
           >
             &times;
           </button>
         </div>
-        <h2 className="text-xl font-bold mb-4">
-          Stock In Expense - Receipt No. {receipt.receipt_no}
-        </h2>
 
-        {/* Receipt Details */}
-        <div className="mb-4 flex flex-wrap gap-4">
-          <div className="flex flex-col w-1/4">
-            <label className="font-bold">Receipt No.:</label>
-            <div className="p-2 border rounded-lg shadow bg-gray-200">
-              {receipt.receipt_no}
-            </div>
-          </div>
-          <div className="flex flex-col w-1/4">
-            <label className="font-bold">Supplier:</label>
-            <div className="p-2 border rounded-lg shadow bg-gray-200">
-              {supplierName}
-            </div>
-          </div>
-          <div className="flex flex-col w-1/4">
-            <label className="font-bold">Date:</label>
-            <div className="p-2 border rounded-lg shadow bg-gray-200">
-              {formatDate(receipt.date)}
-            </div>
-          </div>
-        </div>
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-4">
+          <div className="grid grid-cols-3 gap-6">
+            {/* Left Column: Receipt Details and Computations (1/3 width) */}
+            <div className="h-full flex flex-col space-y-6">
+              {/* Receipt Details */}
+              <div className="bg-white p-4 rounded-lg border">
+                <h3 className="text-lg font-medium mb-4">Receipt Details</h3>
+                <div className="space-y-4">
+                  <div className="flex flex-col">
+                    <label className="font-medium mb-1">Receipt No.:</label>
+                    <div className="p-2 border rounded-lg bg-gray-200">
+                      {receipt.receipt_no}
+                    </div>
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="font-medium mb-1">Supplier:</label>
+                    <div className="p-2 border rounded-lg bg-gray-200">
+                      {supplierName}
+                    </div>
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="font-medium mb-1">Date:</label>
+                    <div className="p-2 border rounded-lg bg-gray-200">
+                      {formatDate(receipt.date)}
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-        {/* Table with Items */}
-        <div className="relative overflow-x-auto shadow-md sm:rounded-sm">
-          <table className="w-full text-sm text-left rtl:text-right text-gray-500">
-            <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
-              <tr>
-                {[
-                  "ID",
-                  "ITEM NAME",
-                  "UNIT",
-                  "QUANTITY",
-                  "COST",
-                  "TOTAL COST",
-                ].map((column, index) => (
-                  <th
-                    key={index}
-                    scope="col"
-                    className="px-6 py-4 font-medium text-left"
-                  >
-                    {column}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {stockInData.length > 0 ? (
-                stockInData.map((stock, index) => (
-                  <tr
-                    key={index}
-                    className={`
-                      ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} 
-                      border-b hover:bg-gray-200
-                    `}
-                  >
-                    <td
-                      className="px-6 py-4 font-normal text-gray-700 text-left"
-                      scope="row"
-                    >
-                      {stock.id}
-                    </td>
-                    <td className="px-6 py-4 font-normal text-gray-700 text-left">
-                      {stock.name}
-                    </td>
-                    <td className="px-6 py-4 font-normal text-gray-700 text-left">
-                      {stock.measurement}
-                    </td>
-                    <td className="px-6 py-4 font-normal text-gray-700 text-left">
-                      {stock.quantity}
-                    </td>
-                    <td className="px-6 py-4 font-normal text-gray-700 text-left">
-                      {stock.price.toLocaleString(undefined, {
+              {/* Computations */}
+              <div className="bg-white p-4 rounded-lg border">
+                <div className="flex flex-col">
+                  <p className="font-medium text-xl mt-1">
+                    <span>Total Receipt Cost: </span>
+                    <span className="font-bold">
+                      ₱{" "}
+                      {totalCost.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
-                    </td>
-                    <td className="px-6 py-4 font-normal text-gray-700 text-left">
-                      {stock.totalCost.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr className="bg-white border-b">
-                  <td
-                    className="px-6 py-4 text-center font-normal text-gray-500 italic"
-                    colSpan={7}
-                  >
-                    No Stock Data Available
-                  </td>
-                </tr>
-              )}
-            </tbody>
-            <tfoot>
-              <tr className="bg-gray-100 font-semibold border-t-2 border-gray-400">
-                <td colSpan={5} className="px-6 py-4 text-gray-900 text-right">
-                  TOTAL:
-                </td>
-                <td className="px-6 py-4 text-gray-900 text-left">
-                  {totalCost.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Items Table (2/3 width) */}
+            <div className="col-span-2 flex flex-col w-full h-full">
+              <div className="bg-white p-4 rounded-lg border w-full h-full">
+                <h3 className="text-lg font-medium mb-4">Stock Items</h3>
+                <div className="overflow-y-auto h-[350px]">
+                  <table className="w-full text-sm text-left text-gray-500">
+                    <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
+                      <tr>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 font-medium w-[10%]"
+                        >
+                          ID
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 font-medium w-[30%]"
+                        >
+                          ITEM NAME
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 font-medium w-[10%]"
+                        >
+                          UNIT
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 font-medium w-[15%]"
+                        >
+                          QUANTITY
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 font-medium w-[15%]"
+                        >
+                          COST
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-3 font-medium w-[20%]"
+                        >
+                          TOTAL COST
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stockInData.length > 0 ? (
+                        stockInData.map((stock, index) => (
+                          <tr
+                            key={index}
+                            className={`
+                              ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} 
+                              border-b hover:bg-gray-200 group
+                            `}
+                          >
+                            <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
+                              {stock.id}
+                            </td>
+                            <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900 break-words">
+                              {stock.name}
+                            </td>
+                            <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
+                              {stock.measurement}
+                            </td>
+                            <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
+                              {stock.quantity}
+                            </td>
+                            <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
+                              {stock.price.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </td>
+                            <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
+                              {stock.totalCost.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr className="bg-white border-b">
+                          <td
+                            className="px-4 py-3 text-center font-normal text-gray-500 italic"
+                            colSpan={6}
+                          >
+                            No Stock Data Available
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
