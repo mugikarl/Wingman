@@ -3,6 +3,7 @@ import { getItemKey } from "../cards/OrderProductCard";
 import EditableProductCard from "../cards/EditableProductCard";
 import OrderEditPayment from "../popups/OrderEditPayment";
 import axios from "axios";
+import { useModal } from "../utils/modalUtils";
 
 const EditTransactionOrderSummary = ({
   orderDetails,
@@ -32,7 +33,7 @@ const EditTransactionOrderSummary = ({
   const [isLoading, setIsLoading] = useState(false); // Loading state
   const [buttonText, setButtonText] = useState("Save All Changes"); // Button text state
   const loadingIntervalRef = useRef(null); // Ref for the loading interval
-
+  const { alert, confirm } = useModal();
   // Compute orders directly from orderDetails prop.
   const alaCarteOrders = orderDetails.filter(
     (detail) => detail.instore_category?.id === 1
@@ -203,7 +204,10 @@ const EditTransactionOrderSummary = ({
   // Function to check inventory for all items before saving changes
   const checkInventoryBeforeSave = async () => {
     if (orderDetails.length === 0) {
-      alert("Please add at least one item before saving changes");
+      await alert(
+        "Please add at least one item before saving changes",
+        "Error"
+      );
       return false;
     }
 
@@ -251,18 +255,20 @@ const EditTransactionOrderSummary = ({
 
       // If there are warnings, show them all together
       if (!allItemsAvailable) {
-        const proceed = window.confirm(
+        const proceed = await confirm(
           `Warning: Some items may exceed available inventory! Insufficient ingredients will default to 0 quantity.\n\n${warningMessages.join(
             "\n"
-          )}\n\nDo you want to continue?`
+          )}\n\nDo you want to continue?`,
+          "Warning"
         );
         return proceed;
       }
       return true;
     } catch (error) {
       console.error("Error checking inventory:", error);
-      const proceed = window.confirm(
-        "Error checking inventory. If you proceed, items with insufficient ingredients will have quantity set to 0. Do you want to continue anyway?"
+      const proceed = await confirm(
+        "Error checking inventory. If you proceed, items with insufficient ingredients will have quantity set to 0. Do you want to continue anyway?",
+        "Error"
       );
       return proceed;
     }

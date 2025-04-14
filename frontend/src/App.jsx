@@ -68,7 +68,7 @@ const App = () => {
             {/* Admin Dashboard Routes (protected by AdminRoute) */}
             {/** ORDER */}
             <Route
-              path="/dashboard-admin/ordertable"
+              path="/admin/ordertable"
               element={
                 <AdminRoute>
                   <OrderTable />
@@ -76,7 +76,7 @@ const App = () => {
               }
             />
             <Route
-              path="/dashboard-admin/order"
+              path="/admin/order"
               element={
                 <AdminRoute>
                   <Order />
@@ -85,7 +85,7 @@ const App = () => {
             />
 
             <Route
-              path="/dashboard-admin/order/:transactionId"
+              path="/admin/order/:transactionId"
               element={
                 <AdminRoute>
                   <Order />
@@ -95,7 +95,7 @@ const App = () => {
 
             {/** INVENTORY */}
             <Route
-              path="/dashboard-admin/inventory"
+              path="/admin/inventory"
               element={
                 <AdminRoute>
                   <Inventory />
@@ -103,7 +103,7 @@ const App = () => {
               }
             />
             <Route
-              path="/dashboard-admin/newmenuform"
+              path="/admin/newmenuform"
               element={
                 <AdminRoute>
                   <NewMenuForm />
@@ -111,7 +111,7 @@ const App = () => {
               }
             />
             <Route
-              path="/dashboard-admin/items"
+              path="/admin/items"
               element={
                 <AdminRoute>
                   <Items />
@@ -119,7 +119,7 @@ const App = () => {
               }
             />
             <Route
-              path="/dashboard-admin/stockin"
+              path="/admin/stockin"
               element={
                 <AdminRoute>
                   <StockIn />
@@ -127,7 +127,7 @@ const App = () => {
               }
             />
             <Route
-              path="/dashboard-admin/menu"
+              path="/admin/menu"
               element={
                 <AdminRoute>
                   <Menu />
@@ -135,7 +135,7 @@ const App = () => {
               }
             />
             <Route
-              path="/dashboard-admin/stockout"
+              path="/admin/stockout"
               element={
                 <AdminRoute>
                   <StockOut />
@@ -143,7 +143,7 @@ const App = () => {
               }
             />
             <Route
-              path="/dashboard-admin/staffprofile"
+              path="/admin/staffprofile"
               element={
                 <AdminRoute>
                   <StaffProfile />
@@ -151,7 +151,7 @@ const App = () => {
               }
             />
             <Route
-              path="/dashboard-admin/sales"
+              path="/admin/sales"
               element={
                 <AdminRoute>
                   <Sales />
@@ -159,19 +159,16 @@ const App = () => {
               }
             />
             <Route
-              path="/dashboard-admin/salescalendar"
+              path="/admin/salescalendar"
               element={
                 <AdminRoute>
                   <SalesCalendar />
                 </AdminRoute>
               }
             />
+            <Route path="/admin/daily-sales/:date" element={<DailySales />} />
             <Route
-              path="/dashboard-admin/daily-sales/:date"
-              element={<DailySales />}
-            />
-            <Route
-              path="/dashboard-admin/exportsales"
+              path="/admin/exportsales"
               element={
                 <AdminRoute>
                   <ExportSales />
@@ -179,7 +176,7 @@ const App = () => {
               }
             />
             <Route
-              path="/dashboard-admin/addexpense"
+              path="/admin/addexpense"
               element={
                 <AdminRoute>
                   <AddExpense />
@@ -187,7 +184,7 @@ const App = () => {
               }
             />
             <Route
-              path="/dashboard-admin"
+              path="/admin"
               element={
                 <AdminRoute>
                   <Dashboard isAdmin={isAdmin} setIsAdmin={setIsAdmin} />
@@ -209,7 +206,7 @@ const App = () => {
               path="/inventory"
               element={
                 localStorage.getItem("role") === "Admin" ? (
-                  <Navigate to="/dashboard-admin/inventory" replace />
+                  <Navigate to="/admin/inventory" replace />
                 ) : (
                   <Inventory />
                 )
@@ -219,7 +216,7 @@ const App = () => {
               path="/items"
               element={
                 localStorage.getItem("role") === "Admin" ? (
-                  <Navigate to="/dashboard-admin/items" replace />
+                  <Navigate to="/admin/items" replace />
                 ) : (
                   <Items />
                 )
@@ -229,7 +226,7 @@ const App = () => {
               path="/stockin"
               element={
                 localStorage.getItem("role") === "Admin" ? (
-                  <Navigate to="/dashboard-admin/stockin" replace />
+                  <Navigate to="/admin/stockin" replace />
                 ) : (
                   <StockIn />
                 )
@@ -239,7 +236,7 @@ const App = () => {
               path="/menu"
               element={
                 localStorage.getItem("role") === "Admin" ? (
-                  <Navigate to="/dashboard-admin/menu" replace />
+                  <Navigate to="/admin/menu" replace />
                 ) : (
                   <Menu />
                 )
@@ -249,7 +246,7 @@ const App = () => {
               path="/stockout"
               element={
                 localStorage.getItem("role") === "Admin" ? (
-                  <Navigate to="/dashboard-admin/stockout" replace />
+                  <Navigate to="/admin/stockout" replace />
                 ) : (
                   <StockOut />
                 )
@@ -259,7 +256,7 @@ const App = () => {
               path="/ordertable"
               element={
                 localStorage.getItem("role") === "Admin" ? (
-                  <Navigate to="/dashboard-admin/ordertable" replace />
+                  <Navigate to="/admin/ordertable" replace />
                 ) : (
                   <OrderTable />
                 )
@@ -270,7 +267,7 @@ const App = () => {
               path="/order"
               element={
                 localStorage.getItem("role") === "Admin" ? (
-                  <Navigate to="/dashboard-admin/order" replace />
+                  <Navigate to="/admin/order" replace />
                 ) : (
                   <Order />
                 )
@@ -280,7 +277,7 @@ const App = () => {
               path="/order/:transactionId"
               element={
                 localStorage.getItem("role") === "Admin" ? (
-                  <AdminRedirect to="/dashboard-admin/order/:transactionId" />
+                  <AdminRedirect to="/admin/order/:transactionId" />
                 ) : (
                   <Order />
                 )
@@ -300,10 +297,7 @@ const App = () => {
             <Route
               path="*"
               element={
-                <Navigate
-                  to={isAdmin ? "/dashboard-admin" : "/dashboard"}
-                  replace
-                />
+                <Navigate to={isAdmin ? "/admin" : "/dashboard"} replace />
               }
             />
           </Routes>

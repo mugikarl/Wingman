@@ -6,6 +6,7 @@ import { PiMagnifyingGlass, PiBasket } from "react-icons/pi";
 import OrderSummary from "../../components/panels/OrderSummary";
 import LoadingScreen from "../../components/popups/LoadingScreen";
 import { useNavigate } from "react-router-dom";
+import { useModal } from "../../components/utils/modalUtils";
 
 const Order = () => {
   const navigate = useNavigate();
@@ -40,6 +41,7 @@ const Order = () => {
 
   // Add new state variables for inventory tracking
   const [lowInventoryWarnings, setLowInventoryWarnings] = useState({});
+  const { alert, confirm } = useModal();
 
   // Add to state variables at the top
   const [isCheckingMenuAvailability, setIsCheckingMenuAvailability] =
@@ -194,15 +196,18 @@ const Order = () => {
   }
 
   // Handle filter selection for type
-  const handleTypeFilter = (type) => {
+  const handleTypeFilter = async (type) => {
     if (
       selectedMenuType &&
       selectedMenuType.id !== type.id &&
       selectedItems.length > 0
     ) {
-      const ok = window.confirm(
-        "Changing types will remove the current items in the order summary. Proceed?"
+      // Replace window.confirm with custom confirm
+      const ok = await confirm(
+        "Changing types will remove the current items in the order summary. Proceed?",
+        "Confirm Type Change"
       );
+
       if (!ok) return;
       setSelectedItems([]);
     }
@@ -267,10 +272,11 @@ const Order = () => {
     }
   };
 
-  // Modify the handleAddItem function to skip inventory checking
-  const handleAddItem = (item) => {
+  // Modify the handleAddItem function to use custom alert
+  const handleAddItem = async (item) => {
     if (item.status_id === 2) {
-      return alert("This item is unavailable!");
+      await alert("This item is unavailable!", "Unavailable Item");
+      return;
     }
 
     // Original handleAddItem logic without inventory checking
@@ -287,16 +293,20 @@ const Order = () => {
             item.category_id === 4 &&
             !item.name.toLowerCase().includes("rice")
           ) {
-            return alert(
-              "Only Rice items can be added for Sides in the Unli section."
+            await alert(
+              "Only Rice items can be added for Sides in the Unli section.",
+              "Invalid Selection"
             );
+            return;
           }
           defaultCategory = "Unli Wings";
           defaultDiscount = 0;
         } else {
-          return alert(
-            "Only Wings, Drinks, or Sides items can be added to the Unli section."
+          await alert(
+            "Only Wings, Drinks, or Sides items can be added to the Unli section.",
+            "Invalid Selection"
           );
+          return;
         }
       } else {
         // For Ala Carte mode.
@@ -376,17 +386,21 @@ const Order = () => {
   };
 
   // Prevent adding a new Unli order if the current Unli order is empty.
-  const handleAddNewUnliOrder = () => {
+  const handleAddNewUnliOrder = async () => {
     const hasItemsInCurrentOrder = selectedItems.some(
       (i) =>
         i.orderNumber === currentUnliOrderNumber &&
         i.instoreCategory === "Unli Wings"
     );
+
     if (!hasItemsInCurrentOrder) {
-      return alert(
-        "Please add at least one item to the current Unli Order before adding a new order."
+      await alert(
+        "Please add at least one item to the current Unli Order before adding a new order.",
+        "Empty Order"
       );
+      return;
     }
+
     setCurrentUnliOrderNumber(currentUnliOrderNumber + 1);
   };
 

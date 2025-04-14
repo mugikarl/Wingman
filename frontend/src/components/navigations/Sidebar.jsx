@@ -53,7 +53,7 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
     <div className="w-52 bg-[#CC5500] flex flex-col h-screen overflow-hidden">
       {/* Logo */}
       <div className="flex items-center justify-center py-4">
-        <Link to={isAdmin ? "/dashboard-admin" : "/dashboard"}>
+        <Link to={isAdmin ? "/admin" : "/dashboard"}>
           <button className="flex p-2 rounded-lg w-full justify-center">
             <img src="/images/bawkbawk.png" alt="Logo" className="w-24" />
           </button>
@@ -66,7 +66,7 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
           {isAdmin ? (
             <>
               {/* Order Button */}
-              <Link to="/dashboard-admin/ordertable">
+              <Link to="/admin/ordertable">
                 <button
                   onClick={() => handleMainButtonClick("order")}
                   className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
@@ -124,7 +124,7 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
                     </Link>
                     {role === "Admin" && (
                       <>
-                        <Link to="/dashboard-admin/menu">
+                        <Link to="/admin/menu">
                           <button
                             onClick={() => handleDropdownButtonClick("menu")}
                             className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
@@ -167,7 +167,7 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
               </div>
 
               {/* Staff Profile Button */}
-              <Link to="/dashboard-admin/staffprofile">
+              <Link to="/admin/staffprofile">
                 <button
                   onClick={() => handleMainButtonClick("staffprofile")}
                   className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
@@ -184,7 +184,7 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
               </Link>
 
               {/* Sales Button */}
-              <Link to="/dashboard-admin/sales">
+              <Link to="/admin/sales">
                 <button
                   onClick={() => handleMainButtonClick("sales")}
                   className={`flex items-center py-3 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${
@@ -259,7 +259,7 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
                     </Link>
                     {role === "Admin" && (
                       <>
-                        <Link to="/dashboard-admin/menu">
+                        <Link to="/admin/menu">
                           <button
                             onClick={() => handleDropdownButtonClick("menu")}
                             className={`flex items-center py-2 px-2 rounded-xl text-white transition-all duration-200 w-full overflow-hidden ${

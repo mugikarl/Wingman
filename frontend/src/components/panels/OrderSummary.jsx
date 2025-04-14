@@ -4,6 +4,7 @@ import OrderProductCard from "../cards/OrderProductCard";
 import OrderPayment from "../popups/OrderPayment";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { useModal } from "../utils/modalUtils";
 
 // Helper to create a composite key for an item
 const getItemKey = (item, menuType) => {
@@ -48,7 +49,7 @@ const OrderSummary = ({
   const loadingIntervalRef = useRef(null);
   const deduction = menuType?.deduction_percentage || 0;
   const navigate = useNavigate();
-
+  const { alert, confirm } = useModal();
   // Get Unli Wings base amount from inStoreCategories
   const unliCategory = inStoreCategories?.find(
     (cat) => cat.name === "Unli Wings" || cat.id === 2
@@ -178,7 +179,10 @@ const OrderSummary = ({
   // Add a new function to check inventory for all items
   const checkInventoryBeforePayment = async () => {
     if (selectedItems.length === 0) {
-      alert("Please add at least one item before proceeding to payment");
+      await alert(
+        "Please add at least one item before proceeding to payment",
+        "Error"
+      );
       return false;
     }
 
@@ -225,18 +229,20 @@ const OrderSummary = ({
 
       // If there are warnings, show them all together
       if (!allItemsAvailable) {
-        const proceed = window.confirm(
+        const proceed = await confirm(
           `Warning: Some items may exceed available inventory! Insufficient ingredients will default to 0 quantity.\n\n${warningMessages.join(
             "\n"
-          )}\n\nDo you want to continue?`
+          )}\n\nDo you want to continue?`,
+          "Warning"
         );
         return proceed;
       }
       return true;
     } catch (error) {
       console.error("Error checking inventory:", error);
-      const proceed = window.confirm(
-        "Error checking inventory. If you proceed, items with insufficient ingredients will have quantity set to 0. Do you want to continue anyway?"
+      const proceed = await confirm(
+        "Error checking inventory. If you proceed, items with insufficient ingredients will have quantity set to 0. Do you want to continue anyway?",
+        "Error"
       );
       return proceed;
     }
@@ -265,7 +271,10 @@ const OrderSummary = ({
   // Modify the button click handler
   const handleProceedToPayment = async () => {
     if (selectedItems.length === 0) {
-      alert("Please add at least one item before proceeding to payment");
+      await alert(
+        "Please add at least one item before proceeding to payment",
+        "Error"
+      );
       return;
     }
 

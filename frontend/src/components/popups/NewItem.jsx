@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-
+import { useModal } from "../utils/modalUtils";
 const NewItem = ({ isOpen, closeModal, fetchItemData, categories, units }) => {
   const [itemName, setItemName] = useState("");
   const [stockTrigger, setStockTrigger] = useState("");
@@ -9,6 +9,7 @@ const NewItem = ({ isOpen, closeModal, fetchItemData, categories, units }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const { alert } = useModal();
   useEffect(() => {
     if (isOpen) {
       fetchItemData();
@@ -17,7 +18,7 @@ const NewItem = ({ isOpen, closeModal, fetchItemData, categories, units }) => {
 
   const handleSubmit = async () => {
     if (!itemName || !stockTrigger || !selectedUnit || !selectedCategory) {
-      alert("Please fill in all fields.");
+      await alert("Please fill in all fields.", "Error");
       return;
     }
 
@@ -38,7 +39,7 @@ const NewItem = ({ isOpen, closeModal, fetchItemData, categories, units }) => {
 
       const newItem = addItemResponse.data.item || addItemResponse.data;
       if (!newItem || !newItem.id) {
-        alert("Item added but no item ID was returned.");
+        await alert("Item added but no item ID was returned.", "Error");
         return;
       }
       // Create a new inventory record for the new item with initial quantity 0.
@@ -51,12 +52,12 @@ const NewItem = ({ isOpen, closeModal, fetchItemData, categories, units }) => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      alert("Item added successfully!");
+      alert("Item added successfully!", "Success");
       fetchItemData();
       closeModal(); // Refresh items list
     } catch (error) {
       console.error("Error adding item:", error);
-      alert("Failed to add item.");
+      await alert("Failed to add item.", "Error");
     } finally {
       setLoading(false);
     }

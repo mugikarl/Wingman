@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { IoMdClose } from "react-icons/io";
+import { useModal } from "../utils/modalUtils";
 
 const EditStockInDetails = ({
   isOpen,
@@ -29,6 +30,7 @@ const EditStockInDetails = ({
   const [isAdding, setIsAdding] = useState(false);
   const [savingText, setSavingText] = useState("Save Changes");
   const [deletingText, setDeletingText] = useState("Delete Receipt");
+  const { alert, confirm } = useModal();
 
   // Add this useEffect for the loading animations
   useEffect(() => {
@@ -262,7 +264,7 @@ const EditStockInDetails = ({
           (item) => item.name === selectedStock.name
         );
         if (!selectedItem) {
-          alert("Selected item not found.");
+          await alert("Selected item not found.", "Error");
           return;
         }
 
@@ -339,9 +341,8 @@ const EditStockInDetails = ({
         };
 
         console.log("Adding new stock-in entry:", newStock);
+        await alert("Stock added successfully!", "Success");
         setEditedStockData((prev) => [...prev, newStock]);
-
-        // Reset the form
         setSelectedStock({
           name: "",
           measurement: "",
@@ -350,12 +351,15 @@ const EditStockInDetails = ({
         });
       } catch (error) {
         console.error("Error adding stock:", error);
-        alert(`Error adding stock: ${error.message}`);
+        await alert(`Error adding stock: ${error.message}`, "Error");
       } finally {
         setIsAdding(false);
       }
     } else {
-      alert("Please fill in all fields for the new stock entry.");
+      await alert(
+        "Please fill in all fields for the new stock entry.",
+        "Error"
+      );
     }
   };
 
@@ -422,7 +426,12 @@ const EditStockInDetails = ({
 
   // Handler for deleting the receipt (only visible when not editing).
   const deleteReceiptHandler = async () => {
-    if (window.confirm("Are you sure you want to delete this receipt?")) {
+    const confirmDelete = await confirm(
+      "Are you sure you want to delete this receipt?",
+      "Delete Receipt"
+    );
+
+    if (confirmDelete) {
       try {
         setIsSubmitting(true);
 
@@ -431,7 +440,10 @@ const EditStockInDetails = ({
 
         if (!receiptId) {
           console.error("No receipt ID found:", editedReceipt);
-          alert("Error: Cannot delete receipt - receipt ID is missing");
+          await alert(
+            "Error: Cannot delete receipt - receipt ID is missing",
+            "Error"
+          );
           return;
         }
 
@@ -440,13 +452,13 @@ const EditStockInDetails = ({
         );
 
         if (res.status === 200) {
-          alert("Receipt deleted successfully!");
+          await alert("Receipt deleted successfully!", "Success");
           onUpdate();
           onClose();
         }
       } catch (error) {
         console.error("Failed to delete receipt:", error);
-        alert("An error occurred while deleting the receipt.");
+        await alert("An error occurred while deleting the receipt.", "Error");
       } finally {
         setIsSubmitting(false);
       }
@@ -466,7 +478,10 @@ const EditStockInDetails = ({
 
       if (!receiptId) {
         console.error("No receipt ID found:", editedReceipt);
-        alert("Error: Cannot update receipt - receipt ID is missing");
+        await alert(
+          "Error: Cannot update receipt - receipt ID is missing",
+          "Error"
+        );
         return;
       }
 
@@ -488,7 +503,7 @@ const EditStockInDetails = ({
         }
       );
 
-      alert("Changes saved successfully!");
+      await alert("Changes saved successfully!", "Success");
       if (response.data && response.data.receipt) {
         const updatedReceipt = response.data.receipt;
 
@@ -558,7 +573,7 @@ const EditStockInDetails = ({
       onClose();
     } catch (error) {
       console.error("Failed to update receipt:", error);
-      alert("An error occurred while saving the changes.");
+      await alert("An error occurred while saving the changes.", "Error");
     } finally {
       setIsSubmitting(false);
       setIsEditing(false);
@@ -796,16 +811,18 @@ const EditStockInDetails = ({
                                   <span>{stock.totalCost}</span>
                                   {isEditing && !stock.to_delete && (
                                     <button
-                                      onClick={(e) => {
+                                      onClick={async (e) => {
                                         e.stopPropagation();
                                         if (!stock.id) {
                                           markStockForDeletion(index);
-                                        } else if (
-                                          window.confirm(
-                                            "Are you sure you want to delete this stock-in detail?"
-                                          )
-                                        ) {
-                                          markStockForDeletion(index);
+                                        } else {
+                                          const confirmDelete = await confirm(
+                                            "Are you sure you want to delete this stock-in detail?",
+                                            "Delete Stock Item"
+                                          );
+                                          if (confirmDelete) {
+                                            markStockForDeletion(index);
+                                          }
                                         }
                                       }}
                                       className="text-red-500 hover:text-red-700 p-1 rounded-full ml-2"

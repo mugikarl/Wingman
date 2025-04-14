@@ -1,16 +1,17 @@
 import { useState, useEffect } from "react";
 import { FaMoneyBill, FaCreditCard } from "react-icons/fa6";
+import { useModal } from "../utils/modalUtils";
 
 const OrderEditPayment = ({
   isOpen,
   onClose,
-  totalAmount, // The initial total (already paid)
-  finalTotal, // The new total (final total for the order)
-  transaction, // Transaction object; its id will be used in the parent's PUT request
-  onUpdateComplete, // Callback when order is updated successfully
-  handleEditOrder, // Passed update function
+  totalAmount,
+  finalTotal,
+  transaction,
+  onUpdateComplete,
+  handleEditOrder,
   paymentMethods,
-  employees, // Array of employee objects
+  employees,
   fetchOrderData,
 }) => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
@@ -20,6 +21,8 @@ const OrderEditPayment = ({
   // GCash fields
   const [gcashReferenceNo, setGcashReferenceNo] = useState("");
   const [gcashReferenceImage, setGcashReferenceImage] = useState(null);
+
+  const { alert } = useModal();
 
   // When modal opens, initialize state.
   useEffect(() => {
@@ -106,22 +109,23 @@ const OrderEditPayment = ({
     }
   };
 
-  const onSubmit = () => {
+  const onSubmit = async () => {
     // Ensure payment method is selected
     if (!selectedPaymentMethod) {
-      alert("Please select a payment method.");
+      await alert("Please select a payment method.", "Error");
       return;
     }
     if (selectedPaymentMethod.name.toLowerCase() === "cash") {
       if ((Number.parseFloat(cashReceived) || 0) < finalPayment) {
-        alert(
-          "Cash received must be greater than or equal to the extra payment required."
+        await alert(
+          "Cash received must be greater than or equal to the extra payment required.",
+          "Error"
         );
         return;
       }
     } else if (selectedPaymentMethod.name.toLowerCase() === "gcash") {
       if (!gcashReferenceNo) {
-        alert("Please provide GCash Reference No.");
+        await alert("Please provide GCash Reference No.", "Error");
         return;
       }
     }

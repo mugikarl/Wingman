@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { useModal } from "../utils/modalUtils";
 
 const NewCategory = ({
   isOpen,
@@ -10,7 +11,7 @@ const NewCategory = ({
   const [categoryName, setCategoryName] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-
+  const { alert, confirm } = useModal();
   const handleAddCategory = async () => {
     if (!categoryName.trim()) return;
     try {
@@ -59,7 +60,7 @@ const NewCategory = ({
           },
         }
       );
-      alert("Category updated successfully!");
+      await alert("Category updated successfully!", "Success");
       fetchItemData((prevCategories) =>
         prevCategories.map((category, index) =>
           index === selectedIndex
@@ -72,12 +73,15 @@ const NewCategory = ({
       setSelectedIndex(null); // Close modal if applicable
     } catch (error) {
       console.error("Error updating category:", error);
-      alert("Failed to update category.");
+      await alert("Failed to update category.", "Error");
     }
   };
 
   const handleDeleteCategory = async (index) => {
-    const confirmDelete = window.confirm("Delete category?");
+    const confirmDelete = await confirm(
+      "Are you sure you want to delete this category?",
+      "Delete Category"
+    );
     if (!confirmDelete) return;
 
     try {
@@ -98,6 +102,7 @@ const NewCategory = ({
       }
     } catch (error) {
       console.error("Error deleting category:", error);
+      await alert("Failed to delete category. Please try again.", "Error");
     }
   };
 

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { useModal } from "../utils/modalUtils";
 
 const NewMenuForm = ({
   onSave,
@@ -25,6 +26,8 @@ const NewMenuForm = ({
     unit_id: "",
   });
 
+  const { alert } = useModal();
+
   // Handle image upload
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -43,7 +46,7 @@ const NewMenuForm = ({
       !image ||
       recipes.length === 0
     ) {
-      alert("Please fill in all fields.");
+      await alert("Please fill in all fields.", "Error");
       return;
     }
 
@@ -77,7 +80,7 @@ const NewMenuForm = ({
         }
       );
 
-      alert("Menu added successfully!");
+      alert("Menu added successfully!", "Success");
       fetchMenus();
       // Reset form
       setImage(null);
@@ -89,18 +92,21 @@ const NewMenuForm = ({
       setRecipes([]);
     } catch (error) {
       console.error("Error saving menu item:", error.response?.data || error);
-      alert("Failed to add menu item.");
+      await alert("Failed to add menu item.", "Error");
     }
   };
 
   // Handle adding a new recipe
-  const handleAddRecipe = () => {
+  const handleAddRecipe = async () => {
     if (
       !currentRecipe.inventory_id ||
       !currentRecipe.quantity ||
       !currentRecipe.unit_id
     ) {
-      alert("Please enter valid item, quantity, and unit of measurement.");
+      await alert(
+        "Please enter valid item, quantity, and unit of measurement.",
+        "Error"
+      );
       return;
     }
 

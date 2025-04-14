@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { FaTrash } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
+import { useModal } from "../utils/modalUtils";
 
 const ExpensesType = ({
   isOpen,
@@ -17,6 +18,7 @@ const ExpensesType = ({
   const [addingText, setAddingText] = useState("Add");
   const [updatingText, setUpdatingText] = useState("Update");
   const [deletingDots, setDeletingDots] = useState("");
+  const { alert, confirm } = useModal();
 
   // Sort expenses types alphabetically by name
   const sortedExpensesTypes = [...expensesTypes].sort((a, b) => a.id - b.id);
@@ -55,7 +57,7 @@ const ExpensesType = ({
 
   const handleAddExpenseType = async () => {
     if (!expenseTypeName.trim()) {
-      alert("Please enter an expense type name");
+      await alert("Please enter an expense type name", "Error");
       return;
     }
 
@@ -72,10 +74,8 @@ const ExpensesType = ({
         }
       );
 
-      console.log("Add expense type response:", response.data);
-
       if (response.data.message) {
-        alert(response.data.message);
+        await alert(response.data.message, "Success");
         fetchExpensesData();
         setExpenseTypeName("");
 
@@ -86,9 +86,9 @@ const ExpensesType = ({
     } catch (error) {
       console.error("Error adding expense type:", error);
       if (error.response?.data?.error) {
-        alert(error.response.data.error);
+        await alert(error.response.data.error, "Error");
       } else {
-        alert("Failed to add expense type. Please try again.");
+        await alert("Failed to add expense type. Please try again.", "Error");
       }
     } finally {
       setIsSubmitting(false);
@@ -125,7 +125,7 @@ const ExpensesType = ({
           },
         }
       );
-      alert("Expense type updated successfully!");
+      await alert("Expense type updated successfully!", "Success");
       fetchExpensesData();
       setExpenseTypeName("");
       setIsEditing(false);
@@ -136,7 +136,7 @@ const ExpensesType = ({
       }, 0);
     } catch (error) {
       console.error("Error updating expense type:", error);
-      alert("Failed to update expense type.");
+      await alert("Failed to update expense type.", "Error");
     } finally {
       setIsSubmitting(false);
     }
@@ -145,7 +145,10 @@ const ExpensesType = ({
   const handleDeleteExpenseType = async () => {
     if (selectedIndex === null) return;
 
-    const confirmDelete = window.confirm("Delete expense type?");
+    const confirmDelete = await confirm(
+      "Are you sure you want to delete this expense type?",
+      "Delete Expense Type"
+    );
     if (!confirmDelete) return;
 
     setIsDeleting(true);

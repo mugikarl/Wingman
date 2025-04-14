@@ -3,6 +3,7 @@ import axios from "axios";
 import EditTransactionMenu from "../panels/EditTransactionMenu";
 import EditTransactionOrderSummary from "../panels/EditTransactionOrderSummary";
 import { FaChevronUp, FaChevronDown } from "react-icons/fa";
+import { useModal } from "../utils/modalUtils";
 
 const OrderEditModal = ({
   isOpen,
@@ -39,8 +40,8 @@ const OrderEditModal = ({
   const [isUpdatingAvailability, setIsUpdatingAvailability] = useState(false);
   const [availabilityMessage, setAvailabilityMessage] = useState("");
   const [isInitialDataFetched, setIsInitialDataFetched] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // New loading state
-  const [inventoryWarnings, setInventoryWarnings] = useState({}); // New state for inventory warnings
+  const [isLoading, setIsLoading] = useState(false);
+  const [inventoryWarnings, setInventoryWarnings] = useState({});
 
   // Filter menu items based on the current menu type and selected category.
   const filteredMenuItems = menuItems.filter((item) => {
@@ -51,6 +52,8 @@ const OrderEditModal = ({
         : true;
     return matchesType && matchesCategory;
   });
+
+  const { alert, confirm } = useModal();
 
   const fetchOrderData = async () => {
     try {
@@ -68,7 +71,7 @@ const OrderEditModal = ({
     try {
       // First check if this item is already unavailable
       if (item.status_id === 2) {
-        alert("This item is currently unavailable!");
+        await alert("This item is currently unavailable!", "Error");
         return;
       }
 
@@ -90,8 +93,9 @@ const OrderEditModal = ({
             .join("\n");
 
           // Show warning but allow adding
-          const proceed = window.confirm(
-            `Warning: Adding this item may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`
+          const proceed = await confirm(
+            `Warning: Adding this item may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`,
+            "Inventory Warning"
           );
 
           if (!proceed) {
@@ -110,7 +114,6 @@ const OrderEditModal = ({
       onItemSelect(item);
     } catch (error) {
       console.error("Error checking inventory:", error);
-      // Still allow adding if check fails
       onItemSelect(item);
     }
   };

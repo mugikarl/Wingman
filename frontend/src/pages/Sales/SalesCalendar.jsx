@@ -1,7 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import LoadingScreen from "../../components/popups/LoadingScreen";
-import { FaCalendarAlt, FaChartBar, FaFileExport, FaPlus } from "react-icons/fa";
+import {
+  FaCalendarAlt,
+  FaChartBar,
+  FaFileExport,
+  FaPlus,
+} from "react-icons/fa";
 import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
 import ExportSales from "../../components/popups/ExportSales";
 import AddExpense from "../../components/popups/AddExpense";
@@ -111,7 +116,7 @@ const SalesCalendar = () => {
       <div className="flex justify-between mb-4">
         <div className="flex gap-2">
           <Link
-            to="/dashboard-admin/sales"
+            to="/admin/sales"
             className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
           >
             <div className="flex items-center justify-center border-r p-3">

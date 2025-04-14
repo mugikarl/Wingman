@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { FaTrash } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
+import { useModal } from "../utils/modalUtils";
 
 const NewSupplier = ({ isOpen, onClose, suppliers = [], fetchItemData }) => {
   const [supplierName, setSupplierName] = useState("");
@@ -12,6 +13,8 @@ const NewSupplier = ({ isOpen, onClose, suppliers = [], fetchItemData }) => {
   const [addingText, setAddingText] = useState("Add");
   const [updatingText, setUpdatingText] = useState("Update");
   const [deletingDots, setDeletingDots] = useState("");
+
+  const { alert, confirm } = useModal();
 
   // Sort suppliers alphabetically by name
   const sortedSuppliers = [...suppliers].sort((a, b) =>
@@ -67,8 +70,9 @@ const NewSupplier = ({ isOpen, onClose, suppliers = [], fetchItemData }) => {
       );
       fetchItemData();
       setSupplierName("");
+      alert("Supplier added successfully!", "Success");
     } catch (error) {
-      console.error("Error adding supplier:", error);
+      await alert("Failed to add supplier. Please try again.", "Error");
     } finally {
       setIsSubmitting(false);
     }
@@ -104,14 +108,14 @@ const NewSupplier = ({ isOpen, onClose, suppliers = [], fetchItemData }) => {
           },
         }
       );
-      alert("Supplier updated successfully!");
+      alert("Supplier updated successfully!", "Success");
       fetchItemData();
       setSupplierName("");
       setIsEditing(false);
       setSelectedIndex(null);
     } catch (error) {
       console.error("Error updating supplier:", error);
-      alert("Failed to update supplier.");
+      await alert("Failed to update supplier.", "Error");
     } finally {
       setIsSubmitting(false);
     }
@@ -120,7 +124,10 @@ const NewSupplier = ({ isOpen, onClose, suppliers = [], fetchItemData }) => {
   const handleDeleteSupplier = async () => {
     if (selectedIndex === null) return;
 
-    const confirmDelete = window.confirm("Delete supplier?");
+    const confirmDelete = await confirm(
+      "Are you sure you want to delete this supplier?",
+      "Delete Supplier"
+    );
     if (!confirmDelete) return;
 
     setIsDeleting(true);
@@ -134,12 +141,13 @@ const NewSupplier = ({ isOpen, onClose, suppliers = [], fetchItemData }) => {
           },
         }
       );
+      alert("Supplier deleted successfully!", "Success");
       fetchItemData();
       setSupplierName("");
       setIsEditing(false);
       setSelectedIndex(null);
     } catch (error) {
-      console.error("Error deleting supplier:", error);
+      await alert("Failed to delete supplier. Please try again.", "Error");
     } finally {
       setIsDeleting(false);
     }

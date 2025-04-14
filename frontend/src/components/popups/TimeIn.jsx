@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
+import { useModal } from "../utils/modalUtils";
 
 const TimeIn = ({
   closeModal,
@@ -16,6 +17,8 @@ const TimeIn = ({
   const [isVerifying, setIsVerifying] = useState(false);
   const [buttonText, setButtonText] = useState("Verify & Time In");
   const [showPassword, setShowPassword] = useState(false);
+
+  const { alert } = useModal();
 
   // Animation for the loading dots
   useEffect(() => {
@@ -50,46 +53,48 @@ const TimeIn = ({
       });
   }, []);
 
-  const verifyCode = () => {
+  const verifyCode = async () => {
     if (
       !selectedEmployeeId ||
       !email ||
       code.length !== 6 ||
       !/^\d+$/.test(code)
     ) {
-      alert("Please enter valid details.");
+      await alert("Please enter valid details.", "Validation Error");
       return;
     }
 
     setIsVerifying(true);
 
-    axios
-      .post("http://127.0.0.1:8000/time-in/", {
+    try {
+      const response = await axios.post("http://127.0.0.1:8000/time-in/", {
         employee_id: selectedEmployeeId,
         email: email,
         passcode: code,
-      })
-      .then((response) => {
-        if (response.data.success) {
-          setIsVerifying(false);
-          alert("Time in successful.");
-
-          // First refresh data
-          forceRefresh ? forceRefresh() : refreshAttendance(currentDate);
-
-          // Then close modal after a slight delay to ensure the UI has refreshed
-          setTimeout(() => {
-            closeModal();
-          }, 500);
-        } else {
-          alert("Verification failed.");
-          setIsVerifying(false);
-        }
-      })
-      .catch((error) => {
-        alert(error.response?.data?.error || "Verification failed.");
-        setIsVerifying(false);
       });
+
+      setIsVerifying(false);
+
+      if (response.data.success) {
+        await alert("Time in successful.", "Success");
+
+        // First refresh data
+        forceRefresh ? forceRefresh() : refreshAttendance(currentDate);
+
+        // Then close modal after a slight delay to ensure the UI has refreshed
+        setTimeout(() => {
+          closeModal();
+        }, 500);
+      } else {
+        await alert("Verification failed.", "Error");
+      }
+    } catch (error) {
+      setIsVerifying(false);
+      await alert(
+        error.response?.data?.error || "Verification failed.",
+        "Error"
+      );
+    }
   };
 
   const togglePasswordVisibility = () => {
