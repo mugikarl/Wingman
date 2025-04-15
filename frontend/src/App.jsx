@@ -5,8 +5,6 @@ import {
   Route,
   Navigate,
 } from "react-router-dom";
-
-// Import your components and pages
 import Sidebar from "./components/navigations/Sidebar"; // Combined Sidebar component
 import Dashboard from "./pages/Dashboard";
 import OrderTable from "./pages/Order/Ordertable";
