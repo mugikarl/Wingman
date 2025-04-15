@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 import axios from "axios";
 import { PiBasket } from "react-icons/pi";
+import { useModal } from "../utils/modalUtils";
 
 const EditTransactionMenu = ({
   menuCategories,
@@ -13,13 +14,13 @@ const EditTransactionMenu = ({
   onItemSelect, // callback when a menu item is selected
 }) => {
   const [inventoryWarnings, setInventoryWarnings] = useState({});
-
+  const { alert, confirm } = useModal();
   // New function to check inventory before adding item
   const handleItemSelect = async (item) => {
     try {
       // First check if this item is already unavailable
       if (item.status_id === 2) {
-        alert("This item is currently unavailable!");
+        await alert("This item is currently unavailable!", "Error");
         return;
       }
 
@@ -41,8 +42,9 @@ const EditTransactionMenu = ({
             .join("\n");
 
           // Show warning but allow adding
-          const proceed = window.confirm(
-            `Warning: Adding this item may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`
+          const proceed = await confirm(
+            `Warning: Adding this item may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`,
+            "Warning"
           );
 
           if (!proceed) {

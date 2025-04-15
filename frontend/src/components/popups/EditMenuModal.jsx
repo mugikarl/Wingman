@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { IoMdClose } from "react-icons/io";
+import { useModal } from "../utils/modalUtils";
 
 const EditMenuModal = ({
   item,
@@ -23,6 +24,8 @@ const EditMenuModal = ({
   const [categoryId, setCategoryId] = useState(item.category_id || "");
   const [typeId, setTypeId] = useState(item.type_id || "");
   const [isAvailable, setIsAvailable] = useState(item.status_id === 1);
+
+  const { alert, confirm } = useModal();
 
   // State for recipe data
   const [recipes, setRecipes] = useState(item.menu_ingredients || []);
@@ -91,7 +94,7 @@ const EditMenuModal = ({
       !image ||
       recipes.length === 0
     ) {
-      alert("Please fill in all fields.");
+      await alert("Please fill in all fields.", "Error");
       return;
     }
 
@@ -136,21 +139,26 @@ const EditMenuModal = ({
         }
       );
 
-      alert("Menu updated successfully!");
+      alert("Menu updated successfully!", "Success");
 
       if (typeof onSave === "function") {
         onSave(response.data); // This will handle closing and refreshing
       }
     } catch (error) {
       console.error("Error updating menu item:", error.response?.data || error);
-      alert("Failed to update menu item.");
+      await alert("Failed to update menu item.", "Error");
       setIsSaving(false); // Only reset if there's an error
     }
   };
 
   // Handle delete
   const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this menu item?")) {
+    if (
+      !(await confirm(
+        "Are you sure you want to delete this menu item?",
+        "Delete Menu Item"
+      ))
+    ) {
       return;
     }
 
@@ -164,7 +172,7 @@ const EditMenuModal = ({
         },
       });
 
-      alert("Menu deleted successfully!");
+      alert("Menu deleted successfully!", "Success");
 
       // Use the onDelete prop to handle closing and refreshing
       if (typeof onDelete === "function") {
@@ -174,13 +182,13 @@ const EditMenuModal = ({
       }
     } catch (error) {
       console.error("Error deleting menu item:", error.response?.data || error);
-      alert("Failed to delete menu item.");
+      await alert("Failed to delete menu item.", "Error");
       setIsDeleting(false); // Only reset if there's an error
     }
   };
 
   // Handle adding a new recipe
-  const handleAddRecipe = () => {
+  const handleAddRecipe = async () => {
     if (!isEditing) return;
 
     if (
@@ -188,7 +196,10 @@ const EditMenuModal = ({
       !currentRecipe.quantity ||
       !currentRecipe.unit_id
     ) {
-      alert("Please enter valid item, quantity, and unit of measurement.");
+      await alert(
+        "Please enter valid item, quantity, and unit of measurement.",
+        "Error"
+      );
       return;
     }
 

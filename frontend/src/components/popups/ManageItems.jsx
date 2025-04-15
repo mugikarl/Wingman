@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { FaTrash } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
+import { useModal } from "../utils/modalUtils";
 
 const ManageItems = ({
   isOpen,
@@ -36,6 +37,8 @@ const ManageItems = ({
   const [addingCategoryText, setAddingCategoryText] = useState("Add");
   const [updatingCategoryText, setUpdatingCategoryText] = useState("Update");
   const [deletingCategoryDots, setDeletingCategoryDots] = useState("");
+
+  const { alert, confirm } = useModal();
 
   // Sort items and categories alphabetically
   const sortedItems = [...items].sort((a, b) =>
@@ -113,7 +116,7 @@ const ManageItems = ({
   // Item Functions
   const handleAddItem = async () => {
     if (!itemName || !stockTrigger || !selectedUnit || !selectedCategory) {
-      alert("Please fill in all fields.");
+      await alert("Please fill in all fields.", "Error");
       return;
     }
 
@@ -133,7 +136,7 @@ const ManageItems = ({
 
       const newItem = addItemResponse.data.item || addItemResponse.data;
       if (!newItem || !newItem.id) {
-        alert("Item added but no item ID was returned.");
+        await alert("Item added but no item ID was returned.", "Error");
         return;
       }
 
@@ -146,12 +149,12 @@ const ManageItems = ({
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
+      alert("Item added successfully!", "Success");
       fetchItemData();
       resetItemForm();
     } catch (error) {
       console.error("Error adding item:", error);
-      alert("Failed to add item.");
+      await alert("Failed to add item.", "Error");
     } finally {
       setIsSubmittingItem(false);
     }
@@ -165,7 +168,7 @@ const ManageItems = ({
       !selectedCategory ||
       selectedItemIndex === null
     ) {
-      alert("Please fill in all fields.");
+      await alert("Please fill in all fields.", "Error");
       return;
     }
 
@@ -191,12 +194,12 @@ const ManageItems = ({
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      alert("Item updated successfully!");
+      alert("Item updated successfully!", "Success");
       fetchItemData();
       resetItemForm();
     } catch (error) {
       console.error("Error updating item:", error);
-      alert("Failed to update item.");
+      await alert("Failed to update item.", "Error");
     } finally {
       setIsSubmittingItem(false);
     }
@@ -205,8 +208,9 @@ const ManageItems = ({
   const handleDeleteItem = async () => {
     if (selectedItemIndex === null) return;
 
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this item?"
+    const confirmDelete = await confirm(
+      "Are you sure you want to delete this item?",
+      "Delete Item"
     );
     if (!confirmDelete) return;
 
@@ -218,12 +222,12 @@ const ManageItems = ({
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      alert("Item deleted successfully!");
+      alert("Item deleted successfully!", "Success");
       fetchItemData();
       resetItemForm();
     } catch (error) {
       console.error("Error deleting item:", error);
-      alert("Failed to delete item.");
+      await alert("Failed to delete item.", "Error");
     } finally {
       setIsDeletingItem(false);
     }
@@ -263,7 +267,7 @@ const ManageItems = ({
       setCategoryName("");
     } catch (error) {
       console.error("Error adding category:", error);
-      alert("Failed to add category.");
+      await alert("Failed to add category.", "Error");
     } finally {
       setIsSubmittingCategory(false);
     }
@@ -288,12 +292,12 @@ const ManageItems = ({
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      alert("Category updated successfully!");
+      alert("Category updated successfully!", "Success");
       fetchItemData();
       resetCategoryForm();
     } catch (error) {
       console.error("Error updating category:", error);
-      alert("Failed to update category.");
+      await alert("Failed to update category.", "Error");
     } finally {
       setIsSubmittingCategory(false);
     }
@@ -302,7 +306,10 @@ const ManageItems = ({
   const handleDeleteCategory = async () => {
     if (selectedCategoryIndex === null) return;
 
-    const confirmDelete = window.confirm("Delete category?");
+    const confirmDelete = await confirm(
+      "Are you sure you want to delete this category?",
+      "Delete Category"
+    );
     if (!confirmDelete) return;
 
     setIsDeletingCategory(true);
@@ -317,7 +324,7 @@ const ManageItems = ({
       resetCategoryForm();
     } catch (error) {
       console.error("Error deleting category:", error);
-      alert("Failed to delete category.");
+      await alert("Failed to delete category.", "Error");
     } finally {
       setIsDeletingCategory(false);
     }

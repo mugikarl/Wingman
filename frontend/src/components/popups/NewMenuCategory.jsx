@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { FaTrash } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
+import { useModal } from "../utils/modalUtils";
 
 const NewMenuCategory = ({
   isOpen,
@@ -18,6 +19,8 @@ const NewMenuCategory = ({
   const [updatingText, setUpdatingText] = useState("Update");
   const [deletingDots, setDeletingDots] = useState("");
   const [localCategories, setLocalCategories] = useState([]);
+
+  const { alert, confirm } = useModal();
 
   // Copy menuCategories to localCategories for local management
   useEffect(() => {
@@ -141,8 +144,7 @@ const NewMenuCategory = ({
       setIsEditing(false);
       setSelectedIndex(null);
 
-      // Show success message
-      alert("Menu Category updated successfully!");
+      alert("Menu Category updated successfully!", "Success");
 
       // Trigger background fetch without waiting for it
       setTimeout(() => {
@@ -150,7 +152,7 @@ const NewMenuCategory = ({
       }, 0);
     } catch (error) {
       console.error("Error updating menu category:", error);
-      alert("Failed to update menu category.");
+      await alert("Failed to update menu category.", "Error");
     } finally {
       setIsSubmitting(false);
     }
@@ -159,7 +161,10 @@ const NewMenuCategory = ({
   const handleDeleteMenuCategory = async () => {
     if (selectedIndex === null) return;
 
-    const confirmDelete = window.confirm("Delete category?");
+    const confirmDelete = await confirm(
+      "Are you sure you want to delete this category?",
+      "Delete Category"
+    );
     if (!confirmDelete) return;
 
     setIsDeleting(true);

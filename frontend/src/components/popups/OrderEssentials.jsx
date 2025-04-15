@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { IoMdClose } from "react-icons/io";
 import { FaTrash, FaPencilAlt, FaCheck, FaTimes } from "react-icons/fa";
+import { useModal } from "../utils/modalUtils";
 
 const OrderEssentials = ({
   isOpen,
@@ -48,6 +49,8 @@ const OrderEssentials = ({
   const sortedMenuTypes = [...menuTypes].sort((a, b) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
   );
+
+  const { alert, confirm } = useModal();
 
   // Loading animations for Discounts tab
   useEffect(() => {
@@ -121,23 +124,33 @@ const OrderEssentials = ({
 
   // Discount functions
   const handleAddDiscount = async () => {
+    const token = localStorage.getItem("access_token");
+
     if (!newDiscountType || !newDiscountPercentage) {
-      alert("Both fields are required.");
+      await alert("Both fields are required.", "Error");
       return;
     }
 
     const percentage = Number.parseFloat(newDiscountPercentage) / 100;
     if (isNaN(percentage)) {
-      alert("Percentage must be a valid number.");
+      await alert("Percentage must be a valid number.", "Error");
       return;
     }
 
     setIsSubmittingDiscount(true);
     try {
-      const response = await axios.post("http://127.0.0.1:8000/add-discount/", {
-        type: newDiscountType,
-        percentage: percentage,
-      });
+      const response = await axios.post(
+        "http://127.0.0.1:8000/add-discount/",
+        {
+          type: newDiscountType,
+          percentage: percentage,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (response.status === 201) {
         setNewDiscountType("");
@@ -149,7 +162,7 @@ const OrderEssentials = ({
         "Failed to add discount",
         error.response?.data || error.message
       );
-      alert("Failed to add discount.");
+      await alert("Failed to add discount.", "Error");
     } finally {
       setIsSubmittingDiscount(false);
     }
@@ -169,8 +182,10 @@ const OrderEssentials = ({
 
   const handleSaveEditDiscount = async (discountId) => {
     const percentage = parseFloat(editedDiscountPercentage) / 100;
+    const token = localStorage.getItem("access_token");
+
     if (!editedDiscountType || isNaN(percentage)) {
-      alert("Invalid input.");
+      await alert("Invalid input.", "Error");
       return;
     }
 
@@ -178,7 +193,15 @@ const OrderEssentials = ({
     try {
       const response = await axios.put(
         `http://127.0.0.1:8000/edit-discount/${discountId}/`,
-        { type: editedDiscountType, percentage }
+        {
+          type: editedDiscountType,
+          percentage,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
 
       if (response.status === 200) {
@@ -190,27 +213,36 @@ const OrderEssentials = ({
         "Failed to update discount",
         error.response?.data || error.message
       );
-      alert("Failed to update discount.");
+      await alert("Failed to update discount.", "Error");
     } finally {
       setIsSubmittingDiscount(false);
     }
   };
 
   const handleDeleteDiscount = async (discountId) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this discount?"
+    const token = localStorage.getItem("access_token");
+
+    const confirmDelete = await confirm(
+      "Are you sure you want to delete this discount?",
+      "Confirm Delete"
     );
+
     if (!confirmDelete) return;
 
     setIsDeletingDiscount(true);
     try {
       await axios.delete(
-        `http://127.0.0.1:8000/delete-discount/${discountId}/`
+        `http://127.0.0.1:8000/delete-discount/${discountId}/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
       fetchOrderData();
     } catch (error) {
       console.error("Error deleting discount:", error);
-      alert("Failed to delete discount. Please try again.");
+      await alert("Failed to delete discount. Please try again.", "Error");
     } finally {
       setIsDeletingDiscount(false);
     }
@@ -219,6 +251,7 @@ const OrderEssentials = ({
   // Delivery percentage functions
   const handleSaveEditDelivery = async (appId) => {
     const updatedPercentage = parseFloat(editingDeliveryPercentage) / 100;
+    const token = localStorage.getItem("access_token");
 
     if (isNaN(updatedPercentage)) {
       console.error("Invalid percentage value.");
@@ -229,7 +262,12 @@ const OrderEssentials = ({
     try {
       const response = await axios.put(
         `http://127.0.0.1:8000/edit-delivery-deduction/${appId}/`,
-        { deduction_percentage: updatedPercentage }
+        { deduction_percentage: updatedPercentage },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
 
       if (response.status === 200) {
@@ -249,6 +287,7 @@ const OrderEssentials = ({
   // Unli Wings functions
   const handleSaveUnliWingsBaseAmount = async (categoryId) => {
     const updatedBaseAmount = parseFloat(editingBaseAmount);
+    const token = localStorage.getItem("access_token");
 
     if (isNaN(updatedBaseAmount)) {
       console.error("Invalid base amount value.");
@@ -259,7 +298,12 @@ const OrderEssentials = ({
     try {
       const response = await axios.put(
         `http://127.0.0.1:8000/edit-unli-wings-base-amount/${categoryId}/`,
-        { base_amount: updatedBaseAmount }
+        { base_amount: updatedBaseAmount },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
 
       if (response.status === 200) {

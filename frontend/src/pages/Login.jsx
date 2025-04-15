@@ -64,7 +64,7 @@ const Login = ({ setIsAdmin }) => {
       if (is_admin) {
         setIsAdmin(true);
         localStorage.setItem("role", "Admin");
-        navigate("/dashboard-admin");
+        navigate("/admin");
       } else {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");

@@ -4,6 +4,7 @@ import autoTable from "jspdf-autotable";
 import axios from "axios";
 import LoadingScreen from "./LoadingScreen";
 import * as XLSX from "xlsx-js-style";
+import { useModal } from "../utils/modalUtils";
 
 const ExportSales = ({ isOpen, onClose, selectedDate, salesData }) => {
   const [fileName, setFileName] = useState("");
@@ -12,6 +13,8 @@ const ExportSales = ({ isOpen, onClose, selectedDate, salesData }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [monthData, setMonthData] = useState(null);
+
+  const { alert } = useModal();
 
   const month = selectedDate.toLocaleString("default", { month: "long" });
   const year = selectedDate.getFullYear();
@@ -415,16 +418,16 @@ const ExportSales = ({ isOpen, onClose, selectedDate, salesData }) => {
     XLSX.writeFile(wb, `${fileName || "SalesReport"}.xlsx`);
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!fileName.trim()) {
-      alert("Please enter a file name");
+      await alert("Please enter a file name", "Error");
       return;
     }
 
     const processedData = processMonthlyData();
 
     if (processedData.dailyData.length === 0 && !processedData.monthlyTotal) {
-      alert("No data available to export");
+      await alert("No data available to export", "Error");
       return;
     }
 

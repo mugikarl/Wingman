@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { FaMoneyBill, FaCreditCard } from "react-icons/fa6";
+import { useModal } from "../utils/modalUtils";
 
 const OrderPayment = ({
   isOpen,
@@ -20,6 +21,7 @@ const OrderPayment = ({
   // Selected employee
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
+  const { alert } = useModal();
   useEffect(() => {
     if (isOpen) {
       // Set default payment method to first payment method object if available
@@ -54,16 +56,17 @@ const OrderPayment = ({
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedPaymentMethod) {
-      alert("Please select a payment method.");
+      await alert("Please select a payment method.", "Validation Error");
       return;
     }
 
     if (selectedPaymentMethod.name.toLowerCase() === "cash") {
       if ((Number.parseFloat(cashReceived) || 0) < totalAmount) {
-        alert(
-          "Cash received must be greater than or equal to the total amount"
+        await alert(
+          "Cash received must be greater than or equal to the total amount",
+          "Validation Error"
         );
         return;
       }
@@ -79,7 +82,7 @@ const OrderPayment = ({
       }, 1000);
     } else if (selectedPaymentMethod.name.toLowerCase() === "gcash") {
       if (!gcashReferenceNo) {
-        alert("Please provide GCash Reference No.");
+        await alert("Please provide GCash Reference No.", "Validation Error");
         return;
       }
       setIsProcessing(true);

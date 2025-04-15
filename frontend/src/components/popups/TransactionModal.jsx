@@ -8,6 +8,7 @@ import EditTransactionMenu from "../panels/EditTransactionMenu";
 import EditTransactionOrderSummary from "../panels/EditTransactionOrderSummary";
 import OrderEditModal from "./OrderEditModal";
 import axios from "axios";
+import { useModal } from "../utils/modalUtils";
 
 const TransactionModal = ({
   isOpen,
@@ -24,6 +25,7 @@ const TransactionModal = ({
   if (!isOpen || !transaction) return null;
 
   const navigate = useNavigate();
+  const { alert, confirm } = useModal();
 
   // State to track expansion
   const [isExpanded, setIsExpanded] = useState(false);
@@ -331,7 +333,11 @@ const TransactionModal = ({
     };
 
     if (newStatus === "Cancelled") {
-      if (window.confirm("Switching to Cancelled. Are you sure?")) {
+      const isConfirmed = await confirm(
+        "Switching to Cancelled. Are you sure?",
+        "Confirm Status Change"
+      );
+      if (isConfirmed) {
         setIsUpdatingStatus(true);
         // Update local UI state
         setOrderStatus(newStatus);
@@ -340,11 +346,11 @@ const TransactionModal = ({
         setIsUpdatingStatus(false);
       }
     } else if (newStatus === "Completed") {
-      if (
-        window.confirm(
-          "Switching to Completed. This will deduct the quantity from the inventory. Are you sure?"
-        )
-      ) {
+      const isConfirmed = await confirm(
+        "Switching to Completed. This will deduct the quantity from the inventory. Are you sure?",
+        "Confirm Status Change"
+      );
+      if (isConfirmed) {
         setIsUpdatingStatus(true);
         // Update local UI state
         setOrderStatus(newStatus);
@@ -363,15 +369,15 @@ const TransactionModal = ({
     setIsStatusDropdownOpen(false);
   };
 
-  const handleCancelUpdate = () => {
-    if (window.confirm("Are you sure you want to cancel updating the order?")) {
-      onClose();
-    }
-  };
+  // const handleCancelUpdate = () => {
+  //   if (window.confirm("Are you sure you want to cancel updating the order?")) {
+  //     onClose();
+  //   }
+  // };
 
-  const handleAddOrderDetails = () => {
-    console.log("Add Order Details triggered");
-  };
+  // const handleAddOrderDetails = () => {
+  //   console.log("Add Order Details triggered");
+  // };
 
   // API call to update order status in the backend
   const updateOrderStatus = async (transactionId, statusId) => {
@@ -387,8 +393,9 @@ const TransactionModal = ({
       // Show success message for completed orders
       if (statusId === 2) {
         // Completed
-        alert(
-          "Order status updated to Completed. Ingredients have been deducted from inventory."
+        await alert(
+          "Order status updated to Completed. Ingredients have been deducted from inventory.",
+          "Status Updated"
         );
       }
 
@@ -398,9 +405,10 @@ const TransactionModal = ({
     } catch (error) {
       // Handle error
       console.error("Error updating order status:", error);
-      alert(
+      await alert(
         "Failed to update order status: " +
-          (error.response?.data?.error || error.message || "Unknown error")
+          (error.response?.data?.error || error.message || "Unknown error"),
+        "Error"
       );
       return false;
     }

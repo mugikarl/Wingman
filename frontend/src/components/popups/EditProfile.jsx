@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { PiArrowsClockwiseLight } from "react-icons/pi";
+import { useModal } from "../utils/modalUtils";
 
 const EditProfile = ({
   isOpen,
@@ -20,6 +21,7 @@ const EditProfile = ({
   const [contactNumber, setContactNumber] = useState(employee?.contact || "");
   const [salary, setSalary] = useState(employee?.base_salary || "");
 
+  const { alert, confirm } = useModal();
   // Password states
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -75,7 +77,7 @@ const EditProfile = ({
           },
         }
       );
-      alert("Employee has been updated!");
+      alert("Employee has been updated!", "Success");
       if (newPassword) {
         setNewPassword("");
         setPasswordSuccess("Password updated successfully");
@@ -93,7 +95,12 @@ const EditProfile = ({
   };
 
   const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this employee?"))
+    if (
+      !(await confirm(
+        "Are you sure you want to delete this employee?",
+        "Delete Employee"
+      ))
+    )
       return;
 
     const token = localStorage.getItem("access_token");

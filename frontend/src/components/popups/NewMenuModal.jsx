@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { PiArrowsClockwiseLight } from "react-icons/pi";
 import { IoMdClose } from "react-icons/io";
+import { useModal } from "../utils/modalUtils";
 
 const NewMenuModal = ({
   onClose,
@@ -32,6 +33,7 @@ const NewMenuModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [loadingDots, setLoadingDots] = useState("");
 
+  const { alert } = useModal();
   // Add useEffect for loading dots animation
   useEffect(() => {
     let dotsInterval;
@@ -67,7 +69,7 @@ const NewMenuModal = ({
       !image ||
       recipes.length === 0
     ) {
-      alert("Please fill in all fields.");
+      await alert("Please fill in all fields.", "Error");
       return;
     }
 
@@ -103,7 +105,7 @@ const NewMenuModal = ({
         }
       );
 
-      alert("Menu added successfully!");
+      alert("Menu added successfully!", "Success");
 
       // Use onSave to handle closing and refreshing
       if (typeof onSave === "function") {
@@ -111,19 +113,22 @@ const NewMenuModal = ({
       }
     } catch (error) {
       console.error("Error saving menu item:", error.response?.data || error);
-      alert("Failed to add menu item.");
+      await alert("Failed to add menu item.", "Error");
       setIsLoading(false); // Only reset loading state if there's an error
     }
   };
 
   // Handle adding a new recipe
-  const handleAddRecipe = () => {
+  const handleAddRecipe = async () => {
     if (
       !currentRecipe.inventory_id ||
       !currentRecipe.quantity ||
       !currentRecipe.unit_id
     ) {
-      alert("Please enter valid item, quantity, and unit of measurement.");
+      await alert(
+        "Please enter valid item, quantity, and unit of measurement.",
+        "Error"
+      );
       return;
     }
 
