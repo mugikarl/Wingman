@@ -17,8 +17,6 @@ import TestConnection from "./pages/TestConnection";
 import StockOut from "./pages/Inventory/StockOut";
 import Schedule from "./pages/Staff Profile/Schedule";
 import LegendModal from "./components/popups/LegendModal";
-import EmployeeLeave from "./components/popups/EmployeeLeave";
-import Holidays from "./components/popups/Holidays";
 import Menu from "./pages/Inventory/Menu";
 import StockIn from "./pages/Inventory/StockIn";
 import Order from "./pages/Order/Order";
@@ -284,8 +282,6 @@ const App = () => {
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/schedule" element={<Schedule />} />
             <Route path="/legendmodal" element={<LegendModal />} />
-            <Route path="/employeeleave" element={<EmployeeLeave />} />
-            <Route path="/holidays" element={<Holidays />} />
             <Route path="/salescalendar" element={<SalesCalendar />} />
             <Route path="/chooseorder" element={<ChooseOrder />} />
             <Route path="/testconnection" element={<TestConnection />} />
