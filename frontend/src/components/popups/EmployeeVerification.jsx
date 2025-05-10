@@ -1,24 +1,29 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { useModal } from "../utils/modalUtils";
 
-const TimeOut = ({
+const EmployeeVerification = ({
   closeModal,
-  refreshAttendance,
-  handleTimeOutSuccess,
-  currentDate,
-  forceRefresh,
+  employee,
+  onVerificationSuccess,
+  isOpen,
 }) => {
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [employees, setEmployees] = useState([]);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [buttonText, setButtonText] = useState("Verify & Time Out");
+  const [buttonText, setButtonText] = useState("Verify & Proceed");
   const [showPassword, setShowPassword] = useState(false);
 
   const { alert } = useModal();
+
+  // Reset form when component opens
+  useEffect(() => {
+    if (isOpen) {
+      setEmail("");
+      setCode("");
+      setIsVerifying(false);
+    }
+  }, [isOpen]);
 
   // Animation for the loading dots
   useEffect(() => {
@@ -28,11 +33,11 @@ const TimeOut = ({
       let dotCount = 0;
       loadingInterval = setInterval(() => {
         const dots = ".".repeat(dotCount % 4);
-        setButtonText(`Verifying Time Out${dots}`);
+        setButtonText(`Verifying${dots}`);
         dotCount++;
       }, 500);
     } else {
-      setButtonText("Verify & Time Out");
+      setButtonText("Verify & Proceed");
     }
 
     return () => {
@@ -40,31 +45,8 @@ const TimeOut = ({
     };
   }, [isVerifying]);
 
-  // Modified to fetch attendance data for the current date and filter for employees who have timed in
-  useEffect(() => {
-    const url = `http://127.0.0.1:8000/fetch-attendance-data/?date=${currentDate}`;
-
-    axios
-      .get(url)
-      .then((response) => {
-        // Filter for active employees who have timed in but not timed out yet
-        const timedInEmployees = response.data.filter(
-          (emp) => emp.employeeStatus === "ACTIVE" && emp.timeIn && !emp.timeOut
-        );
-        setEmployees(timedInEmployees);
-      })
-      .catch((error) => {
-        console.error("Error fetching attendance data:", error);
-      });
-  }, [currentDate]);
-
-  const handleTimeOut = async () => {
-    if (
-      !selectedEmployeeId ||
-      !email ||
-      code.length !== 6 ||
-      !/^\d+$/.test(code)
-    ) {
+  const verifyCode = async () => {
+    if (!employee || !email || code.length !== 6 || !/^\d+$/.test(code)) {
       await alert("Please enter valid details.", "Validation Error");
       return;
     }
@@ -72,30 +54,15 @@ const TimeOut = ({
     setIsVerifying(true);
 
     try {
-      const response = await axios.post("http://127.0.0.1:8000/time-out/", {
-        employee_id: selectedEmployeeId,
-        email: email,
-        passcode: code,
-      });
-
+      // Now just collecting the credentials for verification on the backend
+      // No separate verification API call, passing credentials to parent
       setIsVerifying(false);
 
-      if (response.data.success) {
-        await alert("Time out successful.", "Success");
-
-        // First refresh data
-        forceRefresh ? forceRefresh() : refreshAttendance(currentDate);
-
-        // Then close modal after a slight delay to ensure the UI has refreshed
-        setTimeout(() => {
-          closeModal();
-        }, 500);
-      } else {
-        await alert(response.data.error || "Time out failed.", "Error");
-      }
+      // Pass the verification info back to parent component
+      onVerificationSuccess(email, code);
     } catch (error) {
       setIsVerifying(false);
-      await alert(error.response?.data?.error || "Time out failed.", "Error");
+      await alert("Verification process failed.", "Error");
     }
   };
 
@@ -103,12 +70,14 @@ const TimeOut = ({
     setShowPassword(!showPassword);
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg w-[400px] flex flex-col">
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b">
-          <h2 className="text-xl font-medium">Time Out</h2>
+          <h2 className="text-xl font-medium">Verify Employee</h2>
           <button
             onClick={closeModal}
             className="p-1 rounded-full hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
@@ -119,27 +88,15 @@ const TimeOut = ({
 
         {/* Form Content */}
         <div className="p-6 space-y-4">
-          <select
-            value={selectedEmployeeId}
-            onChange={(e) =>
-              setSelectedEmployeeId(parseInt(e.target.value, 10))
-            }
-            className="w-full p-2 border rounded-lg"
-            disabled={isVerifying}
-          >
-            <option value="">Select Name</option>
-            {employees.length > 0 ? (
-              employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.name}
-                </option>
-              ))
-            ) : (
-              <option value="" disabled>
-                No employees timed in
-              </option>
-            )}
-          </select>
+          {/* Employee info display */}
+          <div className="bg-gray-100 p-3 rounded-lg text-center">
+            <p className="text-gray-500 text-sm">Selected Employee</p>
+            <p className="font-semibold text-lg">
+              {employee
+                ? `${employee.first_name} ${employee.last_name}`
+                : "None"}
+            </p>
+          </div>
 
           <input
             type="email"
@@ -175,7 +132,7 @@ const TimeOut = ({
           </div>
 
           <button
-            onClick={handleTimeOut}
+            onClick={verifyCode}
             disabled={isVerifying}
             className={`bg-[#CC5500] hover:bg-[#b34500] text-white p-2 w-full rounded-lg transition-colors duration-200 ${
               isVerifying ? "opacity-70 cursor-not-allowed" : ""
@@ -189,4 +146,4 @@ const TimeOut = ({
   );
 };
 
-export default TimeOut;
+export default EmployeeVerification;

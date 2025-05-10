@@ -2659,21 +2659,56 @@ def fetch_order_data(request, transactionId=None):
         # Fetch Order Status Type
         order_status_types = supabase_anon.table("order_status_type").select("id, name").execute().data or []
         
-        # Fetch employees
-        active_status_id = 1  # Adjust based on your actual "Active" status ID
-
+        # Fetch GCash references
+        gcash_references = supabase_anon.table("gcash_reference").select("id, name, attached_transaction").execute().data or []
+        
+        # Get current date in YYYY-MM-DD format
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        
+        # Fetch employees who have timed in today (based on fetch_attendance_data approach)
+        # First get all active employees
+        active_status_id = 1  # Assuming 1 = Active
         employees_response = supabase_anon.table("employee") \
-            .select("id, first_name, last_name, status_id") \
-            .eq("status_id", active_status_id) \
-            .execute()
-
-        employees = employees_response.data if employees_response.data else []
+            .select(
+                "id, first_name, last_name, "
+                "employee_status:employee_status(id, status_name), "
+                "attendance:attendance(attendance_status:attendance_status(id, status_name), "
+                "attendance_time:attendance_time(time_in, time_out))"
+        ).eq("employee_status.id", active_status_id).execute()
+        
+        all_employees = employees_response.data if employees_response.data else []
+        
+        # Filter for employees who have timed in today
+        employees = []
+        for emp in all_employees:
+            # Get attendance records
+            attendance = emp.get("attendance", [])
+            time_in_today = False
+            
+            # Check if the employee has timed in today
+            if attendance:
+                if isinstance(attendance, list):
+                    for record in attendance:
+                        time_obj = record.get("attendance_time", {})
+                        t_in = time_obj.get("time_in")
+                        if t_in and t_in.startswith(today_str):
+                            time_in_today = True
+                            break
+            
+            # Only include employees who have timed in today
+            if time_in_today:
+                employees.append({
+                    "id": emp.get("id"),
+                    "first_name": emp.get("first_name", ""),
+                    "last_name": emp.get("last_name", ""),
+                    "status_id": active_status_id
+                })
         
         # Fetch order details
         order_details = supabase_anon.table("order_details").select("id", "quantity", "menu_id", "discount_id", "instore_category", "transaction_id","unli_wings_group").execute().data or []
         
-        # Fetch transactions
-        transactions = supabase_anon.table("transaction").select("id", "date", "payment_amount", "reference_id", "receipt_image", "order_status(id, name)", "payment_method", "employee_id").execute().data or []
+        # Fetch transactions - removed receipt_image
+        transactions = supabase_anon.table("transaction").select("id, date, payment_amount, order_status(id, name), payment_method, employee_id").execute().data or []
         
         # Combine transactions with order details
         formatted_transactions = []
@@ -2689,16 +2724,19 @@ def fetch_order_data(request, transactionId=None):
                 }
                 for order in order_details if order["transaction_id"] == transaction["id"]
             ]
+            
+            # Find GCash reference for this transaction (if any)
+            gcash_reference = next((ref for ref in gcash_references if ref["attached_transaction"] == transaction["id"]), None)
+            
             formatted_transactions.append({
                 "id": transaction["id"],
                 "date": transaction["date"],
                 "payment_amount": transaction["payment_amount"],
-                "reference_id": transaction["reference_id"],
-                "receipt_image": transaction["receipt_image"],
                 "order_status": transaction["order_status"],
                 "payment_method": next((method for method in payment_methods if method["id"] == transaction["payment_method"]), None),
-                "employee": next((emp for emp in employees if emp["id"] == transaction["employee_id"]), None),
-                "order_details": related_orders
+                "employee": next((emp for emp in all_employees if emp["id"] == transaction["employee_id"]), None), # Use all_employees for historical records
+                "order_details": related_orders,
+                "gcash_reference": gcash_reference  # Add GCash reference info
             })
         
         # If a transactionId is provided, filter the transaction.
@@ -2718,8 +2756,9 @@ def fetch_order_data(request, transactionId=None):
             "payment_methods": payment_methods,
             "instore_categories": instore_categories,
             "order_status_types": order_status_types,
-            "employees": employees,
-            "transactions": formatted_transactions
+            "employees": employees, # This now contains only employees who've timed in today
+            "transactions": formatted_transactions,
+            "gcash_references": gcash_references  # Add all GCash references to the response
         })
     
     except Exception as e:
@@ -3009,12 +3048,56 @@ def add_order(request):
         payment_method = data.get("payment_method")
         payment_amount = data.get("payment_amount")  # Amount paid by customer
         reference_id = data.get("reference_id")  # Optional, can be null
-        receipt_image = data.get("receipt_image")  # New: receipt image from the frontend (if any)
         order_details = data.get("order_details", [])
+        # Employee verification data
+        provided_email = data.get("email")
+        entered_passcode = data.get("passcode")
         
         if not order_details:
             return Response({"error": "No order details provided."}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Verify employee credentials - similar to time_in function
+        if not employee_id or not entered_passcode or not provided_email:
+            return Response({"error": "Missing employee verification fields."}, status=400)
+            
+        # Query the employee record
+        employee_response = (
+            supabase_service.table("employee")
+            .select("id, user_id, first_name, last_name")
+            .eq("id", employee_id)
+            .single()
+            .execute()
+        )
+        if not employee_response.data:
+            return Response({"error": "Employee not found."}, status=404)
+            
+        employee = employee_response.data
+        if not employee.get("user_id"):
+            return Response({"error": "Employee not linked to an auth user."}, status=400)
+            
+        # Fetch user details using the admin client
+        user_response = supabase_service.auth.admin.get_user_by_id(employee["user_id"])
+        if not (user_response and user_response.user):
+            return Response({"error": "Unable to fetch user authentication details."}, status=404)
+            
+        # Ensure the provided email matches the employee's registered email
+        if provided_email.lower() != user_response.user.email.lower():
+            return Response(
+                {"error": "Provided email does not match the selected employee's email."},
+                status=400,
+            )
+            
+        # Attempt to sign in using the provided email and passcode
+        sign_in_response = supabase_service.auth.sign_in_with_password({
+            "email": provided_email,
+            "password": entered_passcode
+        })
+        if not getattr(sign_in_response, "user", None):
+            return Response({"error": "Invalid passcode."}, status=401)
+        # Sign out after successful sign in
+        supabase_service.auth.sign_out()
+        
+        # Continue with original add_order logic
         # Validate employee
         employee = supabase_anon.table("employee").select("id").eq("id", employee_id).execute().data
         if not employee:
@@ -3065,19 +3148,31 @@ def add_order(request):
         else:
             menu_types = {}
         
-        # Create transaction record (including receipt_image if provided)
+        # Create transaction record (removed reference_id and receipt_image)
         transaction_data = {
-            "reference_id": reference_id,  
             "payment_amount": payment_amount,  
             "payment_method": payment_method,
             "employee_id": employee_id,
             "order_status": 1,  # e.g., Pending
-            "receipt_image": receipt_image  # Ensure your table has this column
         }
         transaction_response = supabase_anon.table("transaction").insert(transaction_data).execute()
         if not transaction_response.data:
             return Response({"error": "Failed to create transaction."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         transaction_id = transaction_response.data[0]["id"]
+        
+        # If payment method is GCash and we have a reference ID, save it to gcash_reference table
+        if payment_method == 2:  # Assuming payment_method ID 2 is GCash
+            if reference_id:
+                gcash_reference_data = {
+                    "name": reference_id,
+                    "attached_transaction": transaction_id
+                }
+                # Insert into the gcash_reference table
+                gcash_response = supabase_anon.table("gcash_reference").insert(gcash_reference_data).execute()
+                if not gcash_response.data:
+                    # If we fail to save GCash reference, we should still proceed with the order
+                    # but log the error
+                    print(f"Failed to save GCash reference for transaction {transaction_id}")
         
         total_price = 0  # Running total for transaction
         order_items = []  # To be inserted for inventory purposes
@@ -3238,7 +3333,6 @@ def edit_order(request, transaction_id):
         payment_method = data.get("payment_method")
         payment_amount = data.get("payment_amount")  # New/updated payment amount
         reference_id = data.get("reference_id")
-        receipt_image = data.get("receipt_image")
         order_details = data.get("order_details", [])
         
         if not order_details:
@@ -3305,18 +3399,25 @@ def edit_order(request, transaction_id):
         else:
             menu_types = {}
         
-        # Update the transaction record
+        # Update the transaction record - removed reference_id and receipt_image
         transaction_data = {
-            "reference_id": reference_id,
             "payment_amount": payment_amount,
             "payment_method": payment_method,
-            "employee_id": employee_id,
-            "receipt_image": receipt_image
+            "employee_id": employee_id
         }
         transaction_update_response = supabase_anon.table("transaction")\
             .update(transaction_data).eq("id", transaction_id).execute()
         if hasattr(transaction_update_response, "error") and transaction_update_response.error:
             return Response({"error": "Failed to update transaction."}, status=500)
+        
+        # Update GCash reference if payment method is GCash
+        if payment_method == 2 and reference_id:  # Assuming payment_method ID 2 is GCash
+            # Always create a new reference record instead of updating existing ones
+            gcash_reference_data = {
+                "name": reference_id,
+                "attached_transaction": transaction_id
+            }
+            supabase_anon.table("gcash_reference").insert(gcash_reference_data).execute()
         
         total_price = 0
         order_items = []
@@ -4132,13 +4233,16 @@ def fetch_sales_data(request):
         items = supabase_anon.table('items').select("id, name, measurement, category").execute().data or []
         essential_data['items'] = items
         
+        # Fetch GCash references
+        gcash_references = supabase_anon.table("gcash_reference").select("id, name, attached_transaction").execute().data or []
+        essential_data['gcash_references'] = gcash_references
+        
         # Optimize transaction fetching - only get completed transactions (status = 2)
+        # Removed reference_id and receipt_image
         transactions = supabase_anon.table('transaction').select("""
             id, 
             date,
             payment_amount, 
-            reference_id,
-            receipt_image,
             order_status,
             payment_method,
             employee_id
@@ -4181,10 +4285,14 @@ def fetch_sales_data(request):
                 transaction_id = transaction['id']
                 transaction_details = order_details_by_transaction.get(transaction_id, [])
                 
+                # Find GCash reference for this transaction (if any)
+                gcash_reference = next((ref for ref in gcash_references if ref['attached_transaction'] == transaction_id), None)
+                
                 # Add formatted transaction with its details
                 processed_transaction = {
                     **transaction,
-                    'order_details': transaction_details
+                    'order_details': transaction_details,
+                    'gcash_reference': gcash_reference
                 }
                 processed_transactions.append(processed_transaction)
         else:
