@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { FaMoneyBill, FaCreditCard } from "react-icons/fa6";
 import { useModal } from "../utils/modalUtils";
+import axios from "axios";
+import EmployeeVerification from "./EmployeeVerification";
 
 const OrderPayment = ({
   isOpen,
@@ -17,28 +19,75 @@ const OrderPayment = ({
   const [isProcessing, setIsProcessing] = useState(false);
   // GCash fields
   const [gcashReferenceNo, setGcashReferenceNo] = useState("");
-  const [gcashReferenceImage, setGcashReferenceImage] = useState(null);
   // Selected employee
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  // Active employees with time in
+  const [timedInEmployees, setTimedInEmployees] = useState([]);
+  const [loading, setLoading] = useState(false);
+  // Verification modal
+  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
 
   const { alert } = useModal();
+
+  // Helper to get today's date in YYYY-MM-DD format (in local timezone)
+  const getTodayDateString = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
+  // Fetch employees who have timed in for current day
   useEffect(() => {
     if (isOpen) {
-      // Set default payment method to first payment method object if available
+      setLoading(true);
+
+      // Get today's date in the format expected by the API
+      const todayDate = getTodayDateString();
+      const url = `http://127.0.0.1:8000/fetch-attendance-data/?date=${todayDate}`;
+
+      axios
+        .get(url)
+        .then((response) => {
+          // Filter for active employees who have timed in
+          const timedIn = response.data.filter(
+            (emp) => emp.employeeStatus === "ACTIVE" && emp.timeIn
+          );
+
+          setTimedInEmployees(timedIn);
+          // Set default to first timed in employee if available
+          if (timedIn.length > 0) {
+            // Find corresponding employee from the full employees list
+            const matchedEmployee = employees?.find(
+              (emp) => String(emp.id) === String(timedIn[0].id)
+            );
+            setSelectedEmployee(matchedEmployee || null);
+          } else {
+            setSelectedEmployee(null);
+          }
+        })
+        .catch((error) => {
+          console.error("Error fetching timed in employees:", error);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+
+      // Set default payment method
       if (paymentMethods && paymentMethods.length > 0) {
         setSelectedPaymentMethod(paymentMethods[0]);
       } else {
         setSelectedPaymentMethod(null);
       }
+
+      // Reset other form fields
       setCashReceived("");
       setChange(0);
       setGcashReferenceNo("");
-      setGcashReferenceImage(null);
-      if (employees && employees.length > 0) {
-        setSelectedEmployee(employees[0]);
-      }
     }
-  }, [isOpen, paymentMethods, employees]);
+  }, [isOpen, employees, paymentMethods]);
 
   useEffect(() => {
     const cashAmount = Number.parseFloat(cashReceived) || 0;
@@ -49,16 +98,18 @@ const OrderPayment = ({
     }
   }, [cashReceived, totalAmount]);
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setGcashReferenceImage(file);
-    }
-  };
-
+  // Modified to open verification modal first
   const handleSubmit = async () => {
     if (!selectedPaymentMethod) {
       await alert("Please select a payment method.", "Validation Error");
+      return;
+    }
+
+    if (!selectedEmployee) {
+      await alert(
+        "Please select an employee who has timed in today.",
+        "Validation Error"
+      );
       return;
     }
 
@@ -70,34 +121,49 @@ const OrderPayment = ({
         );
         return;
       }
-      setIsProcessing(true);
-      setTimeout(() => {
-        onPlaceOrder(
-          selectedEmployee.id,
-          selectedPaymentMethod.id,
-          Number.parseFloat(cashReceived) || 0
-        );
-        setIsProcessing(false);
-        onClose();
-      }, 1000);
     } else if (selectedPaymentMethod.name.toLowerCase() === "gcash") {
       if (!gcashReferenceNo) {
         await alert("Please provide GCash Reference No.", "Validation Error");
         return;
       }
-      setIsProcessing(true);
-      setTimeout(() => {
+    }
+
+    // Open verification modal instead of proceeding directly
+    setIsVerificationModalOpen(true);
+  };
+
+  // This is called when verification is successful
+  const handleVerificationSuccess = (email, passcode) => {
+    // Close verification modal
+    setIsVerificationModalOpen(false);
+
+    // Proceed with order processing
+    setIsProcessing(true);
+    setTimeout(() => {
+      if (selectedPaymentMethod.name.toLowerCase() === "cash") {
         onPlaceOrder(
           selectedEmployee.id,
           selectedPaymentMethod.id,
-          0,
-          gcashReferenceNo,
-          gcashReferenceImage
+          Number.parseFloat(cashReceived) || 0,
+          null, // reference id for GCash
+          null, // receipt image for GCash
+          email, // Add employee email for verification
+          passcode // Add employee passcode for verification
         );
-        setIsProcessing(false);
-        onClose();
-      }, 1000);
-    }
+      } else if (selectedPaymentMethod.name.toLowerCase() === "gcash") {
+        onPlaceOrder(
+          selectedEmployee.id,
+          selectedPaymentMethod.id,
+          totalAmount,
+          gcashReferenceNo,
+          null, // Removed receipt image for GCash
+          email, // Add employee email for verification
+          passcode // Add employee passcode for verification
+        );
+      }
+      setIsProcessing(false);
+      onClose();
+    }, 1000);
   };
 
   if (!isOpen) return null;
@@ -118,9 +184,13 @@ const OrderPayment = ({
         {/* Content */}
         <div className="p-4 space-y-6">
           {/* Employee Selection */}
-          {employees && employees.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Employee</label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Employee</label>
+            {loading ? (
+              <div className="w-full p-2 border rounded-md bg-gray-100">
+                Loading...
+              </div>
+            ) : timedInEmployees.length > 0 ? (
               <select
                 value={selectedEmployee ? selectedEmployee.id : ""}
                 onChange={(e) => {
@@ -131,14 +201,27 @@ const OrderPayment = ({
                 }}
                 className="w-full p-2 border rounded-md focus:outline-none"
               >
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.first_name} {emp.last_name}
-                  </option>
-                ))}
+                {timedInEmployees.map((emp) => {
+                  // Find the corresponding employee in the full employee list
+                  const employee = employees.find(
+                    (e) => String(e.id) === String(emp.id)
+                  );
+                  if (!employee) return null;
+
+                  return (
+                    <option key={emp.id} value={emp.id}>
+                      {employee.first_name} {employee.last_name}
+                    </option>
+                  );
+                })}
               </select>
-            </div>
-          )}
+            ) : (
+              <div className="w-full p-2 border rounded-md bg-gray-100 text-red-500">
+                No employees have timed in today. Please have at least one
+                employee time in first.
+              </div>
+            )}
+          </div>
 
           {/* Total Amount */}
           <div className="flex items-center justify-between border-b pb-4">
@@ -266,31 +349,6 @@ const OrderPayment = ({
                     placeholder="Enter reference number"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Reference Image (optional)
-                  </label>
-                  <div
-                    onClick={() =>
-                      document.getElementById("gcash-image-upload").click()
-                    }
-                    className="flex-1 py-2 rounded bg-blue-500 text-white cursor-pointer text-center"
-                  >
-                    Choose File
-                  </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    id="gcash-image-upload"
-                  />
-                  {gcashReferenceImage && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      {gcashReferenceImage.name}
-                    </p>
-                  )}
-                </div>
               </div>
             )}
         </div>
@@ -301,6 +359,7 @@ const OrderPayment = ({
             onClick={handleSubmit}
             className={`w-full py-3 rounded-lg text-white text-lg font-medium transition-colors ${
               isProcessing ||
+              !selectedEmployee ||
               (selectedPaymentMethod &&
                 selectedPaymentMethod.name.toLowerCase() === "cash" &&
                 (Number.parseFloat(cashReceived) || 0) < totalAmount) ||
@@ -312,6 +371,7 @@ const OrderPayment = ({
             }`}
             disabled={
               isProcessing ||
+              !selectedEmployee ||
               (selectedPaymentMethod &&
                 selectedPaymentMethod.name.toLowerCase() === "cash" &&
                 (Number.parseFloat(cashReceived) || 0) < totalAmount) ||
@@ -324,6 +384,14 @@ const OrderPayment = ({
           </button>
         </div>
       </div>
+
+      {/* Employee Verification Modal */}
+      <EmployeeVerification
+        isOpen={isVerificationModalOpen}
+        closeModal={() => setIsVerificationModalOpen(false)}
+        employee={selectedEmployee}
+        onVerificationSuccess={handleVerificationSuccess}
+      />
     </div>
   );
 };

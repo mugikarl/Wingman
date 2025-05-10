@@ -478,7 +478,9 @@ const Order = () => {
     paymentMethod,
     cashReceived,
     gcashReferenceNo,
-    gcashReferenceImage
+    gcashReferenceImage,
+    employeeEmail,
+    employeePasscode
   ) => {
     // Construct order_details from selectedItems:
     const orderDetails = selectedItems.map((item) => {
@@ -504,9 +506,11 @@ const Order = () => {
 
     const payload = {
       employee_id: employeeId,
+      email: employeeEmail,
+      passcode: employeePasscode,
       payment_method: paymentMethod,
       payment_amount: Number(cashReceived) || 0,
-      reference_id: null,
+      reference_id: gcashReferenceNo || null,
       receipt_image: gcashReferenceImage,
       order_details: orderDetails,
     };

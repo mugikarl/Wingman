@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import TimeIn from "../../components/popups/TimeIn";
 import TimeOut from "../../components/popups/TimeOut";
 import LoadingScreen from "../../components/popups/LoadingScreen";
+import TableWithDatePicker from "../../components/tables/TablewithDatePicker";
 import axios from "axios";
 import { Datepicker } from "flowbite-react";
 import { FaSortUp, FaSortDown } from "react-icons/fa";
@@ -135,7 +136,7 @@ const Attendance = () => {
     });
   }, [currentDate, fetchAttendanceData]);
 
-  // Prepare and sort table data
+  // Prepare table data
   const tableData = attendanceData
     .sort((a, b) => Number(a.id) - Number(b.id))
     .map((entry) => [
@@ -194,7 +195,7 @@ const Attendance = () => {
     },
   };
 
-  // Add this new function in Attendance.jsx
+  // Force refresh function for the attendance data
   const forceRefresh = useCallback(() => {
     // Clear cache for current date
     setAttendanceCache((prev) => {
@@ -228,9 +229,21 @@ const Attendance = () => {
       });
   }, [currentDate]);
 
+  // Handle date change from the TableWithDatePicker component
+  const handleDateChange = useCallback(
+    (newDate) => {
+      setCurrentDate(newDate);
+      fetchAttendanceData(newDate);
+    },
+    [fetchAttendanceData]
+  );
+
+  // Table columns
+  const columns = ["ID", "Name", "Attendance Status", "Time In", "Time Out"];
+
   return (
     <div className="flex-grow p-6 bg-[#fcf4dc] min-h-full">
-      <div className="max-w-[1200px]">
+      <div className="">
         <div className="flex items-start mb-4 gap-2">
           <button
             onClick={() => setIsTimeInModalOpen(true)}
@@ -284,148 +297,14 @@ const Attendance = () => {
               <LoadingScreen message="Loading attendance" />
             </div>
           ) : (
-            <div className="w-full">
-              <div className="flex flex-col">
-                {/* Date picker navigation bar */}
-                <div className="bg-[#cc5500] text-lg font-semibold w-full rounded-t-sm flex justify-between items-center relative shadow-md">
-                  <button
-                    className="px-4 py-2 text-white hover:bg-white hover:text-[#cc5500]"
-                    onClick={decrementDate}
-                  >
-                    <HiChevronLeft className="w-5 h-5" />
-                  </button>
-                  <div
-                    className="absolute left-1/2 transform -translate-x-1/2 cursor-pointer px-2 bg-[#cc5500] text-white text-"
-                    onClick={() => setShowDatepicker(!showDatepicker)}
-                  >
-                    {displayDate}
-                  </div>
-                  <button
-                    className="px-4 py-2 text-white hover:bg-white hover:text-[#cc5500]"
-                    onClick={incrementDate}
-                  >
-                    <HiChevronRight className="w-5 h-5" />
-                  </button>
-                  {showDatepicker && (
-                    <div className="absolute top-10 left-1/2 transform -translate-x-1/2 mt-2 z-10 bg-white shadow-lg">
-                      <Datepicker
-                        inline
-                        value={new Date(currentDate)}
-                        onChange={(date) => {
-                          if (date instanceof Date) {
-                            const newDate = getLocalDateString(date);
-                            setCurrentDate(newDate);
-                            fetchAttendanceData(newDate);
-                            setShowDatepicker(false);
-                          } else if (Array.isArray(date) && date.length > 0) {
-                            const newDate = getLocalDateString(date[0]);
-                            setCurrentDate(newDate);
-                            fetchAttendanceData(newDate);
-                            setShowDatepicker(false);
-                          }
-                        }}
-                        theme={datepickerTheme}
-                        className="bg-white"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Table with sorting */}
-                <div
-                  className="relative shadow-md rounded-b-sm overflow-y-auto"
-                  style={{ maxHeight: "700px" }}
-                >
-                  <table className="w-full text-sm text-left rtl:text-right text-gray-500 table-auto">
-                    <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
-                      <tr>
-                        {[
-                          "ID",
-                          "Name",
-                          "Attendance Status",
-                          "Time In",
-                          "Time Out",
-                        ].map((column, index) => (
-                          <th
-                            key={index}
-                            scope="col"
-                            className="px-6 py-4 font-medium text-left cursor-pointer"
-                            onClick={() => requestSort(index)}
-                          >
-                            <div className="flex items-center">
-                              {column}
-                              {sortConfig.key === index ? (
-                                <span className="ml-1.5">
-                                  {sortConfig.direction === "ascending" ? (
-                                    <FaSortUp className="inline h-3 w-3 text-white" />
-                                  ) : (
-                                    <FaSortDown className="inline h-3 w-3 text-white" />
-                                  )}
-                                </span>
-                              ) : (
-                                <span className="ml-1.5 text-gray-300 opacity-30">
-                                  <svg
-                                    className="w-3 h-3"
-                                    aria-hidden="true"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path d="M8.574 11.024h6.852a2.075 2.075 0 0 0 1.847-1.086 1.9 1.9 0 0 0-.11-1.986L13.736 2.9a2.122 2.122 0 0 0-3.472 0L6.837 7.952a1.9 1.9 0 0 0-.11 1.986 2.074 2.074 0 0 0 1.847 1.086Zm6.852 1.952H8.574a2.072 2.072 0 0 0-1.847 1.087 1.9 1.9 0 0 0 .11 1.985l3.426 5.05a2.123 2.123 0 0 0 3.472 0l3.427-5.05a1.9 1.9 0 0 0 .11-1.985 2.074 2.074 0 0 0-1.846-1.087Z" />
-                                  </svg>
-                                </span>
-                              )}
-                            </div>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedData.length > 0 ? (
-                        sortedData.map((row, rowIndex) => (
-                          <tr
-                            key={rowIndex}
-                            className={`
-                              ${rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                              border-b hover:bg-gray-200 group
-                            `}
-                          >
-                            {row.map((cell, cellIndex) => (
-                              <td
-                                key={cellIndex}
-                                className="px-6 py-4 font-normal text-left text-gray-700 group-hover:text-gray-900"
-                                scope={cellIndex === 0 ? "row" : undefined}
-                              >
-                                {cell}
-                              </td>
-                            ))}
-                          </tr>
-                        ))
-                      ) : (
-                        <tr className="bg-white border-b">
-                          <td
-                            className="px-6 py-4 text-center font-normal text-gray-500 italic"
-                            colSpan={5}
-                          >
-                            No attendance data available
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* CSS for rounded borders */}
-                <style jsx>{`
-                  .rounded-b-sm {
-                    border-bottom-left-radius: 0.125rem;
-                    border-bottom-right-radius: 0.125rem;
-                    border-top-left-radius: 0;
-                    border-top-right-radius: 0;
-                  }
-                `}</style>
-              </div>
-            </div>
+            <TableWithDatePicker
+              columns={columns}
+              data={tableData}
+              initialDate={new Date(currentDate)}
+              onDateChange={handleDateChange}
+              emptyMessage="No attendance data available"
+              maxHeight="700px"
+            />
           )}
         </div>
       </div>
