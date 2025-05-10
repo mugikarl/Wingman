@@ -14,6 +14,7 @@ const ManageItems = ({
 }) => {
   const [activeTab, setActiveTab] = useState("items");
   const token = localStorage.getItem("access_token");
+  const [filterStatus, setFilterStatus] = useState(1); // 1 = Active, 2 = Archived
 
   // States for Items tab
   const [itemName, setItemName] = useState("");
@@ -24,9 +25,11 @@ const ManageItems = ({
   const [isEditingItem, setIsEditingItem] = useState(false);
   const [isSubmittingItem, setIsSubmittingItem] = useState(false);
   const [isDeletingItem, setIsDeletingItem] = useState(false);
+  const [isArchivingItem, setIsArchivingItem] = useState(false);
   const [addingItemText, setAddingItemText] = useState("Add Item");
   const [updatingItemText, setUpdatingItemText] = useState("Update");
   const [deletingItemDots, setDeletingItemDots] = useState("");
+  const [archivingItemDots, setArchivingItemDots] = useState("");
 
   // States for Categories tab
   const [categoryName, setCategoryName] = useState("");
@@ -40,8 +43,13 @@ const ManageItems = ({
 
   const { alert, confirm } = useModal();
 
+  // Filter items based on archive status
+  const filteredItems = items.filter((item) =>
+    filterStatus === 1 ? !item.is_archived : item.is_archived
+  );
+
   // Sort items and categories alphabetically
-  const sortedItems = [...items].sort((a, b) =>
+  const sortedItems = [...filteredItems].sort((a, b) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
   );
 
@@ -53,7 +61,7 @@ const ManageItems = ({
   useEffect(() => {
     let loadingInterval;
 
-    if (isSubmittingItem || isDeletingItem) {
+    if (isSubmittingItem || isDeletingItem || isArchivingItem) {
       let dotCount = 0;
       loadingInterval = setInterval(() => {
         const dots = ".".repeat(dotCount % 4);
@@ -68,18 +76,23 @@ const ManageItems = ({
           setDeletingItemDots(dots);
         }
 
+        if (isArchivingItem) {
+          setArchivingItemDots(dots);
+        }
+
         dotCount++;
       }, 500);
     } else {
       setAddingItemText("Add Item");
       setUpdatingItemText("Update");
       setDeletingItemDots("");
+      setArchivingItemDots("");
     }
 
     return () => {
       if (loadingInterval) clearInterval(loadingInterval);
     };
-  }, [isSubmittingItem, isEditingItem, isDeletingItem]);
+  }, [isSubmittingItem, isEditingItem, isDeletingItem, isArchivingItem]);
 
   // Loading animations for Categories tab
   useEffect(() => {
@@ -205,29 +218,90 @@ const ManageItems = ({
     }
   };
 
+  const handleArchiveItem = async () => {
+    if (selectedItemIndex === null) return;
+
+    const item = sortedItems[selectedItemIndex];
+    const isArchived = item.is_archived;
+    const action = isArchived ? "restore" : "archive";
+
+    const confirmMessage = isArchived
+      ? "Are you sure you want to restore this item?"
+      : "Are you sure you want to archive this item?";
+
+    const confirmTitle = isArchived ? "Restore Item" : "Archive Item";
+
+    const confirmAction = await confirm(confirmMessage, confirmTitle);
+    if (!confirmAction) return;
+
+    setIsArchivingItem(true);
+    const itemId = item.id;
+
+    try {
+      const endpoint = isArchived
+        ? `http://127.0.0.1:8000/unarchive-item/${itemId}/`
+        : `http://127.0.0.1:8000/archive-item/${itemId}/`;
+
+      await axios.put(
+        endpoint,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      await alert(`Item ${action}d successfully!`, "Success");
+      fetchItemData();
+      resetItemForm();
+    } catch (error) {
+      console.error(`Error ${action}ing item:`, error);
+      await alert(`Failed to ${action} item.`, "Error");
+    } finally {
+      setIsArchivingItem(false);
+    }
+  };
+
   const handleDeleteItem = async () => {
     if (selectedItemIndex === null) return;
 
+    const item = sortedItems[selectedItemIndex];
+
+    if (!item.is_archived) {
+      await alert("Cannot delete an active item. Archive it first.", "Error");
+      return;
+    }
+
     const confirmDelete = await confirm(
-      "Are you sure you want to delete this item?",
-      "Delete Item"
+      "Are you sure you want to permanently delete this archived item? This action cannot be undone.",
+      "Delete Item Permanently"
     );
     if (!confirmDelete) return;
 
     setIsDeletingItem(true);
-    const itemId = sortedItems[selectedItemIndex]?.id;
+    const itemId = item.id;
 
     try {
-      await axios.delete(`http://127.0.0.1:8000/delete-item/${itemId}/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axios.delete(
+        `http://127.0.0.1:8000/delete-item/${itemId}/`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
-      alert("Item deleted successfully!", "Success");
+      alert("Item deleted permanently!", "Success");
       fetchItemData();
       resetItemForm();
     } catch (error) {
       console.error("Error deleting item:", error);
-      await alert("Failed to delete item.", "Error");
+
+      // Handle the specific error for menu recipes
+      if (error.response && error.response.data && error.response.data.error) {
+        if (error.response.data.error.includes("menu recipes")) {
+          await alert(error.response.data.error, "Cannot Delete Item");
+        } else {
+          await alert("Failed to delete item.", "Error");
+        }
+      } else {
+        await alert("Failed to delete item.", "Error");
+      }
     } finally {
       setIsDeletingItem(false);
     }
@@ -320,11 +394,24 @@ const ManageItems = ({
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
+      alert("Category deleted successfully!", "Success");
       fetchItemData();
       resetCategoryForm();
     } catch (error) {
       console.error("Error deleting category:", error);
-      await alert("Failed to delete category.", "Error");
+
+      // Handle the specific error for categories assigned to items
+      if (error.response && error.response.data && error.response.data.error) {
+        if (
+          error.response.data.error.includes("assigned to the following items")
+        ) {
+          await alert(error.response.data.error, "Cannot Delete Category");
+        } else {
+          await alert("Failed to delete category.", "Error");
+        }
+      } else {
+        await alert("Failed to delete category.", "Error");
+      }
     } finally {
       setIsDeletingCategory(false);
     }
@@ -340,7 +427,7 @@ const ManageItems = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl h-[600px] flex flex-col">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-5xl h-[600px] flex flex-col">
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b">
           <h2 className="text-lg font-medium">Item Manager</h2>
@@ -448,9 +535,9 @@ const ManageItems = ({
                     {!isEditingItem ? (
                       <button
                         onClick={handleAddItem}
-                        disabled={isSubmittingItem}
+                        disabled={isSubmittingItem || filterStatus === 2}
                         className={`bg-green-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
-                          isSubmittingItem
+                          isSubmittingItem || filterStatus === 2
                             ? "opacity-70 cursor-not-allowed"
                             : "hover:bg-green-600"
                         }`}
@@ -466,31 +553,58 @@ const ManageItems = ({
                           >
                             Cancel
                           </button>
+                          {filterStatus === 2 && (
+                            <button
+                              onClick={handleDeleteItem}
+                              disabled={isDeletingItem}
+                              className={`bg-red-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
+                                isDeletingItem
+                                  ? "opacity-70 cursor-not-allowed"
+                                  : "hover:bg-red-600"
+                              }`}
+                            >
+                              {isDeletingItem
+                                ? `Deleting${deletingItemDots}`
+                                : "Remove Item"}
+                            </button>
+                          )}
                           <button
-                            onClick={handleDeleteItem}
-                            disabled={isDeletingItem}
-                            className={`bg-red-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
-                              isDeletingItem
+                            onClick={handleArchiveItem}
+                            disabled={isArchivingItem}
+                            className={`${
+                              sortedItems[selectedItemIndex]?.is_archived
+                                ? "bg-green-500 hover:bg-green-600"
+                                : "bg-[#CC5500] hover:bg-[#CC5500]/80"
+                            } text-white px-4 py-2 rounded-lg min-w-[140px] ${
+                              isArchivingItem
                                 ? "opacity-70 cursor-not-allowed"
-                                : "hover:bg-red-600"
+                                : ""
                             }`}
                           >
-                            {isDeletingItem
-                              ? `Deleting${deletingItemDots}`
-                              : "Delete Item"}
+                            {isArchivingItem
+                              ? `${
+                                  sortedItems[selectedItemIndex]?.is_archived
+                                    ? "Restoring"
+                                    : "Archiving"
+                                }${archivingItemDots}`
+                              : sortedItems[selectedItemIndex]?.is_archived
+                              ? "Restore Item"
+                              : "Archive Item"}
                           </button>
                         </div>
-                        <button
-                          onClick={handleEditItem}
-                          disabled={isSubmittingItem}
-                          className={`bg-green-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
-                            isSubmittingItem
-                              ? "opacity-70 cursor-not-allowed"
-                              : "hover:bg-green-600"
-                          }`}
-                        >
-                          {updatingItemText}
-                        </button>
+                        {filterStatus === 1 && (
+                          <button
+                            onClick={handleEditItem}
+                            disabled={isSubmittingItem}
+                            className={`bg-green-500 text-white px-4 py-2 rounded-lg min-w-[120px] ${
+                              isSubmittingItem
+                                ? "opacity-70 cursor-not-allowed"
+                                : "hover:bg-green-600"
+                            }`}
+                          >
+                            {updatingItemText}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -499,6 +613,32 @@ const ManageItems = ({
                 {/* Scrollable Items Table */}
                 <div className="flex-1 overflow-hidden p-4">
                   <div className="h-full overflow-y-auto">
+                    {/* Status Filter */}
+                    <div className="flex items-center justify-start pt-2">
+                      <div className="inline-flex rounded-md shadow-sm">
+                        <button
+                          className={`flex items-center justify-center p-2 transition-colors duration-200 w-48 rounded-tl-sm rounded-bl-sm ${
+                            filterStatus === 1
+                              ? "bg-[#CC5500] text-white"
+                              : "bg-[#CC5500]/70 text-white"
+                          }`}
+                          onClick={() => setFilterStatus(1)}
+                        >
+                          Available
+                        </button>
+
+                        <button
+                          className={`flex items-center justify-center p-2 transition-colors duration-200 w-48 rounded-tr-sm rounded-br-sm ${
+                            filterStatus === 2
+                              ? "bg-[#CC5500] text-white"
+                              : "bg-[#CC5500]/70 text-white"
+                          }`}
+                          onClick={() => setFilterStatus(2)}
+                        >
+                          Archived
+                        </button>
+                      </div>
+                    </div>
                     <table className="w-full text-sm text-left rtl:text-right text-gray-500">
                       <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
                         <tr>
@@ -548,7 +688,9 @@ const ManageItems = ({
                               colSpan="4"
                               className="px-6 py-4 text-center font-normal text-gray-500 italic"
                             >
-                              No Items Available
+                              {filterStatus === 1
+                                ? "No Available Items"
+                                : "No Archived Items"}
                             </td>
                           </tr>
                         )}

@@ -13,9 +13,7 @@ const ItemBox = ({
   return (
     <div
       onClick={onClick}
-      className={`relative w-54 h-full rounded-lg pb-3 overflow-hidden shadow-md transition-shadow duration-300 bg-white ${
-        isAvailable ? "cursor-pointer hover:shadow-lg" : "cursor-not-allowed"
-      }`}
+      className={`relative w-54 h-full rounded-lg pb-3 overflow-hidden border transition-shadow duration-300 bg-white cursor-pointer hover:shadow-lg"`}
     >
       <div className="px-3 pt-3">
         <img

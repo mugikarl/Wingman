@@ -13,10 +13,12 @@ const AddStockInDetails = ({
 }) => {
   if (!isOpen) return null;
 
+  const today = new Date().toISOString().split("T")[0];
+
   const [newStockIn, setNewStockIn] = useState({
     receipt_no: "",
     supplier_id: "",
-    date: "",
+    date: today,
     stock_ins: [],
   });
 

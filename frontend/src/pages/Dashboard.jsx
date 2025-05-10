@@ -262,7 +262,7 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
     <div className="h-screen w-full flex flex-col p-6 bg-[#fcf4dc] overflow-hidden">
       {/* Dashboard content */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between">
+        <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between shadow-xl">
           <span className="text-white text-lg">Orders Today</span>
           <div className="text-white text-3xl font-bold flex items-end">
             {dashboardData.orders.today}

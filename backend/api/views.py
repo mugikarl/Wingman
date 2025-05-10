@@ -887,7 +887,8 @@ def fetch_item_data(request):
                 "name": item["name"],
                 "stock_trigger": item["stock_trigger"],
                 "measurement": unit_value,
-                "category": category_value
+                "category": category_value,
+                "is_archived": item.get("is_archived", False)
             })
 
         # Fetch inventory data
@@ -1575,7 +1576,8 @@ def add_item(request):
             "name": name,
             "stock_trigger": stock_trigger,
             "measurement": unit_id,
-            "category": category_id
+            "category": category_id,
+            "is_archived": False
         }).execute()
 
         if insert_response.data:
@@ -1589,7 +1591,66 @@ def add_item(request):
     except Exception as e:
         return Response({"error": str(e)}, status=500)
 
+@api_view(['PUT'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def archive_item(request, item_id):
+    """
+    Archives an existing item instead of deleting it.
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        # Verify the item exists
+        item_response = supabase_client.table("items").select("*").eq("id", item_id).execute()
+        if not item_response.data:
+            return Response({"error": "Item not found."}, status=404)
+
+        # Archive the item by setting is_archived to True
+        archive_response = supabase_client.table("items").update({
+            "is_archived": True
+        }).eq("id", item_id).execute()
+
+        if archive_response.data:
+            return Response({"message": "Item archived successfully."}, status=200)
+        else:
+            return Response({"error": "Failed to archive item."}, status=500)
     
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+@api_view(['PUT'])
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
+def unarchive_item(request, item_id):
+    """
+    Restores an archived item.
+    """
+    try:
+        # Authenticate the user and get the authenticated Supabase client
+        auth_data = authenticate_user(request)
+        supabase_client = auth_data["client"]
+
+        # Verify the item exists
+        item_response = supabase_client.table("items").select("*").eq("id", item_id).execute()
+        if not item_response.data:
+            return Response({"error": "Item not found."}, status=404)
+
+        # Unarchive the item by setting is_archived to False
+        unarchive_response = supabase_client.table("items").update({
+            "is_archived": False
+        }).eq("id", item_id).execute()
+
+        if unarchive_response.data:
+            return Response({"message": "Item restored successfully."}, status=200)
+        else:
+            return Response({"error": "Failed to restore item."}, status=500)
+    
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
 @api_view(['PUT'])
 @authentication_classes([SupabaseAuthentication])
 @permission_classes([SupabaseIsAdmin]) 
@@ -1637,33 +1698,57 @@ def edit_item(request, item_id):
         return Response({"error": str(e)}, status=500)
     
 @api_view(['DELETE'])
-@authentication_classes([SupabaseAuthentication])  # Use appropriate authentication
-@permission_classes([SupabaseIsAdmin])  # Ensure only admins can delete items
+@authentication_classes([SupabaseAuthentication])
+@permission_classes([SupabaseIsAdmin])
 def delete_item(request, item_id):
     """
-    This view handles the deletion of an existing item.
+    This view handles the permanent deletion of an archived item.
     """
     try:
-         # Authenticate the user and get the authenticated Supabase client
+        # Authenticate the user and get the authenticated Supabase client
         auth_data = authenticate_user(request)
         supabase_client = auth_data["client"]
 
-        # Verify the item exists
+        # Verify the item exists and is archived
         item_response = supabase_client.table("items").select("*").eq("id", item_id).execute()
         if not item_response.data:
             return Response({"error": "Item not found."}, status=404)
+        
+        # Check if the item is archived
+        item = item_response.data[0]
+        if not item.get("is_archived", False):
+            return Response({"error": "Cannot delete an active item. Archive it first."}, status=400)
 
-        # Delete the item
+        # Check if the item is used in any inventory records
+        inventory_response = supabase_client.table("inventory").select("id").eq("item", item_id).execute()
+        if inventory_response.data:
+            inventory_ids = [inv["id"] for inv in inventory_response.data]
+            
+            # Check if any of these inventory items are used in menu_ingredients
+            menu_check_query = supabase_client.table("menu_ingredients").select("menu_id, inventory_id").in_("inventory_id", inventory_ids).execute()
+            
+            if menu_check_query.data:
+                # Get the menu details to provide a helpful error message
+                menu_ids = set(item["menu_id"] for item in menu_check_query.data)
+                menus_response = supabase_client.table("menu_items").select("id, name").in_("id", list(menu_ids)).execute()
+                
+                menu_names = [menu["name"] for menu in menus_response.data]
+                menu_list = ", ".join(menu_names)
+                
+                return Response({
+                    "error": f"Cannot delete this item because it is used in menu recipes: {menu_list}. Please update the recipes first."
+                }, status=400)
+        
+        # Delete the item if it's not used in any menus
         delete_response = supabase_client.table("items").delete().eq("id", item_id).execute()
 
         if delete_response.data:
-            return Response({"message": "Item deleted successfully."}, status=200)
+            return Response({"message": "Item deleted permanently."}, status=200)
         else:
             return Response({"error": "Failed to delete item."}, status=500)
     
     except Exception as e:
         return Response({"error": str(e)}, status=500)
-
 
 @api_view(['POST'])
 @authentication_classes([SupabaseAuthentication])
@@ -1752,7 +1837,19 @@ def delete_category(request, category_id):
         if not category_response.data:
             return Response({"error": "Item Category not found."}, status=404)
 
-        # Delete category
+        # Check if the category is used in any items
+        items_using_category = supabase_client.table("items").select("id, name").eq("category", category_id).execute()
+
+        if items_using_category.data and len(items_using_category.data) > 0:
+            # Get the item names for a more useful error message
+            item_names = [item["name"] for item in items_using_category.data]
+            item_list = ", ".join(item_names)
+            
+            return Response({
+                "error": f"Cannot delete this category because it is assigned to the following items: {item_list}. Please change the category of these items first."
+            }, status=400)
+        
+        # Delete category if no items are using it
         delete_response = supabase_client.table("item_category").delete().eq("id", category_id).execute()
 
         if delete_response.data:
@@ -2577,11 +2674,34 @@ def delete_menu_item(request, menu_id):
     Handles deleting an existing menu item.
     Deletes the menu record, its associated image from Supabase Storage,
     and all related menu_ingredients records.
+    
+    Will prevent deletion if the menu item is used in any transactions.
     """
     try:
         # Authenticate the user and get the Supabase client
         auth_data = authenticate_user(request)
         supabase_client = auth_data["client"]
+
+        # Check if the menu item is used in any transactions (order_details)
+        order_check_query = supabase_client.table("order_details").select("transaction_id").eq("menu_id", menu_id).execute()
+        
+        if order_check_query.data and len(order_check_query.data) > 0:
+            # Get unique transaction IDs
+            transaction_ids = list(set(item["transaction_id"] for item in order_check_query.data))
+            
+            # Get the first few transaction IDs to show in the error message
+            tx_preview = transaction_ids[:3]
+            tx_list = ", ".join([str(tx_id) for tx_id in tx_preview])
+            
+            # Total count of unique transactions
+            total_count = len(transaction_ids)
+            
+            # Add "and X more" if there are more than the ones we're showing
+            additional_text = f" and {total_count - 3} more" if total_count > 3 else ""
+            
+            return Response({
+                "error": f"Cannot delete this menu item because it is used in transactions: {tx_list}{additional_text}. You need to modify these orders before deleting this menu item."
+            }, status=400)
 
         # Retrieve the current menu record to get the image filename
         current_menu_response = supabase_client.table("menu_items").select("image").eq("id", menu_id).execute()
@@ -2975,7 +3095,8 @@ def edit_menu_category(request, category_id):
 @permission_classes([SupabaseIsAdmin])
 def delete_menu_category(request, category_id):
     """
-    This view handles the deletion of an existing category
+    This view handles the deletion of an existing menu category.
+    Checks if the category is used by any menu items before deletion.
     """
     try:
         # Authenticate the user and get the authenticated Supabase client
@@ -2985,8 +3106,23 @@ def delete_menu_category(request, category_id):
         # Verify category exists
         category_response = supabase_client.table("menu_category").select("*").eq("id", category_id).execute()
         if not category_response.data:
-            return Response({"error": "Item Category not found."}, status=404)
+            return Response({"error": "Menu Category not found."}, status=404)
 
+        # Check if any menu items are using this category
+        menu_check_query = supabase_client.table("menu_items").select("id, name").eq("category_id", category_id).limit(5).execute()
+        
+        if menu_check_query.data and len(menu_check_query.data) > 0:
+            # Get up to 3 menu names to show in error message
+            menu_names = [menu["name"] for menu in menu_check_query.data[:3]]
+            menu_list = ", ".join(menu_names)
+            
+            # Add "and X more" if there are more than we're showing
+            additional_text = f" and {len(menu_check_query.data) - 3} more" if len(menu_check_query.data) > 3 else ""
+            
+            return Response({
+                "error": f"Cannot delete this category because it is used by menu items: {menu_list}{additional_text}. Please change the category of these menu items first."
+            }, status=400)
+            
         # Delete category
         delete_response = supabase_client.table("menu_category").delete().eq("id", category_id).execute()
 
