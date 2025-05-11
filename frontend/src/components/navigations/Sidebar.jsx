@@ -323,17 +323,17 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
       </div>
 
       {/* Bottom Section: Login/Logout Button */}
-      <div className="w-full px-4 py-4">
+      <div className="w-full px-4 py-6">
         {isAdmin ? (
           <button
             onClick={handleLogout}
-            className="flex items-center justify-center bg-white text-[#E88504] p-2 rounded-lg shadow hover:shadow-lg w-full"
+            className="flex items-center justify-center bg-white text-[#E88504] p-2 rounded-sm shadow hover:shadow-lg hover:bg-gray-300 w-full"
           >
             <span>Logout</span>
           </button>
         ) : (
           <Link to="/login">
-            <button className="flex items-center justify-center bg-white text-[#E88504] p-2 rounded-lg shadow hover:shadow-lg w-full">
+            <button className="flex items-center justify-center bg-white text-[#E88504] p-2 rounded-sm shadow hover:shadow-lg hover:bg-gray-300 w-full">
               <span>Admin Mode</span>
             </button>
           </Link>

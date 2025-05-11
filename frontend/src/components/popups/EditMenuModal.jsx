@@ -182,7 +182,17 @@ const EditMenuModal = ({
       }
     } catch (error) {
       console.error("Error deleting menu item:", error.response?.data || error);
-      await alert("Failed to delete menu item.", "Error");
+
+      // Check if the error is related to transactions using this menu item
+      if (
+        error.response?.data?.error &&
+        error.response.data.error.includes("transactions")
+      ) {
+        await alert(error.response.data.error, "Cannot Delete Menu Item");
+      } else {
+        await alert("Failed to delete menu item.", "Error");
+      }
+
       setIsDeleting(false); // Only reset if there's an error
     }
   };

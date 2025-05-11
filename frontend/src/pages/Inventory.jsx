@@ -23,6 +23,13 @@ const Inventory = () => {
   const [isManageItemsOpen, setIsManageItemsOpen] = useState(false);
   const [items, setItems] = useState([]);
 
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const role = localStorage.getItem("role");
+    setIsAdmin(role === "Admin");
+  }, []);
+
   const openDisposedModal = (item) => {
     console.log("Row clicked:", item);
     setSelectedInventory(item);
@@ -115,20 +122,22 @@ const Inventory = () => {
         </div>
 
         {/* Action Buttons - Added from Items.jsx */}
-        <div className="w-full">
-          <div className="flex justify-start gap-x-2 items-center w-full">
-            {/* Manage Items Button */}
-            <button
-              onClick={() => setIsManageItemsOpen(true)}
-              className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
-            >
-              <div className="flex items-center justify-center border-r p-3">
-                <PiBasket className="w-5 h-5 text-[#CC5500]" />
-              </div>
-              <span className="flex-1 text-left pl-3">Manage Items</span>
-            </button>
+        {isAdmin && (
+          <div className="w-full">
+            <div className="flex justify-start gap-x-2 items-center w-full">
+              {/* Manage Items Button */}
+              <button
+                onClick={() => setIsManageItemsOpen(true)}
+                className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
+              >
+                <div className="flex items-center justify-center border-r p-3">
+                  <PiBasket className="w-5 h-5 text-[#CC5500]" />
+                </div>
+                <span className="flex-1 text-left pl-3">Manage Items</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Show search results info if searching */}

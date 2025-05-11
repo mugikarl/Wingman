@@ -198,6 +198,13 @@ const NewMenuCategory = ({
       }, 0);
     } catch (error) {
       console.error("Error deleting menu category:", error);
+
+      // Show the error message from the backend if it exists
+      if (error.response?.data?.error) {
+        await alert(error.response.data.error, "Cannot Delete Category");
+      } else {
+        await alert("Failed to delete menu category.", "Error");
+      }
     } finally {
       setIsDeleting(false);
     }
