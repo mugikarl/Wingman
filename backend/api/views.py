@@ -2660,7 +2660,7 @@ def fetch_order_data(request, transactionId=None):
         order_status_types = supabase_anon.table("order_status_type").select("id, name").execute().data or []
         
         # Fetch GCash references
-        gcash_references = supabase_anon.table("gcash_reference").select("id, name, attached_transaction").execute().data or []
+        gcash_references = supabase_anon.table("gcash_reference").select("id, name, attached_transaction, paid_amount").execute().data or []
         
         # Get current date in YYYY-MM-DD format
         today_str = datetime.now().strftime("%Y-%m-%d")
@@ -2726,8 +2726,8 @@ def fetch_order_data(request, transactionId=None):
             ]
             
             # Find GCash reference for this transaction (if any)
-            gcash_reference = next((ref for ref in gcash_references if ref["attached_transaction"] == transaction["id"]), None)
-            
+            gcash_references_for_transaction = [ref for ref in gcash_references if ref["attached_transaction"] == transaction["id"]]
+
             formatted_transactions.append({
                 "id": transaction["id"],
                 "date": transaction["date"],
@@ -2736,7 +2736,7 @@ def fetch_order_data(request, transactionId=None):
                 "payment_method": next((method for method in payment_methods if method["id"] == transaction["payment_method"]), None),
                 "employee": next((emp for emp in all_employees if emp["id"] == transaction["employee_id"]), None), # Use all_employees for historical records
                 "order_details": related_orders,
-                "gcash_reference": gcash_reference  # Add GCash reference info
+                "gcash_references": gcash_references_for_transaction  # Include all GCash references
             })
         
         # If a transactionId is provided, filter the transaction.
@@ -3161,18 +3161,17 @@ def add_order(request):
         transaction_id = transaction_response.data[0]["id"]
         
         # If payment method is GCash and we have a reference ID, save it to gcash_reference table
-        if payment_method == 2:  # Assuming payment_method ID 2 is GCash
-            if reference_id:
+        # In add_order view, modify the GCash reference creation part:
+        if payment_method == 2 and reference_id:  # GCash payment
+            try:
                 gcash_reference_data = {
                     "name": reference_id,
-                    "attached_transaction": transaction_id
+                    "attached_transaction": transaction_id,
+                    "paid_amount": payment_amount  # Add this line to store individual payment amount
                 }
-                # Insert into the gcash_reference table
-                gcash_response = supabase_anon.table("gcash_reference").insert(gcash_reference_data).execute()
-                if not gcash_response.data:
-                    # If we fail to save GCash reference, we should still proceed with the order
-                    # but log the error
-                    print(f"Failed to save GCash reference for transaction {transaction_id}")
+                supabase_anon.table("gcash_reference").insert(gcash_reference_data).execute()
+            except Exception as e:
+                print(f"Failed to save GCash reference for transaction {transaction_id}")
         
         total_price = 0  # Running total for transaction
         order_items = []  # To be inserted for inventory purposes
@@ -3411,13 +3410,35 @@ def edit_order(request, transaction_id):
             return Response({"error": "Failed to update transaction."}, status=500)
         
         # Update GCash reference if payment method is GCash
-        if payment_method == 2 and reference_id:  # Assuming payment_method ID 2 is GCash
-            # Always create a new reference record instead of updating existing ones
-            gcash_reference_data = {
-                "name": reference_id,
-                "attached_transaction": transaction_id
-            }
-            supabase_anon.table("gcash_reference").insert(gcash_reference_data).execute()
+        # In edit_order view, when handling GCash reference:
+        # In edit_order view, when handling GCash reference:
+        if payment_method == 2 and reference_id:  # GCash payment
+            try:
+                # Instead of calculating the difference ourselves, we should get the 
+                # additional_payment value directly from the request data
+                # This ensures we use exactly what the frontend calculated as extra_payment_required
+                additional_payment = data.get("additional_payment", 0)
+                
+                # If additional_payment is not provided, calculate it (as fallback)
+                if additional_payment == 0:
+                    # Get the original payment amount
+                    original_transaction = supabase_anon.table("transaction").select("payment_amount").eq("id", transaction_id).execute()
+                    original_payment_amount = original_transaction.data[0].get("payment_amount", 0) if original_transaction.data else 0
+                    
+                    # Calculate additional payment
+                    additional_payment = payment_amount - original_payment_amount
+                
+                # Create a GCash reference record with the additional amount
+                gcash_reference_data = {
+                    "name": reference_id,
+                    "attached_transaction": transaction_id,
+                    "paid_amount": additional_payment  # Store the additional payment amount
+                }
+                
+                print(f"Adding GCash reference with amount: {additional_payment}")
+                supabase_anon.table("gcash_reference").insert(gcash_reference_data).execute()
+            except Exception as e:
+                print(f"Failed to save GCash reference for transaction {transaction_id}: {str(e)}")
         
         total_price = 0
         order_items = []

@@ -57,6 +57,8 @@ const OrderPayment = ({
           );
 
           setTimedInEmployees(timedIn);
+          console.log("Timed in employees:", timedIn.length);
+
           // Set default to first timed in employee if available
           if (timedIn.length > 0) {
             // Find corresponding employee from the full employees list
@@ -64,8 +66,10 @@ const OrderPayment = ({
               (emp) => String(emp.id) === String(timedIn[0].id)
             );
             setSelectedEmployee(matchedEmployee || null);
+            console.log("Set default employee:", matchedEmployee?.id);
           } else {
             setSelectedEmployee(null);
+            console.log("No timed-in employees available");
           }
         })
         .catch((error) => {
@@ -78,8 +82,10 @@ const OrderPayment = ({
       // Set default payment method
       if (paymentMethods && paymentMethods.length > 0) {
         setSelectedPaymentMethod(paymentMethods[0]);
+        console.log("Set default payment method:", paymentMethods[0].id);
       } else {
         setSelectedPaymentMethod(null);
+        console.log("No payment methods available");
       }
 
       // Reset other form fields
@@ -97,6 +103,37 @@ const OrderPayment = ({
       setChange(0);
     }
   }, [cashReceived, totalAmount]);
+
+  // Add debugging to see what's causing the button to remain disabled
+  useEffect(() => {
+    console.log("Button conditions:", {
+      isProcessing,
+      selectedEmployee: selectedEmployee ? selectedEmployee.id : null,
+      selectedPaymentMethod: selectedPaymentMethod
+        ? selectedPaymentMethod.id
+        : null,
+      paymentMethods: paymentMethods ? paymentMethods.length : 0,
+      cashReceived,
+      gcashReferenceNo,
+      disabledCondition:
+        isProcessing ||
+        !selectedEmployee ||
+        !selectedPaymentMethod ||
+        (selectedPaymentMethod &&
+          selectedPaymentMethod.name.toLowerCase() === "cash" &&
+          (Number.parseFloat(cashReceived) || 0) < totalAmount) ||
+        (selectedPaymentMethod &&
+          selectedPaymentMethod.name.toLowerCase() === "gcash" &&
+          !gcashReferenceNo),
+    });
+  }, [
+    isProcessing,
+    selectedEmployee,
+    selectedPaymentMethod,
+    cashReceived,
+    gcashReferenceNo,
+    totalAmount,
+  ]);
 
   // Modified to open verification modal first
   const handleSubmit = async () => {
@@ -358,27 +395,11 @@ const OrderPayment = ({
           <button
             onClick={handleSubmit}
             className={`w-full py-3 rounded-lg text-white text-lg font-medium transition-colors ${
-              isProcessing ||
-              !selectedEmployee ||
-              (selectedPaymentMethod &&
-                selectedPaymentMethod.name.toLowerCase() === "cash" &&
-                (Number.parseFloat(cashReceived) || 0) < totalAmount) ||
-              (selectedPaymentMethod &&
-                selectedPaymentMethod.name.toLowerCase() === "gcash" &&
-                !gcashReferenceNo)
+              isProcessing || !selectedPaymentMethod
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-green-500 hover:bg-green-600"
             }`}
-            disabled={
-              isProcessing ||
-              !selectedEmployee ||
-              (selectedPaymentMethod &&
-                selectedPaymentMethod.name.toLowerCase() === "cash" &&
-                (Number.parseFloat(cashReceived) || 0) < totalAmount) ||
-              (selectedPaymentMethod &&
-                selectedPaymentMethod.name.toLowerCase() === "gcash" &&
-                !gcashReferenceNo)
-            }
+            disabled={isProcessing || !selectedPaymentMethod}
           >
             {isProcessing ? "Processing..." : "Place Order"}
           </button>

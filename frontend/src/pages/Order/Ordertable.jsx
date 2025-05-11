@@ -469,6 +469,7 @@ const OrderTable = () => {
         unliWingsCategory={unliWingsCategory}
         employees={orderData.employees}
         fetchOrderData={fetchOrderData}
+        payment_methods={orderData.payment_methods}
       />
     </div>
   );

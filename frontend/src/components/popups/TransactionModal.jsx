@@ -21,6 +21,7 @@ const TransactionModal = ({
   employees,
   unliWingsCategory,
   fetchOrderData, // Add this prop for refreshing data
+  payment_methods, // Add this line
 }) => {
   if (!isOpen || !transaction) return null;
 
@@ -456,6 +457,18 @@ const TransactionModal = ({
                       {menuType}
                     </span>
                   </p>
+                  <p>
+                    <strong>Payment Method:</strong>{" "}
+                    <span
+                      className={`font-medium ${
+                        transaction.payment_method?.id === 1
+                          ? "text-green-800"
+                          : "text-blue-600"
+                      }`}
+                    >
+                      {transaction.payment_method?.name || "Cash"}
+                    </span>
+                  </p>
                   <div className="relative inline-block text-left">
                     <button
                       onClick={() => {
@@ -590,6 +603,30 @@ const TransactionModal = ({
                       </p>
                     </>
                   )}
+                  {transaction.payment_method?.id === 2 &&
+                    transaction.gcash_references &&
+                    transaction.gcash_references.length > 0 && (
+                      <div className="mt-4 pt-2 border-t">
+                        <h4 className="font-medium mb-2">
+                          GCash Payment History:
+                        </h4>
+                        <div className="space-y-2">
+                          {transaction.gcash_references.map((ref, index) => (
+                            <div
+                              key={index}
+                              className="flex justify-between items-center py-1 px-2 bg-blue-50 rounded"
+                            >
+                              <span className="text-blue-600">
+                                Ref: {ref.name}
+                              </span>
+                              <span className="font-medium">
+                                ₱{(ref.paid_amount || 0).toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                 </div>
               </div>
             </div>
@@ -777,6 +814,7 @@ const TransactionModal = ({
             employees={employees}
             unliWingsCategory={unliWingsCategory}
             fetchOrderData={fetchOrderData}
+            payment_methods={payment_methods}
           />
         )}
       </div>

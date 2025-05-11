@@ -152,6 +152,7 @@ const OrderEditPayment = ({
       reference_id: gcashReferenceNo || transaction.reference_id,
       employee_email: email, // Add employee email for verification
       employee_passcode: passcode, // Add employee passcode for verification
+      additional_payment: extraPaymentRequired, // Add the extra payment amount needed
     };
 
     console.log("Submitting payment with payload:", payload);
