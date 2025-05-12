@@ -2884,6 +2884,35 @@ def fetch_order_data(request, transactionId=None):
     except Exception as e:
         return Response({"error": str(e)}, status=500)
 
+@api_view(['GET'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def fetch_inventory_order_data(request):
+    try:
+        # Fetch units of measurement
+        units_response = supabase_anon.table("unit_of_measurement").select("*").execute()
+        units = units_response.data if units_response.data else []
+        
+        # Fetch inventory items with their units and item information
+        inventory_response = supabase_anon.table("inventory").select(
+            "id, quantity, item, items(id, name, measurement, unit_of_measurement(id, symbol))"
+        ).execute()
+        inventory = inventory_response.data if inventory_response.data else []
+        
+        # Fetch items table
+        items_response = supabase_anon.table("items").select(
+            "id, name, measurement, unit_of_measurement(id, symbol)"
+        ).execute()
+        items = items_response.data if items_response.data else []
+        
+        return Response({
+            "units": units,
+            "inventory": inventory,
+            "items": items
+        })
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 @api_view(['POST'])
 @authentication_classes([SupabaseAuthentication])
 @permission_classes([SupabaseIsAdmin])

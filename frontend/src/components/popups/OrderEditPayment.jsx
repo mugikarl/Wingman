@@ -183,7 +183,7 @@ const OrderEditPayment = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-md mx-4 overflow-hidden max-h-[90vh]">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-lg mx-4 overflow-hidden max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-xl font-semibold">Payment</h2>

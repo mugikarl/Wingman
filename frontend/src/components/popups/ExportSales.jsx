@@ -13,6 +13,7 @@ const ExportSales = ({ isOpen, onClose, selectedDate, salesData }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [monthData, setMonthData] = useState(null);
+  const [monthsToInclude, setMonthsToInclude] = useState(1);
 
   const { alert } = useModal();
 
@@ -54,9 +55,52 @@ const ExportSales = ({ isOpen, onClose, selectedDate, salesData }) => {
     }
   };
 
-  const processMonthlyData = () => {
-    if (!monthData) return [];
+  const processMultiMonthData = () => {
+    if (!monthData) return { monthlyData: [], totalData: null };
 
+    const months = [];
+    const startDate = new Date(selectedDate);
+
+    // Generate data for each month going backward from selected date
+    for (let i = 0; i < monthsToInclude; i++) {
+      const currentDate = new Date(startDate);
+      currentDate.setMonth(startDate.getMonth() - i);
+
+      const monthName = currentDate.toLocaleString("default", {
+        month: "long",
+      });
+      const currentYear = currentDate.getFullYear();
+      const currentMonth = currentDate.getMonth();
+
+      // Process this month's data
+      const processedMonth = processMonthData(currentYear, currentMonth);
+
+      months.push({
+        monthName,
+        year: currentYear,
+        ...processedMonth,
+      });
+    }
+
+    // Calculate overall totals across all months
+    const totalData = months.reduce(
+      (total, month) => {
+        return {
+          sales: total.sales + month.monthlyTotal.sales,
+          expenses: total.expenses + month.monthlyTotal.expenses,
+          netIncome: total.netIncome + month.monthlyTotal.netIncome,
+        };
+      },
+      { sales: 0, expenses: 0, netIncome: 0 }
+    );
+
+    return {
+      monthlyData: months,
+      totalData,
+    };
+  };
+
+  const processMonthData = (year, month) => {
     const calculateTransactionTotal = (transaction) => {
       if (
         !transaction.order_details ||
@@ -114,15 +158,12 @@ const ExportSales = ({ isOpen, onClose, selectedDate, salesData }) => {
       return total;
     };
 
-    const selectedYear = selectedDate.getFullYear();
-    const selectedMonth = selectedDate.getMonth();
-
     const monthTransactions = (monthData.transactions || []).filter(
       (transaction) => {
         const transactionDate = new Date(transaction.date);
         return (
-          transactionDate.getFullYear() === selectedYear &&
-          transactionDate.getMonth() === selectedMonth &&
+          transactionDate.getFullYear() === year &&
+          transactionDate.getMonth() === month &&
           transaction.order_status === 2
         );
       }
@@ -131,8 +172,7 @@ const ExportSales = ({ isOpen, onClose, selectedDate, salesData }) => {
     const monthExpenses = (monthData.expenses || []).filter((expense) => {
       const expenseDate = new Date(expense.date);
       return (
-        expenseDate.getFullYear() === selectedYear &&
-        expenseDate.getMonth() === selectedMonth
+        expenseDate.getFullYear() === year && expenseDate.getMonth() === month
       );
     });
 
@@ -199,103 +239,258 @@ const ExportSales = ({ isOpen, onClose, selectedDate, salesData }) => {
   // Export handlers for different file types
   // PDF
   const exportToPDF = (processedData) => {
-    const { dailyData, monthlyTotal } = processedData;
+    const { monthlyData, totalData } = processedData;
     const doc = new jsPDF();
 
     // Add title
     doc.setFontSize(16);
-    doc.text(`Sales Report: ${month} ${year}`, 14, 22);
+    const titleText =
+      monthsToInclude > 1
+        ? `Sales Report: ${monthsToInclude} Month${
+            monthsToInclude > 1 ? "s" : ""
+          } (${monthlyData[monthlyData.length - 1].monthName} ${
+            monthlyData[monthlyData.length - 1].year
+          } - ${monthlyData[0].monthName} ${monthlyData[0].year})`
+        : `Sales Report: ${month} ${year}`;
 
-    // Generate table data
-    let tableData = [];
+    doc.text(titleText, 14, 22);
 
-    // Daily breakdown if includeDaily is true
-    if (includeDaily) {
-      tableData = dailyData.map((day) => [
-        day.date,
-        `${formatCurrency(day.sales)}`,
-        `${formatCurrency(day.expenses)}`,
-        `${formatCurrency(day.netIncome)}`,
-      ]);
-    }
+    let yPosition = 30;
 
-    // Prepare the footer with color styling
-    const footerStyles = [
-      {},
-      { textColor: [0, 128, 0] },
-      { textColor: [255, 0, 0] },
-      { textColor: monthlyTotal.netIncome >= 0 ? [0, 128, 0] : [255, 0, 0] },
-    ];
+    // For each month in our data
+    monthlyData.forEach((monthData, index) => {
+      // Add month header
+      doc.setFontSize(14);
+      doc.text(`${monthData.monthName} ${monthData.year}`, 14, yPosition);
+      yPosition += 10;
 
-    // Generate the table using autoTable
-    autoTable(doc, {
-      head: [["Date", "Sales", "Expenses", "Net Income"]],
-      body: tableData,
-      startY: 30,
-      theme: "striped",
-      headStyles: { fillColor: [204, 85, 0] },
-      foot: [
-        [
-          monthlyTotal.date,
-          `${formatCurrency(monthlyTotal.sales)}`,
-          `${formatCurrency(monthlyTotal.expenses)}`,
-          `${formatCurrency(monthlyTotal.netIncome)}`,
-        ],
-      ],
-      footStyles: {
-        fillColor: "#F7F7F7",
-        fontStyle: "bold",
-        lineWidth: { top: 0.2 },
-        lineColor: "#CC5500",
-      },
-      columnStyles: {
-        0: {},
-        1: {},
-        2: {},
-        3: {},
-      },
-      styles: {
-        overflow: "linebreak",
-      },
-      margin: { top: 30 },
-      didParseCell: function (data) {
-        // Style footer cells with colors
-        if (data.section === "foot") {
-          data.cell.styles.textColor = footerStyles[data.column.index]
-            .textColor || [0, 0, 0];
-        }
-      },
+      // Generate table data for this month
+      if (includeDaily) {
+        const tableData = monthData.dailyData.map((day) => [
+          day.date,
+          `${formatCurrency(day.sales)}`,
+          `${formatCurrency(day.expenses)}`,
+          `${formatCurrency(day.netIncome)}`,
+        ]);
+
+        // Prepare the footer with color styling
+        const footerStyles = [
+          {},
+          { textColor: [0, 128, 0] },
+          { textColor: [255, 0, 0] },
+          {
+            textColor:
+              monthData.monthlyTotal.netIncome >= 0 ? [0, 128, 0] : [255, 0, 0],
+          },
+        ];
+
+        // Generate the table for this month
+        autoTable(doc, {
+          head: [["Date", "Sales", "Expenses", "Net Income"]],
+          body: tableData,
+          startY: yPosition,
+          theme: "striped",
+          headStyles: { fillColor: [204, 85, 0] },
+          foot: [
+            [
+              monthData.monthlyTotal.date,
+              `${formatCurrency(monthData.monthlyTotal.sales)}`,
+              `${formatCurrency(monthData.monthlyTotal.expenses)}`,
+              `${formatCurrency(monthData.monthlyTotal.netIncome)}`,
+            ],
+          ],
+          footStyles: {
+            fillColor: "#F7F7F7",
+            fontStyle: "bold",
+            lineWidth: { top: 0.2 },
+            lineColor: "#CC5500",
+          },
+          columnStyles: {
+            0: {},
+            1: {},
+            2: {},
+            3: {},
+          },
+          styles: {
+            overflow: "linebreak",
+          },
+          margin: { top: 30 },
+          didParseCell: function (data) {
+            // Style footer cells with colors
+            if (data.section === "foot") {
+              data.cell.styles.textColor = footerStyles[data.column.index]
+                .textColor || [0, 0, 0];
+            }
+          },
+        });
+
+        // Update Y position for next table
+        yPosition = doc.lastAutoTable.finalY + 20;
+      } else {
+        // If we're not including daily data, just show monthly total
+        const tableData = [];
+
+        // Prepare the footer with color styling
+        const footerStyles = [
+          {},
+          { textColor: [0, 128, 0] },
+          { textColor: [255, 0, 0] },
+          {
+            textColor:
+              monthData.monthlyTotal.netIncome >= 0 ? [0, 128, 0] : [255, 0, 0],
+          },
+        ];
+
+        // Generate the table for this month
+        autoTable(doc, {
+          head: [["Month", "Sales", "Expenses", "Net Income"]],
+          body: tableData,
+          startY: yPosition,
+          theme: "striped",
+          headStyles: { fillColor: [204, 85, 0] },
+          foot: [
+            [
+              `${monthData.monthName} ${monthData.year}`,
+              `${formatCurrency(monthData.monthlyTotal.sales)}`,
+              `${formatCurrency(monthData.monthlyTotal.expenses)}`,
+              `${formatCurrency(monthData.monthlyTotal.netIncome)}`,
+            ],
+          ],
+          footStyles: {
+            fillColor: "#F7F7F7",
+            fontStyle: "bold",
+            lineWidth: { top: 0.2 },
+            lineColor: "#CC5500",
+          },
+          columnStyles: {
+            0: {},
+            1: {},
+            2: {},
+            3: {},
+          },
+          styles: {
+            overflow: "linebreak",
+          },
+          margin: { top: 30 },
+          didParseCell: function (data) {
+            // Style footer cells with colors
+            if (data.section === "foot") {
+              data.cell.styles.textColor = footerStyles[data.column.index]
+                .textColor || [0, 0, 0];
+            }
+          },
+        });
+
+        // Update Y position for next table
+        yPosition = doc.lastAutoTable.finalY + 20;
+      }
     });
+
+    // Add overall summary if multiple months
+    if (monthsToInclude > 1) {
+      doc.setFontSize(14);
+      doc.text("Overall Summary", 14, yPosition);
+      yPosition += 10;
+
+      const overallFooterStyles = [
+        {},
+        { textColor: [0, 128, 0] },
+        { textColor: [255, 0, 0] },
+        { textColor: totalData.netIncome >= 0 ? [0, 128, 0] : [255, 0, 0] },
+      ];
+
+      // Generate overall summary table
+      autoTable(doc, {
+        head: [["Period", "Sales", "Expenses", "Net Income"]],
+        body: [],
+        startY: yPosition,
+        theme: "striped",
+        headStyles: { fillColor: [204, 85, 0] },
+        foot: [
+          [
+            `Total (${monthsToInclude} Month${monthsToInclude > 1 ? "s" : ""})`,
+            `${formatCurrency(totalData.sales)}`,
+            `${formatCurrency(totalData.expenses)}`,
+            `${formatCurrency(totalData.netIncome)}`,
+          ],
+        ],
+        footStyles: {
+          fillColor: "#F7F7F7",
+          fontStyle: "bold",
+          lineWidth: { top: 0.2 },
+          lineColor: "#CC5500",
+        },
+        columnStyles: {
+          0: {},
+          1: {},
+          2: {},
+          3: {},
+        },
+        styles: {
+          overflow: "linebreak",
+        },
+        margin: { top: 30 },
+        didParseCell: function (data) {
+          // Style footer cells with colors
+          if (data.section === "foot") {
+            data.cell.styles.textColor = overallFooterStyles[data.column.index]
+              .textColor || [0, 0, 0];
+          }
+        },
+      });
+    }
 
     doc.save(`${fileName || "SalesReport"}.pdf`);
   };
 
   // CSV
   const exportToCSV = (processedData) => {
-    const { dailyData, monthlyTotal } = processedData;
+    const { monthlyData, totalData } = processedData;
 
     // Prepare data
-    let csvData = [["Date", "Sales", "Expenses", "Net Income"]];
+    let csvData = [];
 
-    // Add daily data if needed
-    if (includeDaily) {
-      dailyData.forEach((day) => {
-        csvData.push([
-          day.date,
-          formatCurrency(day.sales),
-          formatCurrency(day.expenses),
-          formatCurrency(day.netIncome),
-        ]);
-      });
+    // Add headers
+    csvData.push(["Date", "Sales", "Expenses", "Net Income"]);
+
+    // Add data for each month
+    monthlyData.forEach((monthData) => {
+      // Add month header
+      csvData.push([`${monthData.monthName} ${monthData.year}`, "", "", ""]);
+
+      // Add daily data if includeDaily is true
+      if (includeDaily) {
+        monthData.dailyData.forEach((day) => {
+          csvData.push([
+            day.date,
+            formatCurrency(day.sales),
+            formatCurrency(day.expenses),
+            formatCurrency(day.netIncome),
+          ]);
+        });
+      }
+
+      // Add monthly total
+      csvData.push([
+        `${monthData.monthName} Total`,
+        formatCurrency(monthData.monthlyTotal.sales),
+        formatCurrency(monthData.monthlyTotal.expenses),
+        formatCurrency(monthData.monthlyTotal.netIncome),
+      ]);
+
+      // Add blank line between months
+      csvData.push(["", "", "", ""]);
+    });
+
+    // Add overall total if multiple months
+    if (monthsToInclude > 1) {
+      csvData.push([
+        `Overall Total (${monthsToInclude} Months)`,
+        formatCurrency(totalData.sales),
+        formatCurrency(totalData.expenses),
+        formatCurrency(totalData.netIncome),
+      ]);
     }
-
-    // Add monthly total
-    csvData.push([
-      monthlyTotal.date,
-      formatCurrency(monthlyTotal.sales),
-      formatCurrency(monthlyTotal.expenses),
-      formatCurrency(monthlyTotal.netIncome),
-    ]);
 
     // Create worksheet
     const ws = XLSX.utils.aoa_to_sheet(csvData);
@@ -310,34 +505,74 @@ const ExportSales = ({ isOpen, onClose, selectedDate, salesData }) => {
 
   // Excel
   const exportToExcel = (processedData) => {
-    const { dailyData, monthlyTotal } = processedData;
+    const { monthlyData, totalData } = processedData;
 
     // Prepare data
-    let excelData = [["Date", "Sales", "Expenses", "Net Income"]];
+    let excelData = [];
+    let rowIndex = 0;
+    let monthHeaders = [];
 
-    // Add daily data if needed
-    if (includeDaily) {
-      dailyData.forEach((day, index) => {
-        excelData.push([day.date, day.sales, day.expenses, day.netIncome]);
-      });
+    // For each month in the data
+    monthlyData.forEach((monthData, monthIndex) => {
+      // Add month header
+      excelData.push([`${monthData.monthName} ${monthData.year}`, "", "", ""]);
+      monthHeaders.push(rowIndex);
+      rowIndex++;
+
+      // Add column headers
+      excelData.push(["Date", "Sales", "Expenses", "Net Income"]);
+      rowIndex++;
+
+      // Add daily data if needed
+      if (includeDaily) {
+        monthData.dailyData.forEach((day) => {
+          excelData.push([day.date, day.sales, day.expenses, day.netIncome]);
+          rowIndex++;
+        });
+      }
+
+      // Add monthly total
+      excelData.push([
+        `${monthData.monthName} Total`,
+        monthData.monthlyTotal.sales,
+        monthData.monthlyTotal.expenses,
+        monthData.monthlyTotal.netIncome,
+      ]);
+      rowIndex++;
+
+      // Add blank row between months
+      if (monthIndex < monthlyData.length - 1) {
+        excelData.push(["", "", "", ""]);
+        rowIndex++;
+      }
+    });
+
+    // Add overall total if multiple months
+    if (monthsToInclude > 1) {
+      excelData.push(["", "", "", ""]);
+      rowIndex++;
+
+      excelData.push([
+        `Overall Total (${monthsToInclude} Months)`,
+        totalData.sales,
+        totalData.expenses,
+        totalData.netIncome,
+      ]);
     }
-
-    // Add monthly total
-    excelData.push([
-      monthlyTotal.date,
-      monthlyTotal.sales,
-      monthlyTotal.expenses,
-      monthlyTotal.netIncome,
-    ]);
 
     // Create worksheet
     const ws = XLSX.utils.aoa_to_sheet(excelData);
 
-    // Add styling
+    // Styling
     const headerStyle = {
       font: { bold: true, color: { rgb: "FFFFFF" } },
       fill: { fgColor: { rgb: "CC5500" } },
       alignment: { horizontal: "center" },
+    };
+
+    const monthHeaderStyle = {
+      font: { bold: true, sz: 14 },
+      fill: { fgColor: { rgb: "EEEEEE" } },
     };
 
     const totalStyle = {
@@ -348,67 +583,21 @@ const ExportSales = ({ isOpen, onClose, selectedDate, salesData }) => {
       },
     };
 
-    const greenStyle = {
-      font: { bold: true, color: { rgb: "008000" } }, // Green text
-    };
+    const greenStyle = { font: { bold: true, color: { rgb: "008000" } } };
+    const redStyle = { font: { bold: true, color: { rgb: "FF0000" } } };
+    const stripedStyle = { fill: { fgColor: { rgb: "F0F0F0" } } };
 
-    const redStyle = {
-      font: { bold: true, color: { rgb: "FF0000" } }, // Red text
-    };
-
-    const stripedStyle = {
-      fill: { fgColor: { rgb: "F0F0F0" } }, // Light gray for striped rows
-    };
-
-    // Apply header style
+    // Apply styles
     const range = XLSX.utils.decode_range(ws["!ref"]);
-    for (let C = range.s.c; C <= range.e.c; ++C) {
-      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
-      if (!ws[cellAddress]) continue;
-      ws[cellAddress].s = headerStyle;
-    }
 
-    for (let R = 1; R < excelData.length - 1; ++R) {
-      if (R % 2 === 0) {
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-          if (!ws[cellAddress]) continue;
-          ws[cellAddress].s = stripedStyle;
-        }
+    // Apply month header styles
+    monthHeaders.forEach((headerRow) => {
+      for (let C = 0; C <= 3; C++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: headerRow, c: C });
+        if (!ws[cellAddress]) continue;
+        ws[cellAddress].s = monthHeaderStyle;
       }
-    }
-
-    // Apply total row style
-    const totalRow = excelData.length - 1;
-
-    // Total label (same style as other total cells, but no color)
-    const totalLabelCell = XLSX.utils.encode_cell({ r: totalRow, c: 0 });
-    if (ws[totalLabelCell]) {
-      ws[totalLabelCell].s = { ...totalStyle, font: { bold: true } };
-    }
-
-    // Total Sales (green)
-    const totalSalesCell = XLSX.utils.encode_cell({ r: totalRow, c: 1 });
-    if (ws[totalSalesCell]) {
-      ws[totalSalesCell].s = { ...totalStyle, ...greenStyle };
-    }
-
-    // Total Expenses (red)
-    const totalExpensesCell = XLSX.utils.encode_cell({ r: totalRow, c: 2 });
-    if (ws[totalExpensesCell]) {
-      ws[totalExpensesCell].s = { ...totalStyle, ...redStyle };
-    }
-
-    // Net Income (green if positive, red if negative)
-    const netIncomeCell = XLSX.utils.encode_cell({ r: totalRow, c: 3 });
-    if (ws[netIncomeCell]) {
-      const netIncomeStyle =
-        monthlyTotal.netIncome >= 0 ? greenStyle : redStyle;
-      ws[netIncomeCell].s = { ...totalStyle, ...netIncomeStyle };
-    }
-
-    // Set column widths
-    ws["!cols"] = [{ wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
+    });
 
     // Create workbook with worksheet
     const wb = XLSX.utils.book_new();
@@ -424,9 +613,9 @@ const ExportSales = ({ isOpen, onClose, selectedDate, salesData }) => {
       return;
     }
 
-    const processedData = processMonthlyData();
+    const processedData = processMultiMonthData();
 
-    if (processedData.dailyData.length === 0 && !processedData.monthlyTotal) {
+    if (processedData.monthlyData.length === 0) {
       await alert("No data available to export", "Error");
       return;
     }
@@ -487,6 +676,29 @@ const ExportSales = ({ isOpen, onClose, selectedDate, salesData }) => {
               />
             </div>
           </div>
+
+          {/* Number of months to include */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700">
+              Number of Months to Include
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="12"
+              value={monthsToInclude}
+              onChange={(e) =>
+                setMonthsToInclude(Math.max(1, parseInt(e.target.value) || 1))
+              }
+              className="w-full px-3 py-2 border rounded-md"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              {monthsToInclude > 1
+                ? `Will include data from ${monthsToInclude} months, from ${month} ${year} going back.`
+                : `Will include only ${month} ${year}.`}
+            </p>
+          </div>
+
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700">
               File Name

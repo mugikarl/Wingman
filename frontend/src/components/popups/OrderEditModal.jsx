@@ -66,60 +66,15 @@ const OrderEditModal = ({
     }
   };
 
-  // Function to check inventory before adding an item
-  const handleItemSelect = async (item) => {
-    try {
-      // First check if this item is already unavailable
-      if (item.status_id === 2) {
-        await alert("This item is currently unavailable!", "Error");
-        return;
-      }
-
-      // Check inventory levels via API
-      const response = await axios.get(
-        `http://127.0.0.1:8000/check-menu-inventory/${item.id}?quantity=1`
-      );
-
-      if (response.data.has_sufficient_inventory === false) {
-        const warnings = response.data.warnings || [];
-
-        if (warnings.length > 0) {
-          // Format warning message
-          const warningItems = warnings
-            .map(
-              (w) =>
-                `${w.inventory_name}: ${w.available_quantity} ${w.unit} available, ${w.required_quantity} ${w.unit} needed`
-            )
-            .join("\n");
-
-          // Show warning but allow adding
-          const proceed = await confirm(
-            `Warning: Adding this item may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`,
-            "Inventory Warning"
-          );
-
-          if (!proceed) {
-            return;
-          }
-
-          // Store warning for this item
-          setInventoryWarnings((prev) => ({
-            ...prev,
-            [item.id]: warnings,
-          }));
-        }
-      }
-
-      // If we get here, either inventory is sufficient or user confirmed to proceed
-      onItemSelect(item);
-    } catch (error) {
-      console.error("Error checking inventory:", error);
-      onItemSelect(item);
-    }
-  };
-
   // When a menu item is clicked in the menu panel, either add it to or update the local order details.
+  // We now directly call onItemSelect without checking inventory first
   const onItemSelect = (menuItem) => {
+    // First check if this item is already unavailable
+    if (menuItem.status_id === 2) {
+      alert("This item is currently unavailable!", "Error");
+      return;
+    }
+
     setLocalOrderDetails((prevDetails) => {
       const defaultDiscountId = 0;
       // If there is an active Unli Wings group, add the item to that group.
@@ -258,42 +213,123 @@ const OrderEditModal = ({
     });
   };
 
-  const handleEditOrder = async (payloadWithUpdatedPayment = null) => {
-    // Always use localOrderDetails as the base
-    const validOrderDetails = localOrderDetails.filter(
-      (detail) => detail.menu_item && detail.menu_item.id !== 0
-    );
+  // Function to check inventory before saving changes
+  const checkInventoryBeforeSave = async () => {
+    if (localOrderDetails.length === 0) {
+      await alert(
+        "Please add at least one item before saving changes",
+        "Error"
+      );
+      return false;
+    }
 
-    // Format the order details to match backend expectations
-    const orderDetailsPayload = validOrderDetails.map((detail) => ({
-      menu_id: detail.menu_item.id,
-      quantity: detail.quantity,
-      discount_id: detail.discount?.id || null,
-      instore_category: detail.instore_category
-        ? detail.instore_category.id
-        : null,
-      unli_wings_group: detail.unli_wings_group || null,
-    }));
-
-    console.log("Preparing order payload", {
-      originalCount: localOrderDetails.length,
-      filteredCount: validOrderDetails.length,
-      payload: orderDetailsPayload,
+    // Group items by ID and sum quantities to check total amounts needed
+    const itemQuantityMap = {};
+    localOrderDetails.forEach((item) => {
+      if (!itemQuantityMap[item.menu_item.id]) {
+        itemQuantityMap[item.menu_item.id] = 0;
+      }
+      itemQuantityMap[item.menu_item.id] += item.quantity;
     });
 
-    // Start with either the provided payload or a default one
-    const payload = payloadWithUpdatedPayment || {
-      employee_id: transaction.employee.id,
-      payment_method: transaction.payment_method.id,
-      payment_amount: transaction.payment_amount,
-      reference_id: transaction.reference_id,
-      receipt_image: transaction.receipt_image,
-    };
-
-    // Always ensure order_details is set correctly
-    payload.order_details = orderDetailsPayload;
+    // Check inventory for each menu item
+    let allItemsAvailable = true;
+    let warningMessages = [];
 
     try {
+      // Check each item's inventory
+      for (const [menuId, quantity] of Object.entries(itemQuantityMap)) {
+        const response = await axios.get(
+          `http://127.0.0.1:8000/check-menu-inventory/${menuId}?quantity=${quantity}`
+        );
+
+        if (response.data.has_sufficient_inventory === false) {
+          const warnings = response.data.warnings || [];
+
+          if (warnings.length > 0) {
+            // Find the menu item name
+            const itemName =
+              localOrderDetails.find(
+                (item) => item.menu_item.id.toString() === menuId
+              )?.menu_item.name || "Unknown item";
+
+            // Add to warning messages
+            warnings.forEach((w) => {
+              warningMessages.push(
+                `${itemName}: ${w.inventory_name} - ${w.available_quantity} ${w.unit} available, ${w.required_quantity} ${w.unit} needed`
+              );
+            });
+
+            allItemsAvailable = false;
+          }
+        }
+      }
+
+      // If there are warnings, show them all together
+      if (!allItemsAvailable) {
+        const proceed = await confirm(
+          `Warning: Some items may exceed available inventory! Insufficient ingredients will default to 0 quantity.\n\n${warningMessages.join(
+            "\n"
+          )}\n\nDo you want to continue?`,
+          "Warning"
+        );
+        return proceed;
+      }
+      return true;
+    } catch (error) {
+      console.error("Error checking inventory:", error);
+      const proceed = await confirm(
+        "Error checking inventory. If you proceed, items with insufficient ingredients will have quantity set to 0. Do you want to continue anyway?",
+        "Error"
+      );
+      return proceed;
+    }
+  };
+
+  const handleEditOrder = async (payloadWithUpdatedPayment = null) => {
+    setIsLoading(true);
+    try {
+      // Check inventory before proceeding
+      const canProceed = await checkInventoryBeforeSave();
+      if (!canProceed) {
+        setIsLoading(false);
+        return;
+      }
+
+      // Always use localOrderDetails as the base
+      const validOrderDetails = localOrderDetails.filter(
+        (detail) => detail.menu_item && detail.menu_item.id !== 0
+      );
+
+      // Format the order details to match backend expectations
+      const orderDetailsPayload = validOrderDetails.map((detail) => ({
+        menu_id: detail.menu_item.id,
+        quantity: detail.quantity,
+        discount_id: detail.discount?.id || null,
+        instore_category: detail.instore_category
+          ? detail.instore_category.id
+          : null,
+        unli_wings_group: detail.unli_wings_group || null,
+      }));
+
+      console.log("Preparing order payload", {
+        originalCount: localOrderDetails.length,
+        filteredCount: validOrderDetails.length,
+        payload: orderDetailsPayload,
+      });
+
+      // Start with either the provided payload or a default one
+      const payload = payloadWithUpdatedPayment || {
+        employee_id: transaction.employee.id,
+        payment_method: transaction.payment_method.id,
+        payment_amount: transaction.payment_amount,
+        reference_id: transaction.reference_id,
+        receipt_image: transaction.receipt_image,
+      };
+
+      // Always ensure order_details is set correctly
+      payload.order_details = orderDetailsPayload;
+
       console.log("Sending final payload:", payload);
       const response = await axios.put(
         `http://127.0.0.1:8000/edit-order/${transaction.id}/`,
@@ -315,7 +351,14 @@ const OrderEditModal = ({
         "Error updating order:",
         error.response ? error.response.data : error.message
       );
-      throw error;
+      await alert(
+        `Error updating order: ${
+          error.response?.data?.message || error.message
+        }`,
+        "Error"
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -20,8 +20,9 @@ const TransactionModal = ({
   menuCategories, // Passed from OrderTable
   employees,
   unliWingsCategory,
-  fetchOrderData, // Add this prop for refreshing data
-  payment_methods, // Add this line
+  fetchOrderData,
+  payment_methods,
+  inventoryData,
 }) => {
   if (!isOpen || !transaction) return null;
 
@@ -391,13 +392,70 @@ const TransactionModal = ({
       // Handle success
       console.log("Order status updated:", response.data);
 
-      // Show success message for completed orders
+      // Show detailed inventory information for completed orders
       if (statusId === 2) {
         // Completed
-        await alert(
-          "Order status updated to Completed. Ingredients have been deducted from inventory.",
-          "Status Updated"
-        );
+        // Extract deducted ingredients information from the response
+        const deductedIngredients = response.data.deducted_ingredients || [];
+
+        if (deductedIngredients.length > 0 && inventoryData) {
+          // Create lookup maps for items and units
+          const itemsMap = {};
+          const unitsMap = {};
+
+          // Process items data
+          if (inventoryData.items) {
+            inventoryData.items.forEach((item) => {
+              if (item.id) {
+                itemsMap[item.id] = {
+                  name: item.name,
+                  unit_symbol: item.unit_of_measurement?.symbol || "units",
+                  measurement: item.measurement,
+                };
+              }
+            });
+          }
+
+          // Process units data
+          if (inventoryData.units) {
+            inventoryData.units.forEach((unit) => {
+              if (unit.id) {
+                unitsMap[unit.id] = unit;
+              }
+            });
+          }
+
+          // Format the inventory information message
+          let inventoryMessage =
+            "Order completed successfully. Inventory updated:\n\n";
+
+          deductedIngredients.forEach((item, index) => {
+            // Get the item details
+            const itemData = itemsMap[item.item_id];
+
+            // Get item name
+            const itemName = itemData ? itemData.name : `Item #${item.item_id}`;
+
+            // Get unit symbol
+            const unitSymbol = itemData ? itemData.unit_symbol : "units";
+
+            const deductedAmount = parseFloat(item.deducted_amount).toFixed(2);
+            const newQuantity = parseFloat(item.new_quantity).toFixed(2);
+
+            inventoryMessage += `${
+              index + 1
+            }. ${itemName}: -${deductedAmount} ${unitSymbol} (Remaining: ${newQuantity} ${unitSymbol})\n`;
+          });
+
+          // Display the detailed inventory alert
+          await alert(inventoryMessage, "Inventory Updated");
+        } else {
+          // Fallback to generic message
+          await alert(
+            "Order status updated to Completed. Ingredients have been deducted from inventory.",
+            "Status Updated"
+          );
+        }
       }
 
       // Refresh order data

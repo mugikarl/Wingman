@@ -20,6 +20,7 @@ const OrderTable = () => {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [inventoryData, setInventoryData] = useState(null);
   const location = useLocation();
 
   const openOrderEssentialsModal = () => {
@@ -46,6 +47,17 @@ const OrderTable = () => {
         ? prevFilters.filter((f) => f !== filter)
         : [...prevFilters, filter]
     );
+  };
+
+  const fetchInventoryData = async () => {
+    try {
+      const response = await axios.get(
+        "http://127.0.0.1:8000/fetch-inventory-order-data/"
+      );
+      setInventoryData(response.data);
+    } catch (err) {
+      console.error("Error fetching inventory data:", err);
+    }
   };
 
   // After orderData is fetched:
@@ -117,8 +129,10 @@ const OrderTable = () => {
     console.log("Location state:", location.state); // Debug log
     if (location.state?.refresh) {
       fetchOrderData();
+      fetchInventoryData();
     } else {
       fetchOrderData();
+      fetchInventoryData();
     }
   }, [location.state]);
 
@@ -470,6 +484,7 @@ const OrderTable = () => {
         employees={orderData.employees}
         fetchOrderData={fetchOrderData}
         payment_methods={orderData.payment_methods}
+        inventoryData={inventoryData}
       />
     </div>
   );

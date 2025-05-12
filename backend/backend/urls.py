@@ -41,6 +41,7 @@ urlpatterns = [
     path('delete-menu-category/<int:category_id>/', views.delete_menu_category, name='delete_menu_category'),
     path('fetch-order-data/', views.fetch_order_data, name='fetch_order_data'),
     path('fetch-order-data/<int:transactionId>/', views.fetch_order_data, name='fetch_transaction_data'),
+    path('fetch-inventory-order-data/', views.fetch_inventory_order_data, name='fetch_inventory_order_data'),
     path('add-discount/', views.add_discount, name='add_discount'),
     path('edit-discount/<int:discount_id>/', views.edit_discount, name='edit_discount'),
     path('delete-discount/<int:discount_id>/', views.delete_discount, name='delete_discount'),

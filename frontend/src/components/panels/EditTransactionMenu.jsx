@@ -14,58 +14,12 @@ const EditTransactionMenu = ({
   onItemSelect, // callback when a menu item is selected
 }) => {
   const [inventoryWarnings, setInventoryWarnings] = useState({});
-  const { alert, confirm } = useModal();
-  // New function to check inventory before adding item
-  const handleItemSelect = async (item) => {
-    try {
-      // First check if this item is already unavailable
-      if (item.status_id === 2) {
-        await alert("This item is currently unavailable!", "Error");
-        return;
-      }
+  const { alert } = useModal();
 
-      // Check inventory levels via API
-      const response = await axios.get(
-        `http://127.0.0.1:8000/check-menu-inventory/${item.id}?quantity=1`
-      );
-
-      if (response.data.has_sufficient_inventory === false) {
-        const warnings = response.data.warnings || [];
-
-        if (warnings.length > 0) {
-          // Format warning message
-          const warningItems = warnings
-            .map(
-              (w) =>
-                `${w.inventory_name}: ${w.available_quantity} ${w.unit} available, ${w.required_quantity} ${w.unit} needed`
-            )
-            .join("\n");
-
-          // Show warning but allow adding
-          const proceed = await confirm(
-            `Warning: Adding this item may exceed available inventory!\n\n${warningItems}\n\nDo you want to continue?`,
-            "Warning"
-          );
-
-          if (!proceed) {
-            return;
-          }
-
-          // Store warning for this item
-          setInventoryWarnings((prev) => ({
-            ...prev,
-            [item.id]: warnings,
-          }));
-        }
-      }
-
-      // If we get here, either inventory is sufficient or user confirmed to proceed
-      onItemSelect(item);
-    } catch (error) {
-      console.error("Error checking inventory:", error);
-      // Still allow adding if check fails
-      onItemSelect(item);
-    }
+  // Simplified handleItemSelect - just check if item is unavailable
+  const handleItemSelect = (item) => {
+    // The availability check is already done in the parent's onItemSelect
+    onItemSelect(item);
   };
 
   return (
