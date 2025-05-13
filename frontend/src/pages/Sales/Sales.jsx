@@ -28,6 +28,13 @@ const Sales = () => {
     direction: "ascending",
   });
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(7);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [displayData, setDisplayData] = useState([]);
+
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -227,7 +234,7 @@ const Sales = () => {
         { sales: 0, expenses: 0, netIncome: 0 }
       );
 
-      setData([
+      const formattedData = [
         ...displayData,
         {
           date: "Total",
@@ -235,7 +242,13 @@ const Sales = () => {
           expenses: totalValues.expenses,
           netIncome: totalValues.netIncome,
         },
-      ]);
+      ];
+
+      setData(formattedData);
+      const dataWithoutTotal = displayData.length;
+      setTotalItems(dataWithoutTotal);
+      setTotalPages(Math.ceil(displayData.length / itemsPerPage));
+      setCurrentPage(1);
     } catch (err) {
       console.error("Error fetching sales data:", err);
       setError(err.message || "Error fetching data");
@@ -249,6 +262,52 @@ const Sales = () => {
   useEffect(() => {
     fetchSalesData();
   }, [month]);
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+
+    if (totalPages <= maxPagesToShow) {
+      // Show all pages if total pages is less than max to show
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Show first page, current page, and surrounding pages
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 5; i++) {
+          pages.push(i);
+        }
+      } else if (currentPage >= totalPages - 2) {
+        for (let i = totalPages - 4; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        for (let i = currentPage - 2; i <= currentPage + 2; i++) {
+          pages.push(i);
+        }
+      }
+    }
+
+    return pages;
+  };
+
+  // Handle page change
+  const handlePageChange = (page) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
+
+  // Calculate the visible data for the current page
+  useEffect(() => {
+    const sortedData = getSortedData();
+    const filteredData = sortedData.filter((row) => row.date !== "Total");
+
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, filteredData.length);
+    setDisplayData(filteredData.slice(startIndex, endIndex));
+  }, [data, currentPage, itemsPerPage, sortConfig]);
 
   // Event Handlers
   const handleExportClick = () => setIsModalOpen(true);
@@ -332,14 +391,6 @@ const Sales = () => {
       maximumFractionDigits: 2,
     })}`;
   };
-
-  if (loading) {
-    return (
-      <div className="w-full flex justify-center items-center">
-        <LoadingScreen message="Loading sales data" />
-      </div>
-    );
-  }
 
   if (error) {
     return <div className="p-4 text-red-500">Error: {error}</div>;
@@ -441,147 +492,258 @@ const Sales = () => {
       </div>
 
       {/* Table with sticky header & scrollable content */}
-      <div
-        className="relative shadow-md rounded-b-sm overflow-y-auto"
-        style={{ maxHeight: "calc(100vh - 290px)" }}
-      >
-        <table className="w-full text-sm text-left text-gray-500 table-auto">
-          <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
-            <tr>
-              {["Date", "Sales", "Expenses", "Net Income"].map(
-                (column, index) => (
-                  <th
-                    key={index}
-                    scope="col"
-                    className="px-6 py-4 font-medium text-left cursor-pointer"
-                    onClick={() =>
-                      requestSort(
-                        index === 0
+      <div className="relative shadow-md rounded-b-sm border border-gray-300 border-t-0 flex flex-col">
+        <div className="overflow-y-auto">
+          <table className="w-full text-sm text-left text-gray-500 table-auto">
+            <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
+              <tr>
+                {["Date", "Sales", "Expenses", "Net Income"].map(
+                  (column, index) => (
+                    <th
+                      key={index}
+                      scope="col"
+                      className="px-6 py-4 font-medium text-left cursor-pointer"
+                      onClick={() =>
+                        requestSort(
+                          index === 0
+                            ? "date"
+                            : index === 1
+                            ? "sales"
+                            : index === 2
+                            ? "expenses"
+                            : "netIncome"
+                        )
+                      }
+                    >
+                      <div className="flex items-center">
+                        {column}
+                        {sortConfig.key ===
+                        (index === 0
                           ? "date"
                           : index === 1
                           ? "sales"
                           : index === 2
                           ? "expenses"
-                          : "netIncome"
-                      )
-                    }
-                  >
-                    <div className="flex items-center">
-                      {column}
-                      {sortConfig.key ===
-                      (index === 0
-                        ? "date"
-                        : index === 1
-                        ? "sales"
-                        : index === 2
-                        ? "expenses"
-                        : "netIncome") ? (
-                        <span className="ml-1.5">
-                          {sortConfig.direction === "ascending" ? (
-                            <FaSortUp className="inline h-3 w-3 text-white" />
-                          ) : (
-                            <FaSortDown className="inline h-3 w-3 text-white" />
-                          )}
-                        </span>
-                      ) : (
-                        <span className="ml-1.5 text-gray-300 opacity-30">
-                          <svg
-                            className="w-3 h-3"
-                            aria-hidden="true"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path d="M8.574 11.024h6.852a2.075 2.075 0 0 0 1.847-1.086 1.9 1.9 0 0 0-.11-1.986L13.736 2.9a2.122 2.122 0 0 0-3.472 0L6.837 7.952a1.9 1.9 0 0 0-.11 1.986 2.074 2.074 0 0 0 1.847 1.086Zm6.852 1.952H8.574a2.072 2.072 0 0 0-1.847 1.087 1.9 1.9 0 0 0 .11 1.985l3.426 5.05a2.123 2.123 0 0 0 3.472 0l3.427-5.05a1.9 1.9 0 0 0 .11-1.985 2.074 2.074 0 0 0-1.846-1.087Z" />
-                          </svg>
-                        </span>
-                      )}
-                    </div>
-                  </th>
-                )
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {getSortedData().filter((row) => row.date !== "Total").length >
-            0 ? (
-              getSortedData()
-                .filter((row) => row.date !== "Total")
-                .map((row, rowIndex) => (
-                  <tr
-                    key={rowIndex}
-                    className={`${
-                      rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"
-                    } border-b hover:bg-gray-200 group cursor-pointer`}
-                    onClick={() => handleRowClick(row)}
-                  >
-                    <td className="px-6 py-4 font-normal text-left text-gray-700 group-hover:text-gray-900">
-                      {row.date}
-                    </td>
-                    <td className="px-6 py-4 font-normal text-left text-green-600">
-                      {formatCurrency(row.sales)}
-                    </td>
-                    <td className="px-6 py-4 font-normal text-left text-red-600">
-                      {formatCurrency(row.expenses)}
-                    </td>
+                          : "netIncome") ? (
+                          <span className="ml-1.5">
+                            {sortConfig.direction === "ascending" ? (
+                              <FaSortUp className="inline h-3 w-3 text-white" />
+                            ) : (
+                              <FaSortDown className="inline h-3 w-3 text-white" />
+                            )}
+                          </span>
+                        ) : (
+                          <span className="ml-1.5 text-gray-300 opacity-30">
+                            <svg
+                              className="w-3 h-3"
+                              aria-hidden="true"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path d="M8.574 11.024h6.852a2.075 2.075 0 0 0 1.847-1.086 1.9 1.9 0 0 0-.11-1.986L13.736 2.9a2.122 2.122 0 0 0-3.472 0L6.837 7.952a1.9 1.9 0 0 0-.11 1.986 2.074 2.074 0 0 0 1.847 1.086Zm6.852 1.952H8.574a2.072 2.072 0 0 0-1.847 1.087 1.9 1.9 0 0 0 .11 1.985l3.426 5.05a2.123 2.123 0 0 0 3.472 0l3.427-5.05a1.9 1.9 0 0 0 .11-1.985 2.074 2.074 0 0 0-1.846-1.087Z" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  )
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <>
+                  <tr className="bg-white">
                     <td
-                      className={`px-6 py-4 font-normal text-left ${
-                        row.netIncome >= 0 ? "text-green-600" : "text-red-600"
-                      }`}
+                      className="px-6 py-16 text-center font-normal text-gray-500"
+                      colSpan={4}
                     >
-                      {formatCurrency(row.netIncome)}
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#CC5500] mb-4"></div>
+                        <p className="text-base">Loading sales data...</p>
+                      </div>
                     </td>
                   </tr>
-                ))
-            ) : (
-              <tr className="bg-white border-b">
-                <td
-                  className="px-6 py-4 text-center font-normal text-gray-500 italic"
-                  colSpan={4}
-                >
-                  No sales data available
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Footer: TOTAL displayed as footer only */}
-      {data.some((row) => row.date === "Total") && (
-        <div className="sticky bottom-0 w-full border-t-2 border-[#CC5500]">
-          <table className="w-full text-sm text-left">
-            <tfoot>
-              <tr className="bg-white">
-                {data
-                  .filter((row) => row.date === "Total")
-                  .map((totalRow, index) => (
-                    <React.Fragment key={index}>
-                      <td className="px-6 py-4 font-bold text-left text-gray-900">
-                        TOTAL
+                </>
+              ) : displayData.length > 0 ? (
+                <>
+                  {displayData.map((row, rowIndex) => (
+                    <tr
+                      key={rowIndex}
+                      className={`${
+                        rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"
+                      } border-b hover:bg-gray-200 group cursor-pointer`}
+                      onClick={() => handleRowClick(row)}
+                    >
+                      <td className="px-6 py-4 font-normal text-left text-gray-700 group-hover:text-gray-900">
+                        {row.date}
                       </td>
-                      <td className="px-6 py-4 font-bold text-left text-green-600">
-                        {formatCurrency(totalRow.sales)}
+                      <td className="px-6 py-4 font-normal text-left text-green-600">
+                        {formatCurrency(row.sales)}
                       </td>
-                      <td className="px-6 py-4 font-bold text-left text-red-600">
-                        {formatCurrency(totalRow.expenses)}
+                      <td className="px-6 py-4 font-normal text-left text-red-600">
+                        {formatCurrency(row.expenses)}
                       </td>
                       <td
-                        className={`px-6 py-4 font-bold text-left ${
-                          totalRow.netIncome >= 0
-                            ? "text-green-600"
-                            : "text-red-600"
+                        className={`px-6 py-4 font-normal text-left ${
+                          row.netIncome >= 0 ? "text-green-600" : "text-red-600"
                         }`}
                       >
-                        {formatCurrency(totalRow.netIncome)}
+                        {formatCurrency(row.netIncome)}
                       </td>
-                    </React.Fragment>
+                    </tr>
                   ))}
-              </tr>
-            </tfoot>
+                  {/* Fill remaining space with empty rows when fewer than itemsPerPage */}
+                  {displayData.length < itemsPerPage &&
+                    Array.from({
+                      length: itemsPerPage - displayData.length,
+                    }).map((_, index) => (
+                      <tr
+                        key={`empty-${index}`}
+                        className={`${
+                          (displayData.length + index) % 2 === 0
+                            ? "bg-white"
+                            : "bg-gray-50"
+                        } border-b`}
+                        style={{ height: "64px" }}
+                      >
+                        <td colSpan={4}>&nbsp;</td>
+                      </tr>
+                    ))}
+                </>
+              ) : (
+                <>
+                  <tr className="bg-white border-b">
+                    <td
+                      className="px-6 py-4 text-center font-normal text-gray-500 italic"
+                      colSpan={4}
+                    >
+                      No sales data available
+                    </td>
+                  </tr>
+                </>
+              )}
+            </tbody>
           </table>
         </div>
-      )}
+
+        {/* Sticky footer and pagination */}
+        <div className="sticky bottom-0 left-0 right-0 bg-white z-10 w-full">
+          {/* Totals row */}
+          {!loading && data.some((row) => row.date === "Total") && (
+            <table className="w-full text-sm text-left text-gray-500 table-auto">
+              <tfoot>
+                <tr className="bg-white border-t-2 border-[#CC5500]">
+                  {data
+                    .filter((row) => row.date === "Total")
+                    .map((totalRow, index) => (
+                      <React.Fragment key={index}>
+                        <td className="px-6 py-4 font-bold text-left text-gray-900">
+                          TOTAL
+                        </td>
+                        <td className="px-6 py-4 font-bold text-left text-green-600">
+                          {formatCurrency(totalRow.sales)}
+                        </td>
+                        <td className="px-6 py-4 font-bold text-left text-red-600">
+                          {formatCurrency(totalRow.expenses)}
+                        </td>
+                        <td
+                          className={`px-6 py-4 font-bold text-left ${
+                            totalRow.netIncome >= 0
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {formatCurrency(totalRow.netIncome)}
+                        </td>
+                      </React.Fragment>
+                    ))}
+                </tr>
+              </tfoot>
+            </table>
+          )}
+
+          {/* Pagination section */}
+          <div className="bg-gray-100 border-t border-gray-300 px-6 py-3">
+            <div className="flex flex-col md:flex-row justify-between items-center">
+              <div className="text-sm text-gray-700 mb-2 md:mb-0">
+                Showing{" "}
+                {totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} to{" "}
+                {Math.min(currentPage * itemsPerPage, totalItems)} of{" "}
+                {totalItems} entries
+              </div>
+
+              <nav aria-label="Table pagination">
+                <ul className="flex items-center -space-x-px h-8 text-sm">
+                  <li>
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1 || loading}
+                      className={`flex items-center justify-center px-3 h-8 ms-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-100 hover:text-[#CC5500] ${
+                        currentPage === 1 || loading
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      }`}
+                    >
+                      Previous
+                    </button>
+                  </li>
+
+                  {getPageNumbers().map((page, index) => (
+                    <li key={index}>
+                      <button
+                        onClick={() => handlePageChange(page)}
+                        disabled={loading}
+                        className={`flex items-center justify-center px-3 h-8 leading-tight ${
+                          currentPage === page
+                            ? "text-white bg-[#CC5500] border border-[#CC5500] hover:bg-[#B34700]"
+                            : "text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-[#CC5500]"
+                        } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                      >
+                        {page}
+                      </button>
+                    </li>
+                  ))}
+
+                  <li>
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages || loading}
+                      className={`flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-100 hover:text-[#CC5500] ${
+                        currentPage === totalPages || loading
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      }`}
+                    >
+                      Next
+                    </button>
+                  </li>
+                </ul>
+              </nav>
+
+              <div className="flex items-center gap-2 mr-4">
+                <span className="text-sm text-gray-700">Page</span>
+                <select
+                  value={currentPage}
+                  onChange={(e) => handlePageChange(Number(e.target.value))}
+                  disabled={loading}
+                  className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-[#CC5500] focus:border-[#CC5500] block p-2"
+                >
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (page) => (
+                      <option key={page} value={page}>
+                        {page}
+                      </option>
+                    )
+                  )}
+                </select>
+                <span className="text-sm text-gray-700">of {totalPages}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <ExportSales
         isOpen={isModalOpen}
