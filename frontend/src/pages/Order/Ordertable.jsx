@@ -161,7 +161,7 @@ const OrderTable = () => {
 
   return (
     <div className="h-screen p-4 bg-[#fcf4dc]">
-      <div className="flex mb-4">
+      <div className="flex justify-between mb-4">
         {/* Search Bar with icon and separator */}
         <div className="flex w-[400px]">
           <div className="relative flex-grow">
@@ -180,6 +180,16 @@ const OrderTable = () => {
             />
           </div>
         </div>
+
+        {/* Add New Order button aligned with search bar */}
+        <Link to="/order">
+          <button className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden">
+            <div className="flex items-center justify-center border-r p-3">
+              <BiFoodMenu className="w-5 h-5 text-[#CC5500]" />
+            </div>
+            <span className="flex-1 text-left pl-3">Add New Order</span>
+          </button>
+        </Link>
       </div>
 
       <div className="flex justify-between items-start">
@@ -258,15 +268,8 @@ const OrderTable = () => {
           </div>
         </div>
 
-        <div className="flex flex-col space-y-2">
-          <Link to="/order">
-            <button className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden">
-              <div className="flex items-center justify-center border-r p-3">
-                <BiFoodMenu className="w-5 h-5 text-[#CC5500]" />
-              </div>
-              <span className="flex-1 text-left pl-3">Add New Order</span>
-            </button>
-          </Link>
+        {/* Order Essentials button in second row */}
+        <div className="mt-2">
           <button
             onClick={openOrderEssentialsModal}
             className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"

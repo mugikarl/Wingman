@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Datepicker } from "flowbite-react";
 import { FaSortUp, FaSortDown } from "react-icons/fa";
 import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
@@ -23,6 +23,13 @@ const TableWithDatePicker = ({
   );
   const [showDatepicker, setShowDatepicker] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [totalItems, setTotalItems] = useState(data.length);
+  const [totalPages, setTotalPages] = useState(Math.ceil(data.length / itemsPerPage));
+  const [displayData, setDisplayData] = useState([]);
 
   // Display the selected date in a human-friendly format
   const displayDate = new Date(selectedDate).toDateString();
@@ -88,6 +95,53 @@ const TableWithDatePicker = ({
     }
     return sortableData;
   }, [data, sortConfig]);
+  
+  // Calculate page details when dependencies change
+  useEffect(() => {
+    setTotalItems(sortedData.length);
+    setTotalPages(Math.ceil(sortedData.length / itemsPerPage));
+    
+    // Calculate the visible data for the current page
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, sortedData.length);
+    setDisplayData(sortedData.slice(startIndex, endIndex));
+  }, [sortedData, currentPage, itemsPerPage]);
+  
+  // Handle page change
+  const handlePageChange = (page) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
+  
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+    
+    if (totalPages <= maxPagesToShow) {
+      // Show all pages if total pages is less than max to show
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Show first page, current page, and surrounding pages
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 5; i++) {
+          pages.push(i);
+        }
+      } else if (currentPage >= totalPages - 2) {
+        for (let i = totalPages - 4; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        for (let i = currentPage - 2; i <= currentPage + 2; i++) {
+          pages.push(i);
+        }
+      }
+    }
+    
+    return pages;
+  };
 
   // Default theme for the date picker
   const defaultTheme = {
@@ -178,6 +232,24 @@ const TableWithDatePicker = ({
 
   return (
     <div className="flex flex-col">
+      <div className="flex items-center justify-end mb-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-700">Page</span>
+          <select
+            value={currentPage}
+            onChange={(e) => handlePageChange(Number(e.target.value))}
+            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-[#CC5500] focus:border-[#CC5500] block p-2.5"
+          >
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <option 
+                key={page} value={page}>
+                {page}
+              </option>
+            ))}
+          </select>
+          <span className="text-sm text-gray-700">of {totalPages}</span>
+        </div>
+      </div>
       {/* Date picker navigation */}
       <div className="bg-[#cc5500] text-lg font-semibold w-full rounded-t-sm flex justify-between items-center relative shadow-md">
         <button
@@ -222,6 +294,9 @@ const TableWithDatePicker = ({
           </div>
         )}
       </div>
+      
+      {/* Table Display Controls and Top Pagination in same row */}
+      
 
       {/* Table - with sticky header and scrollable content */}
       <div
@@ -267,8 +342,8 @@ const TableWithDatePicker = ({
             </tr>
           </thead>
           <tbody>
-            {sortedData.length > 0 ? (
-              sortedData.map((row, rowIndex) => (
+            {displayData.length > 0 ? (
+              displayData.map((row, rowIndex) => (
                 <tr
                   key={rowIndex}
                   className={`
@@ -302,6 +377,52 @@ const TableWithDatePicker = ({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Bottom Pagination */}
+      <div className="flex flex-col md:flex-row justify-between items-center mt-4">
+        <div className="text-sm text-gray-700 mb-2 md:mb-0">
+          Showing {totalItems > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} entries
+        </div>
+        
+        <nav aria-label="Table pagination">
+          <ul className="flex items-center -space-x-px h-8 text-sm">
+            <li>
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`flex items-center justify-center px-3 h-8 ms-0 leading-tight text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-100 hover:text-[#CC5500] ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                Previous
+              </button>
+            </li>
+            
+            {getPageNumbers().map((page, index) => (
+              <li key={index}>
+                <button
+                  onClick={() => handlePageChange(page)}
+                  className={`flex items-center justify-center px-3 h-8 leading-tight ${
+                    currentPage === page
+                      ? 'text-white bg-[#CC5500] border border-[#CC5500] hover:bg-[#B34700]'
+                      : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-[#CC5500]'
+                  }`}
+                >
+                  {page}
+                </button>
+              </li>
+            ))}
+            
+            <li>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={`flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-100 hover:text-[#CC5500] ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                Next
+              </button>
+            </li>
+          </ul>
+        </nav>
       </div>
 
       {/* Add CSS to ensure no top rounded borders on the table */}
