@@ -496,13 +496,7 @@ const DailySales = ({
           <h1 className="text-xl font-semibold">
             Daily Sales for {displayDate}
           </h1>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setIsAddExpenseOpen(true)}
-              className=" bg-[#CC5500] text-white px-4 py-2 rounded-lg shadow min-w-[140px] hover:bg-[#b34d00]"
-            >
-              Add Expense
-            </button>
+          <div className="flex items-center">
             <button
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700"
@@ -597,9 +591,9 @@ const DailySales = ({
           ) : (
             <div className="flex flex-col h-full relative">
               {/* Table container */}
-              <div className="overflow-auto flex-1">
-                <table className="w-full text-sm text-left text-gray-500 relative">
-                  <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 ">
+              <div className="overflow-y-auto flex-1">
+                <table className="w-full text-sm text-left text-gray-500">
+                  <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
                     <tr>
                       {getColumnsForFilterType().map((column, index) => (
                         <th
@@ -622,7 +616,7 @@ const DailySales = ({
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="relative">
+                  <tbody>
                     {filteredItems.length > 0 ? (
                       filteredItems.map((row, rowIndex) => (
                         <tr

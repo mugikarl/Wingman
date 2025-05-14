@@ -276,7 +276,7 @@ const TableWithDatePicker = ({
 
       {/* Table - with sticky header and scrollable content */}
       <div
-        className="relative shadow-md rounded-b-sm overflow-y-auto border border-gray-300 border-t-0"
+        className="relative  overflow-y-auto border-t-0"
         style={{ maxHeight }}
       >
         <table className="w-full text-sm text-left rtl:text-right text-gray-500 table-auto">
