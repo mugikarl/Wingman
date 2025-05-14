@@ -3466,13 +3466,18 @@ def add_order(request):
                         if not unli_wings_groups[unli_wings_group]["discount_id"] and discount_id:
                             unli_wings_groups[unli_wings_group]["discount_id"] = discount_id
                     unli_wings_groups[unli_wings_group]["total_quantity"] += quantity
+                    
+                    # Store the base_amount at creation time
+                    current_base_amount = instore_categories[instore_category_id]["base_amount"]
+                    
                     order_items.append({
                         "transaction_id": transaction_id,
                         "menu_id": menu_id,
                         "quantity": quantity,
                         "discount_id": discount_id,
                         "instore_category": instore_category_id,
-                        "unli_wings_group": unli_wings_group
+                        "unli_wings_group": unli_wings_group,
+                        "base_amount": current_base_amount  # Store the base amount
                     })
                 else:
                     return Response({"error": "Invalid In-Store Category."}, status=status.HTTP_400_BAD_REQUEST)
@@ -3511,7 +3516,15 @@ def add_order(request):
         
         # Process Unli Wings groups pricing (if any)
         for group_key, group in unli_wings_groups.items():
-            base_price = instore_categories[group["instore_category_id"]]["base_amount"]
+            # Find the first order item for this group to get its stored base_amount
+            group_base_amount = None
+            for item in order_items:
+                if item.get("unli_wings_group") == group_key:
+                    group_base_amount = item.get("base_amount")
+                    break
+            
+            # If no stored base_amount found, fall back to the category base_amount
+            base_price = group_base_amount or instore_categories[group["instore_category_id"]]["base_amount"]
             price = base_price
             discount_percentage = 0
             if group["discount_id"]:
@@ -3567,6 +3580,18 @@ def edit_order(request, transaction_id):
         if not order_details:
             return Response({"error": "No order details provided."}, status=400)
         
+        existing_order_details = None
+        try:
+            existing_response = supabase_anon.table("order_details").select("*").eq("transaction_id", transaction_id).execute()
+            if existing_response and existing_response.data:
+                existing_order_details = {
+                    f"{detail.get('menu_id')}-{detail.get('unli_wings_group')}": detail.get('base_amount') 
+                    for detail in existing_response.data 
+                    if detail.get('unli_wings_group')
+                }
+        except Exception as e:
+            print(f"Error fetching existing order details: {str(e)}")
+            
         # Validate the existing transaction record
         existing_transaction_response = supabase_anon.table("transaction").select("id").eq("id", transaction_id).execute()
         if not existing_transaction_response.data:
@@ -3720,6 +3745,7 @@ def edit_order(request, transaction_id):
                         "instore_category": instore_category_id,
                         "unli_wings_group": None
                     })
+
                 elif instore_category["name"] == "Unli Wings":
                     unli_wings_group = order.get("unli_wings_group")
                     if not unli_wings_group:
@@ -3735,13 +3761,23 @@ def edit_order(request, transaction_id):
                         if not unli_wings_groups[unli_wings_group]["discount_id"] and discount_id:
                             unli_wings_groups[unli_wings_group]["discount_id"] = discount_id
                     unli_wings_groups[unli_wings_group]["total_quantity"] += quantity
+                    
+                    # Check if we're editing an existing order with saved base_amount
+                    existing_base_amount = None
+                    if "base_amount" in order:
+                        existing_base_amount = order.get("base_amount")
+                    
+                    # Use existing base_amount if available, otherwise use current category value
+                    current_base_amount = existing_base_amount or instore_categories[instore_category_id]["base_amount"]
+                    
                     order_items.append({
                         "transaction_id": transaction_id,
                         "menu_id": menu_id,
                         "quantity": quantity,
                         "discount_id": discount_id,
                         "instore_category": instore_category_id,
-                        "unli_wings_group": unli_wings_group
+                        "unli_wings_group": unli_wings_group,
+                        "base_amount": current_base_amount  # Use preserved base amount
                     })
                 else:
                     return Response({"error": "Invalid In-Store Category."}, status=400)
@@ -3778,7 +3814,15 @@ def edit_order(request, transaction_id):
         
         # Process Unli Wings groups pricing
         for group_key, group in unli_wings_groups.items():
-            base_price = instore_categories[group["instore_category_id"]]["base_amount"]
+            # Find the base_amount from the first order item in this group
+            group_base_amount = None
+            for item in order_items:
+                if item.get("unli_wings_group") == group_key:
+                    group_base_amount = item.get("base_amount")
+                    break
+            
+            # If no stored base_amount found, fall back to the category base_amount
+            base_price = group_base_amount or instore_categories[group["instore_category_id"]]["base_amount"]
             price = base_price
             discount_percentage = discounts.get(group["discount_id"], 0) if group["discount_id"] else 0
             if discount_percentage:

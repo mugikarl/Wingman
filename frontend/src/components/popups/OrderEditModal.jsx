@@ -100,6 +100,11 @@ const OrderEditModal = ({
               (detail) =>
                 detail.unli_wings_group === activeUnliWingsGroup &&
                 detail.instore_category?.id === 2
+            )?.base_amount ||
+            prevDetails.find(
+              (detail) =>
+                detail.unli_wings_group === activeUnliWingsGroup &&
+                detail.instore_category?.id === 2
             )?.instore_category?.base_amount ||
             unliWingsCategory?.base_amount ||
             0;
@@ -113,6 +118,7 @@ const OrderEditModal = ({
             // Assign the active Unli Wings group and use the group's base_amount.
             unli_wings_group: activeUnliWingsGroup,
             instore_category: { id: 2, base_amount: groupBaseAmount },
+            base_amount: groupBaseAmount, // Also store directly on the detail
           };
           return [...prevDetails, newDetail];
         }
