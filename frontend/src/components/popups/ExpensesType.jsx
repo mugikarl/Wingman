@@ -20,8 +20,13 @@ const ExpensesType = ({
   const [deletingDots, setDeletingDots] = useState("");
   const { alert, confirm } = useModal();
 
-  // Sort expenses types alphabetically by name
-  const sortedExpensesTypes = [...expensesTypes].sort((a, b) => a.id - b.id);
+  // Define protected expense types that cannot be edited
+  const protectedTypes = ["Stock In", "Operational Expenses", "Others"];
+
+  // Sort expenses types alphabetically by name and filter out protected types
+  const filteredExpensesTypes = [...expensesTypes]
+    .filter((type) => !protectedTypes.includes(type.name))
+    .sort((a, b) => a.id - b.id);
 
   // Handle loading text animations
   useEffect(() => {
@@ -58,6 +63,12 @@ const ExpensesType = ({
   const handleAddExpenseType = async () => {
     if (!expenseTypeName.trim()) {
       await alert("Please enter an expense type name", "Error");
+      return;
+    }
+
+    // Prevent adding duplicates of protected types
+    if (protectedTypes.includes(expenseTypeName.trim())) {
+      await alert("This expense type is reserved and cannot be added", "Error");
       return;
     }
 
@@ -102,7 +113,7 @@ const ExpensesType = ({
 
     setIsSubmitting(true);
 
-    const expenseTypeId = sortedExpensesTypes[selectedIndex]?.id;
+    const expenseTypeId = filteredExpensesTypes[selectedIndex]?.id;
 
     if (!expenseTypeId) {
       console.error("Error: No expense type ID found!");
@@ -155,7 +166,7 @@ const ExpensesType = ({
     try {
       const token = localStorage.getItem("access_token");
       await axios.delete(
-        `http://127.0.0.1:8000/delete-expense-type/${sortedExpensesTypes[selectedIndex].id}/`,
+        `http://127.0.0.1:8000/delete-expense-type/${filteredExpensesTypes[selectedIndex].id}/`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -271,8 +282,8 @@ const ExpensesType = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedExpensesTypes.length > 0 ? (
-                    sortedExpensesTypes.map((expenseType, index) => (
+                  {filteredExpensesTypes.length > 0 ? (
+                    filteredExpensesTypes.map((expenseType, index) => (
                       <tr
                         key={index}
                         className={`${

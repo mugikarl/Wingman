@@ -15,6 +15,7 @@ const AddExpense = ({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingDots, setLoadingDots] = useState("");
+  const [isOthersSelected, setIsOthersSelected] = useState(false);
 
   useEffect(() => {
     if (defaultDate) {
@@ -46,18 +47,32 @@ const AddExpense = ({
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setExpenseDetails({ ...expenseDetails, [name]: value });
+
+    // Check if "Others" is selected to show/hide note field
+    if (name === "expenseType") {
+      const selectedType = expenseTypes.find(
+        (type) => type.id.toString() === value
+      );
+      setIsOthersSelected(selectedType?.name === "Others");
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate form - Remove note from required fields
+    // Validate form
     if (
       !expenseDetails.date ||
       !expenseDetails.amount ||
       !expenseDetails.expenseType
     ) {
       alert("Please fill all required fields.");
+      return;
+    }
+
+    // Validate note is required when "Others" is selected
+    if (isOthersSelected && !expenseDetails.note.trim()) {
+      alert("Please provide a note for 'Others' expense type.");
       return;
     }
 
@@ -86,6 +101,31 @@ const AddExpense = ({
       setIsSubmitting(false);
     }
   };
+
+  // Organize expense types to ensure "Others" appears at the bottom
+  const organizedExpenseTypes = React.useMemo(() => {
+    const filteredTypes = expenseTypes.filter(
+      (type) => type.name !== "Stock In"
+    );
+
+    // Find "Others" item
+    const othersItem = filteredTypes.find((type) => type.name === "Others");
+
+    // Remove "Others" from the array
+    const remainingTypes = filteredTypes.filter(
+      (type) => type.name !== "Others"
+    );
+
+    // Sort remaining types by ID
+    const sortedTypes = [...remainingTypes].sort((a, b) => a.id - b.id);
+
+    // Add "Others" at the end if it exists
+    if (othersItem) {
+      return [...sortedTypes, othersItem];
+    }
+
+    return sortedTypes;
+  }, [expenseTypes]);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
@@ -148,29 +188,33 @@ const AddExpense = ({
               <option value="" hidden>
                 Select Type
               </option>
-              {expenseTypes
-                .filter((type) => type.name !== "Stock In")
-                .map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name}
-                  </option>
-                ))}
+              {organizedExpenseTypes.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name}
+                </option>
+              ))}
             </select>
           </div>
 
-          {/* Note */}
-          <div>
-            <label className="block text-sm font-medium">Note</label>
-            <input
-              type="text"
-              id="note"
-              name="note"
-              value={expenseDetails.note}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded-lg"
-              disabled={isSubmitting}
-            />
-          </div>
+          {/* Note - Only display when "Others" is selected */}
+          {isOthersSelected && (
+            <div>
+              <label className="block text-sm font-medium">
+                Note <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="note"
+                name="note"
+                value={expenseDetails.note}
+                onChange={handleInputChange}
+                className="w-full p-2 border rounded-lg"
+                required
+                disabled={isSubmitting}
+                placeholder="Please specify the expense details"
+              />
+            </div>
+          )}
 
           {/* Modal Footer */}
           <div className="flex justify-end mt-4">
