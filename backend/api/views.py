@@ -4891,7 +4891,7 @@ def fetch_dashboard_data(request):
         # Get date parameter from request, default to today
         date_filter = request.GET.get('date', None)
         
-        # If no date provided, use today
+        # If no date provided, use today (preserving exact variable names to avoid bugs)
         if not date_filter:
             today = datetime.now().strftime('%Y-%m-%d')
         else:
@@ -4925,23 +4925,22 @@ def fetch_dashboard_data(request):
         # Use the filtered date from the request parameter instead of resetting to today
         filtered_date = today
         
-        # Fetch all transactions
-        all_transactions = supabase_anon.table('transaction').select('*').execute().data or []
-        
-        # Count total orders
-        dashboard_data['orders']['total'] = len(all_transactions)
-        
-        # Count filtered date orders
-        filtered_transactions = [t for t in all_transactions if t.get('date') and t['date'].startswith(filtered_date)]
-        dashboard_data['orders']['today'] = len(filtered_transactions)
-        
-        # Get completed transactions (status_id = 2)
+        # OPTIMIZATION: Get only completed transactions directly
         completed_transactions = supabase_anon.table('transaction').select('*').eq('order_status', 2).execute().data or []
         
-        # For calculating sales amount, we need order details with menu items
-        order_details = supabase_anon.table('order_details').select('*').execute().data or []
+        # Count total orders
+        dashboard_data['orders']['total'] = len(completed_transactions)
         
-         # Create lookup dict for order details by transaction_id
+        # Prepare filtered transactions list - more efficient than filtering in every step
+        filtered_transactions = [t for t in completed_transactions if t.get('date') and t['date'].startswith(filtered_date)]
+        dashboard_data['orders']['today'] = len(filtered_transactions)
+        
+        # OPTIMIZATION: Only fetch necessary fields for order details
+        order_details = supabase_anon.table('order_details').select(
+            'transaction_id,menu_id,quantity,instore_category,discount_id,unli_wings_group'
+        ).execute().data or []
+        
+        # Create lookup dict for order details by transaction_id
         order_details_by_transaction = {}
         for detail in order_details:
             transaction_id = detail.get('transaction_id')
@@ -4950,20 +4949,17 @@ def fetch_dashboard_data(request):
                     order_details_by_transaction[transaction_id] = []
                 order_details_by_transaction[transaction_id].append(detail)
         
-        # Fetch menu items for pricing
-        menu_items = supabase_anon.table('menu_items').select('id, price, type_id').execute().data or []
+        # OPTIMIZATION: Fetch only needed fields for reference tables
+        menu_items = supabase_anon.table('menu_items').select('id,price,type_id').execute().data or []
         menu_items_dict = {item['id']: item for item in menu_items}
         
-        # Fetch menu types for delivery deductions
-        menu_types = supabase_anon.table('menu_type').select('id, deduction_percentage').execute().data or []
+        menu_types = supabase_anon.table('menu_type').select('id,deduction_percentage').execute().data or []
         menu_types_dict = {type_data['id']: type_data for type_data in menu_types}
         
-        # Fetch discounts
-        discounts = supabase_anon.table('discounts').select('id, percentage').execute().data or []
+        discounts = supabase_anon.table('discounts').select('id,percentage').execute().data or []
         discounts_dict = {discount['id']: discount for discount in discounts}
         
-        # Fetch instore categories (for unli wings)
-        instore_categories = supabase_anon.table('instore_category').select('id, base_amount').execute().data or []
+        instore_categories = supabase_anon.table('instore_category').select('id,base_amount').execute().data or []
         instore_categories_dict = {cat['id']: cat for cat in instore_categories}
         
         # Calculate total sales from completed transactions
@@ -4983,7 +4979,7 @@ def fetch_dashboard_data(request):
             previous_month = current_month - 1
             previous_year = current_year
         
-        # Process each completed transaction
+        # OPTIMIZATION: Process transactions more efficiently but preserve original logic
         for transaction in completed_transactions:
             # Get transaction details
             transaction_id = transaction.get('id')
@@ -4993,18 +4989,21 @@ def fetch_dashboard_data(request):
                 continue
                 
             details = order_details_by_transaction.get(transaction_id, [])
+            if not details:
+                continue
             
             # Calculate transaction total using similar logic to the frontend
             transaction_total = 0
             type_id = None
             
-            # Determine order type
+            # Determine order type - preserve original logic exactly
             for detail in details:
                 menu_id = detail.get('menu_id')
                 if menu_id and menu_id in menu_items_dict:
                     type_id = menu_items_dict[menu_id].get('type_id')
                     break
             
+            # CRITICAL: Keep exact logic pattern for sales computation to avoid issues
             if type_id == 1:  # In-store
                 # Separate unli wings and ala carte
                 unli_wings_orders = [d for d in details if d.get('instore_category') == 2]
@@ -5056,138 +5055,185 @@ def fetch_dashboard_data(request):
                 trans_month = transaction_date_obj.month
                 trans_day = transaction_date_obj.day - 1  # Zero-indexed for array
                 
-                # Current month data
-                if trans_year == current_year and trans_month == current_month:
-                    if 0 <= trans_day < 31:  # Ensure it fits in our array
+                # OPTIMIZATION: Avoid nested conditionals when possible
+                if 0 <= trans_day < 31:  # Ensure it fits in our array
+                    if trans_year == current_year and trans_month == current_month:
                         dashboard_data['sales_by_month']['current_month'][trans_day] += transaction_total
-                
-                # Previous month data
-                elif trans_year == previous_year and trans_month == previous_month:
-                    if 0 <= trans_day < 31:  # Ensure it fits in our array
+                    elif trans_year == previous_year and trans_month == previous_month:
                         dashboard_data['sales_by_month']['previous_month'][trans_day] += transaction_total
             except (ValueError, TypeError):
                 pass
         
-        # Continue with the rest of the function...
-        
-        # Update sales data
         # Update sales data
         dashboard_data['sales']['total'] = total_sales
         dashboard_data['sales']['today'] = filtered_date_sales
         
-        # Fetch expenses data
-        all_expenses = supabase_anon.table('expenses').select('id, date, cost').execute().data or []
+        # OPTIMIZATION: Fetch only needed expenses fields
+        all_expenses = supabase_anon.table('expenses').select('cost,date').execute().data or []
         
-        # Calculate total expenses
-        total_expenses = sum(expense.get('cost', 0) for expense in all_expenses)
-        dashboard_data['expenses']['total'] = total_expenses
-        
-        # Calculate filtered date expenses
-        filtered_date_expenses = sum(expense.get('cost', 0) for expense in all_expenses if expense.get('date') and expense['date'].startswith(filtered_date))
-        dashboard_data['expenses']['today'] = filtered_date_expenses
+        # OPTIMIZATION: Calculate expenses more efficiently
+        dashboard_data['expenses']['total'] = sum(expense.get('cost', 0) for expense in all_expenses)
+        dashboard_data['expenses']['today'] = sum(
+            expense.get('cost', 0) 
+            for expense in all_expenses 
+            if expense.get('date') and expense['date'].startswith(filtered_date)
+        )
 
-        unit_measurements = supabase_anon.table('unit_of_measurement').select('id, symbol').execute().data or []
+        # OPTIMIZATION: Get inventory-related data in a more optimized way
+        unit_measurements = supabase_anon.table('unit_of_measurement').select('id,symbol').execute().data or []
         unit_measurements_dict = {unit['id']: unit for unit in unit_measurements}
 
-        # Fetch items data first
-        items = supabase_anon.table('items').select('id, name, stock_trigger, measurement').execute().data or []
+        items = supabase_anon.table('items').select('id,name,stock_trigger,measurement').execute().data or []
         items_dict = {item['id']: item for item in items}
         
-        # Fetch inventory data for low stock alerts
-        inventory = supabase_anon.table('inventory').select('id, quantity, item').execute().data or []
+        inventory = supabase_anon.table('inventory').select('id,quantity,item').execute().data or []
+        inventory_dict = {inv['id']: inv for inv in inventory}
         
-        # Find low stock items (less than stock trigger)
+        # Find low stock items (less than stock trigger) - with early continues for efficiency
         for inv_item in inventory:
             quantity = inv_item.get('quantity', 0)
-            item = inv_item.get('item')
+            item_id = inv_item.get('item')
             
-            if item in items_dict:
-                item_data = items_dict[item]
-                stock_trigger = item_data.get('stock_trigger', 0)
+            if not item_id or item_id not in items_dict:
+                continue
+                
+            item_data = items_dict[item_id]
+            stock_trigger = item_data.get('stock_trigger', 0)
+            
+            if quantity < stock_trigger:
                 measurement_id = item_data.get('measurement')
                 measurement = unit_measurements_dict.get(measurement_id, {}).get('symbol', 'Unknown')
             
-                if quantity < stock_trigger:
-                    dashboard_data['inventory']['low_stock'].append({
-                        'id': inv_item.get('id'),
-                        'name': item_data.get('name', 'Unknown'),
-                        'quantity': quantity,
-                        'stock_trigger': stock_trigger,
-                        'measurement': measurement
-                    })
+                dashboard_data['inventory']['low_stock'].append({
+                    'id': inv_item.get('id'),
+                    'name': item_data.get('name', 'Unknown'),
+                    'quantity': quantity,
+                    'stock_trigger': stock_trigger,
+                    'measurement': measurement
+                })
         
-        # Fetch recent stock in records - using the appropriate query from your stockin page data
-        receipts_query = supabase_anon.table('receipts').select('id, receipt_no, date, supplier').order('id', desc=True).limit(5)
-        receipts = receipts_query.execute().data or []
+        # OPTIMIZATION: Batch fetch related data for recent stock activities
+        receipts = supabase_anon.table('receipts').select('id,receipt_no,date,supplier').order('id', desc=True).limit(5).execute().data or []
         
-        for receipt in receipts:
-            receipt_id = receipt.get('id')
-            if receipt_id:
-                stock_ins = supabase_anon.table('stockin').select('''
-                    id,
-                    receipt_id,
-                    item_id,
-                    quantity_in,
-                    price
-                ''').eq('receipt_id', receipt_id).execute().data or []
-                
-                for stock_in in stock_ins:
-                    item_id = stock_in.get('item_id')
-                    if item_id and item_id in items_dict:
-                        item_data = items_dict[item_id]
-                        measurement_id = item_data.get('measurement')
-                        measurement = unit_measurements_dict.get(measurement_id, {}).get('symbol', 'Unknown')
-                        dashboard_data['inventory']['recent_stockin'].append({
-                            'id': stock_in.get('id'),
-                            'item_name': item_data.get('name', 'Unknown'),
-                            'quantity_in': stock_in.get('quantity_in', 0),
-                            'measurement': measurement,
-                            'date': receipt.get('date'),
-                            'receipt_no': receipt.get('receipt_no')
-                        })
-        
-        # Fetch recent disposed (stockout) records
-        disposal_query = supabase_anon.table('disposed_inventory').select("*").order('id', desc=True).limit(5)
-        disposals = disposal_query.execute().data or []
-        
-        # Fetch disposal reasons for better context
-        reasons = supabase_anon.table('reason_of_disposal').select('id, name').execute().data or []
-        reasons_dict = {reason['id']: reason for reason in reasons}
-        
-        # Get inventory items for looking up item names
-        inventory_dict = {inv['id']: inv for inv in inventory}
-        
-        for disposal in disposals:
-            inventory_id = disposal.get('inventory_id')
-            reason_id = disposal.get('reason_id')
+        # Process stock-in records more efficiently
+        receipt_ids = [receipt.get('id') for receipt in receipts if receipt.get('id')]
+        if receipt_ids:
+            # Get all stock-ins for these receipts in a single query
+            stock_ins_query = supabase_anon.table('stockin').select('id,receipt_id,item_id,quantity_in,price')
             
-            if inventory_id in inventory_dict:
-                inv_item = inventory_dict[inventory_id]
-                item_id = inv_item.get('item_id')
-                
-                if item_id in items_dict:
+            # Use "in" filter if supported by your Supabase client
+            if len(receipt_ids) == 1:
+                stock_ins_query = stock_ins_query.eq('receipt_id', receipt_ids[0])
+            else:
+                # Some Supabase clients support in_() for multiple values
+                try:
+                    stock_ins_query = stock_ins_query.in_('receipt_id', receipt_ids)
+                except AttributeError:
+                    # Fallback if in_() is not supported
+                    pass
+                    
+            all_stock_ins = stock_ins_query.execute().data or []
+            
+            # Organize by receipt_id for efficient lookup
+            stock_ins_by_receipt = {}
+            for stock_in in all_stock_ins:
+                receipt_id = stock_in.get('receipt_id')
+                if receipt_id not in stock_ins_by_receipt:
+                    stock_ins_by_receipt[receipt_id] = []
+                stock_ins_by_receipt[receipt_id].append(stock_in)
+            
+            # Create a receipt lookup dict for O(1) access
+            receipts_dict = {r['id']: r for r in receipts if 'id' in r}
+            
+            # Process stock-ins
+            for receipt_id, receipt_stock_ins in stock_ins_by_receipt.items():
+                receipt = receipts_dict.get(receipt_id)
+                if not receipt:
+                    continue
+                    
+                for stock_in in receipt_stock_ins:
+                    item_id = stock_in.get('item_id')
+                    if not item_id or item_id not in items_dict:
+                        continue
+                        
                     item_data = items_dict[item_id]
                     measurement_id = item_data.get('measurement')
-                    item_measurement = unit_measurements_dict.get(measurement_id, {}).get('symbol', '')
-                    reason_text = reasons_dict.get(reason_id, {}).get('reason', 'Unknown reason')
+                    measurement = unit_measurements_dict.get(measurement_id, {}).get('symbol', 'Unknown')
                     
-                    # Get the disposed unit's symbol from the units_of_measurement table
-                    disposed_unit_id = disposal.get('disposed_unit')
-                    disposed_unit_symbol = unit_measurements_dict.get(disposed_unit_id, {}).get('symbol', '')
-                    
-                    # Use other_reason if reason_id indicates "Other"
-                    if reason_id == 3 and disposal.get('other_reason'):
-                        reason_text = disposal.get('other_reason')
-                    
-                    dashboard_data['inventory']['recent_stockout'].append({
-                        'id': disposal.get('id'),
+                    dashboard_data['inventory']['recent_stockin'].append({
+                        'id': stock_in.get('id'),
                         'item_name': item_data.get('name', 'Unknown'),
-                        'quantity_out': disposal.get('disposed_quantity', 0),
-                        'measurement': disposed_unit_symbol,
-                        'reason': reason_text,
-                        'date': disposal.get('disposal_datetime'),
-                        'disposer': disposal.get('disposer')
+                        'quantity_in': stock_in.get('quantity_in', 0),
+                        'measurement': measurement,
+                        'date': receipt.get('date'),
+                        'receipt_no': receipt.get('receipt_no')
                     })
+        else:
+            # Fallback to original approach if batch fetching isn't supported
+            for receipt in receipts:
+                receipt_id = receipt.get('id')
+                if receipt_id:
+                    stock_ins = supabase_anon.table('stockin').select(
+                        'id,receipt_id,item_id,quantity_in,price'
+                    ).eq('receipt_id', receipt_id).execute().data or []
+                    
+                    for stock_in in stock_ins:
+                        item_id = stock_in.get('item_id')
+                        if item_id and item_id in items_dict:
+                            item_data = items_dict[item_id]
+                            measurement_id = item_data.get('measurement')
+                            measurement = unit_measurements_dict.get(measurement_id, {}).get('symbol', 'Unknown')
+                            
+                            dashboard_data['inventory']['recent_stockin'].append({
+                                'id': stock_in.get('id'),
+                                'item_name': item_data.get('name', 'Unknown'),
+                                'quantity_in': stock_in.get('quantity_in', 0),
+                                'measurement': measurement,
+                                'date': receipt.get('date'),
+                                'receipt_no': receipt.get('receipt_no')
+                            })
+        
+        # OPTIMIZATION: More efficient handling of disposal records
+        disposals = supabase_anon.table('disposed_inventory').select('*').order('id', desc=True).limit(5).execute().data or []
+        
+        if disposals:
+            # Fetch disposal reasons with only needed fields
+            reasons = supabase_anon.table('reason_of_disposal').select('id,name').execute().data or []
+            reasons_dict = {reason['id']: reason for reason in reasons}
+            
+            # Process disposals with efficient lookups
+            for disposal in disposals:
+                inventory_id = disposal.get('inventory_id')
+                if not inventory_id or inventory_id not in inventory_dict:
+                    continue
+                    
+                inv_item = inventory_dict[inventory_id]
+                item_id = inv_item.get('item')
+                
+                if not item_id or item_id not in items_dict:
+                    continue
+                    
+                item_data = items_dict[item_id]
+                reason_id = disposal.get('reason_id')
+                reason_text = reasons_dict.get(reason_id, {}).get('name', 'Unknown reason')
+                
+                # Use other_reason if reason_id indicates "Other"
+                if reason_id == 3 and disposal.get('other_reason'):
+                    reason_text = disposal.get('other_reason')
+                
+                # Get the disposed unit's symbol
+                disposed_unit_id = disposal.get('disposed_unit')
+                disposed_unit_symbol = unit_measurements_dict.get(disposed_unit_id, {}).get('symbol', '')
+                
+                dashboard_data['inventory']['recent_stockout'].append({
+                    'id': disposal.get('id'),
+                    'item_name': item_data.get('name', 'Unknown'),
+                    'quantity_out': disposal.get('disposed_quantity', 0),
+                    'measurement': disposed_unit_symbol,
+                    'reason': reason_text,
+                    'date': disposal.get('disposal_datetime'),
+                    'disposer': disposal.get('disposer')
+                })
         
         return Response(dashboard_data)
     

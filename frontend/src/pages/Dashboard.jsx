@@ -167,6 +167,11 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
   // Prepare chart data to match the reference style
   const dayLabels = generateDayLabels();
 
+  // Add this function to get the month name from a date object
+  const getMonthName = (date) => {
+    return date.toLocaleString("default", { month: "long" });
+  };
+
   const chartData = {
     labels: dayLabels,
     datasets: [
@@ -241,9 +246,19 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
         },
         ticks: {
           callback: function (value) {
-            return value;
+            return `₱${value}`;
           },
           stepSize: 100,
+        },
+        title: {
+          display: true,
+          text: "Sales (₱)",
+          font: {
+            size: 14,
+          },
+          padding: {
+            top: 5,
+          },
         },
       },
       x: {
@@ -253,6 +268,16 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
         ticks: {
           font: {
             size: 10,
+          },
+        },
+        title: {
+          display: true,
+          text: `Days (Month of ${getMonthName(filterDate)})`,
+          font: {
+            size: 14,
+          },
+          padding: {
+            top: 5,
           },
         },
       },
@@ -354,7 +379,7 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
   return (
     <div className="h-screen w-full flex flex-col p-6 bg-[#fcf4dc] overflow-hidden">
       {/* Dashboard content */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between shadow-xl relative">
           <div className="flex justify-between items-center">
             <span className="text-white text-lg">Orders {dateLabel}</span>
@@ -371,6 +396,9 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
           </div>
           <div className="text-white text-3xl font-bold flex items-end">
             {dashboardData.orders.today}
+          </div>
+          <div className="text-white/80 text-sm mt-1">
+            All Time Orders: {dashboardData.orders.total}
           </div>
           {dropdownVisible && activeDropdown === "orders" && (
             <div className="absolute top-32 right-0 z-50 bg-white rounded-md shadow-lg py-1 w-48">
@@ -390,13 +418,8 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
             </div>
           )}
         </div>
-        <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between">
-          <span className="text-white text-lg">Total Orders</span>
-          <div className="text-white text-3xl font-bold flex items-end">
-            {dashboardData.orders.total}
-          </div>
-        </div>
-        {isAdmin && (
+
+        {isAdmin ? (
           <>
             <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between relative">
               <div className="flex justify-between items-center">
@@ -419,6 +442,13 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
                   maximumFractionDigits: 2,
                 })}
               </div>
+              <div className="text-white/80 text-sm mt-1">
+                All Time Sales: ₱
+                {dashboardData.sales.total.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </div>
               {dropdownVisible && activeDropdown === "sales" && (
                 <div className="absolute top-32 right-0 z-50 bg-white rounded-md shadow-lg py-1 w-48">
                   {last7Days.map((day, index) => (
@@ -437,87 +467,61 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
                 </div>
               )}
             </div>
-            <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between">
-              <span className="text-white text-lg">Total Sales</span>
+
+            <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between shadow-xl relative">
+              <div className="flex justify-between items-center">
+                <span className="text-white text-lg">Expenses {dateLabel}</span>
+                <button
+                  onClick={() => toggleDropdown("expenses")}
+                  className="text-white hover:text-yellow-200 flex items-center"
+                >
+                  {dropdownVisible && activeDropdown === "expenses" ? (
+                    <HiChevronDown size={24} />
+                  ) : (
+                    <HiChevronRight size={24} />
+                  )}
+                </button>
+              </div>
               <div className="text-white text-3xl font-bold flex items-end">
                 ₱
-                {dashboardData.sales.total.toLocaleString("en-US", {
+                {dashboardData.expenses.today.toLocaleString("en-US", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
               </div>
+              <div className="text-white/80 text-sm mt-1">
+                All Time Expenses: ₱
+                {dashboardData.expenses.total.toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </div>
+              {dropdownVisible && activeDropdown === "expenses" && (
+                <div className="absolute top-32 right-0 z-50 bg-white rounded-md shadow-lg py-1 w-48">
+                  {last7Days.map((day, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleDateChange(day.date)}
+                      className={`w-full text-left px-4 py-2 hover:bg-[#fceee8] ${
+                        day.date.toDateString() === filterDate.toDateString()
+                          ? "bg-[#fceee8] text-[#CC5500] font-semibold"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      {day.formatted}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+          </>
+        ) : (
+          // For non-admin, fill the remaining space with empty columns
+          <>
+            <div className="col-span-2"></div>
           </>
         )}
       </div>
-
-      {/* Expenses Row (Admin Only) */}
-      {isAdmin && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between shadow-xl relative">
-            <div className="flex justify-between items-center">
-              <span className="text-white text-lg">Expenses {dateLabel}</span>
-              <button
-                onClick={() => toggleDropdown("expenses")}
-                className="text-white hover:text-yellow-200 flex items-center"
-              >
-                {dropdownVisible && activeDropdown === "expenses" ? (
-                  <HiChevronDown size={24} />
-                ) : (
-                  <HiChevronRight size={24} />
-                )}
-              </button>
-            </div>
-            <div className="text-white text-3xl font-bold flex items-end">
-              ₱
-              {dashboardData.expenses.today.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
-            {dropdownVisible && activeDropdown === "expenses" && (
-              <div className="absolute top-32 right-0 z-50 bg-white rounded-md shadow-lg py-1 w-48">
-                {last7Days.map((day, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleDateChange(day.date)}
-                    className={`w-full text-left px-4 py-2 hover:bg-[#fceee8] ${
-                      day.date.toDateString() === filterDate.toDateString()
-                        ? "bg-[#fceee8] text-[#CC5500] font-semibold"
-                        : "text-gray-700"
-                    }`}
-                  >
-                    {day.formatted}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between">
-            <span className="text-white text-lg">Total Expenses</span>
-            <div className="text-white text-3xl font-bold flex items-end">
-              ₱
-              {dashboardData.expenses.total.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
-          </div>
-          {/* <div className="col-span-2 flex">
-            <button
-              onClick={() => {
-                setFilterDate(new Date());
-              }}
-              className="bg-white/80 px-4 py-2 rounded-md text-center flex items-center hover:bg-white transition-colors duration-200"
-            >
-              <span className="text-[#CC5500] font-semibold mr-2">
-                Date Filter: {dateLabel}
-              </span>
-              <HiChevronRight size={20} className="text-[#CC5500]" />
-            </button>
-          </div> */}
-        </div>
-      )}
 
       {/* Bottom Section */}
       <div className="flex gap-4 flex-1 overflow-hidden">
