@@ -50,9 +50,16 @@ const AddExpense = ({
 
     // Check if "Others" is selected to show/hide note field
     if (name === "expenseType") {
+      // Add debugging to check what's coming through
+      console.log("Selected value:", value);
+      console.log("Expense types:", expenseTypes);
+
+      // Convert both to strings for comparison
       const selectedType = expenseTypes.find(
-        (type) => type.id.toString() === value
+        (type) => String(type.id) === String(value)
       );
+
+      console.log("Found type:", selectedType);
       setIsOthersSelected(selectedType?.name === "Others");
     }
   };
@@ -92,12 +99,25 @@ const AddExpense = ({
       // Call the callback to refresh data
       onExpenseAdded();
 
-      // Close the popup after submission
-      closePopup();
+      // Ensure we clear the form before closing
+      setExpenseDetails({
+        date: defaultDate,
+        amount: "",
+        expenseType: "",
+        note: "",
+      });
+
+      setIsSubmitting(false);
+
+      // Add a slight delay before closing to ensure everything is updated
+      setTimeout(() => {
+        // Close the popup after submission
+        console.log("Closing popup...");
+        closePopup();
+      }, 100);
     } catch (error) {
       console.error("Error adding expense:", error);
       alert("Failed to add expense. Please try again.");
-    } finally {
       setIsSubmitting(false);
     }
   };
