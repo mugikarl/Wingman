@@ -477,6 +477,14 @@ const DailySales = ({
     }
   };
 
+  // Add this useEffect to ensure data is filtered when localSalesData changes
+  useEffect(() => {
+    if (localSalesData) {
+      filterData(localSalesData, displayDate, filterType);
+      setLoading(false);
+    }
+  }, [localSalesData, displayDate, filterType]);
+
   // If modal is not open, don't render anything
   if (!isOpen) return null;
 
@@ -794,9 +802,15 @@ const DailySales = ({
           closePopup={() => setIsAddExpenseOpen(false)}
           expenseTypes={localSalesData?.expenses_types || []}
           onExpenseAdded={() => {
-            if (fetchSalesData) fetchSalesData();
-            else fetchSalesDataFromApi();
-            setIsAddExpenseOpen(false);
+            if (fetchSalesData) {
+              fetchSalesData();
+            } else {
+              fetchSalesDataFromApi();
+            }
+
+            setTimeout(() => {
+              setIsAddExpenseOpen(false);
+            }, 100);
           }}
           defaultDate={formatDateForInput(currentDate)}
         />

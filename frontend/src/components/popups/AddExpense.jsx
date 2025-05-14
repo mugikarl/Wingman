@@ -96,25 +96,13 @@ const AddExpense = ({
 
       console.log("Expense Added:", response.data);
 
-      // Call the callback to refresh data
-      onExpenseAdded();
-
-      // Ensure we clear the form before closing
-      setExpenseDetails({
-        date: defaultDate,
-        amount: "",
-        expenseType: "",
-        note: "",
-      });
-
+      // Important: First finish submission completely
       setIsSubmitting(false);
 
-      // Add a slight delay before closing to ensure everything is updated
-      setTimeout(() => {
-        // Close the popup after submission
-        console.log("Closing popup...");
-        closePopup();
-      }, 100);
+      // THEN call onExpenseAdded and close the popup
+      // This ensures state updates happen in the correct order
+      onExpenseAdded();
+      closePopup();
     } catch (error) {
       console.error("Error adding expense:", error);
       alert("Failed to add expense. Please try again.");
