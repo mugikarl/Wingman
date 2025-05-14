@@ -58,6 +58,12 @@ const EditTransactionOrderSummary = ({
   // Helper: get the base amount for Unli Wings.
   const getUnliWingsBaseAmount = (groupOrders) => {
     if (groupOrders.length > 0) {
+      // First try to get the direct base_amount property
+      const storedBaseAmount = groupOrders[0]?.base_amount;
+      if (storedBaseAmount !== undefined && storedBaseAmount !== null) {
+        return storedBaseAmount;
+      }
+      // Then fall back to the instore_category.base_amount
       return groupOrders[0]?.instore_category?.base_amount;
     }
     return unliWingsCategory?.base_amount;
@@ -468,6 +474,7 @@ const EditTransactionOrderSummary = ({
                           id: Date.now(),
                           unli_wings_group: newGroupNumber,
                           instore_category: { id: 2, base_amount: baseAmount },
+                          base_amount: baseAmount, // Store directly as well
                           quantity: 1,
                           menu_item: {
                             id: 0,
