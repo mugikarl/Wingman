@@ -2735,78 +2735,105 @@ def delete_menu_item(request, menu_id):
 @permission_classes([AllowAny])   
 def fetch_order_data(request, transactionId=None):
     try:
+        # Use exception handling for each database query to provide better error messages
+        
         # Fetch menu types
-        menu_types = supabase_anon.table("menu_type").select("id, name, deduction_percentage").execute().data or []
-        
-        # Fetch menu statuses
-        menu_statuses = supabase_anon.table("menu_status").select("id, name").execute().data or []
-        
-        # Fetch menu categories
-        menu_categories = supabase_anon.table("menu_category").select("id, name").execute().data or []
-        
-        # Fetch menus
-        menus = supabase_anon.table("menu_items").select("id, name, type_id, price, image, status_id, category_id").execute().data or []
-        
-        formatted_menus = [
-            {
-                "id": menu["id"],
-                "name": menu["name"],
-                "type_id": menu["type_id"],
-                "category_id": menu["category_id"],
-                "price": menu["price"],
-                "image": supabase_anon.storage.from_("menu-images").get_public_url(menu["image"]) if menu["image"] else None,
-                "status_id": menu["status_id"]
-            }
-            for menu in menus
-        ]
-        
-        # Fetch menu ingredients
-        menu_ingredients = supabase_anon.table("menu_ingredients").select("id, menu_id, inventory_id, quantity, unit_id").execute().data or []
-        
-        # Attach ingredients to menus
-        for menu in formatted_menus:
-            menu["menu_ingredients"] = [mi for mi in menu_ingredients if mi["menu_id"] == menu["id"]]
-        
-        # Fetch discounts
-        discounts = supabase_anon.table("discounts").select("id", "type", "percentage").execute().data or []
-        
-        # Fetch payment methods
-        payment_methods = supabase_anon.table("payment_methods").select("id", "name").execute().data or []
-        
-        # Fetch in-store categories
-        instore_categories = supabase_anon.table("instore_category").select("id, name", "base_amount").execute().data or []
-        
-        # Fetch Order Status Type
-        order_status_types = supabase_anon.table("order_status_type").select("id, name").execute().data or []
-        
-        # Fetch GCash references
-        gcash_references = supabase_anon.table("gcash_reference").select("id, name, attached_transaction, paid_amount").execute().data or []
-        
-        # Get current date in YYYY-MM-DD format
-        today_str = datetime.now().strftime("%Y-%m-%d")
-        
-        # Fetch employees who have timed in today (based on fetch_attendance_data approach)
-        # First get all active employees
-        active_status_id = 1  # Assuming 1 = Active
-        employees_response = supabase_anon.table("employee") \
-            .select(
-                "id, first_name, last_name, "
-                "employee_status:employee_status(id, status_name), "
-                "attendance:attendance(attendance_status:attendance_status(id, status_name), "
-                "attendance_time:attendance_time(time_in, time_out))"
-        ).eq("employee_status.id", active_status_id).execute()
-        
-        all_employees = employees_response.data if employees_response.data else []
-        
-        # Filter for employees who have timed in today
-        employees = []
-        for emp in all_employees:
-            # Get attendance records
-            attendance = emp.get("attendance", [])
-            time_in_today = False
+        try:
+            menu_types = supabase_anon.table("menu_type").select("id, name, deduction_percentage").execute().data or []
+        except Exception as e:
+            return Response({"error": f"Error fetching menu types: {str(e)}"}, status=500)
             
-            # Check if the employee has timed in today
-            if attendance:
+        # Fetch menu statuses
+        try:
+            menu_statuses = supabase_anon.table("menu_status").select("id, name").execute().data or []
+        except Exception as e:
+            return Response({"error": f"Error fetching menu statuses: {str(e)}"}, status=500)
+            
+        # Fetch menu categories
+        try:
+            menu_categories = supabase_anon.table("menu_category").select("id, name").execute().data or []
+        except Exception as e:
+            return Response({"error": f"Error fetching menu categories: {str(e)}"}, status=500)
+            
+        # Fetch menus - implement pagination if there are many menu items
+        try:
+            menus = supabase_anon.table("menu_items").select("id, name, type_id, price, image, status_id, category_id").execute().data or []
+            
+            formatted_menus = [
+                {
+                    "id": menu["id"],
+                    "name": menu["name"],
+                    "type_id": menu["type_id"],
+                    "category_id": menu["category_id"],
+                    "price": menu["price"],
+                    "image": supabase_anon.storage.from_("menu-images").get_public_url(menu["image"]) if menu.get("image") else None,
+                    "status_id": menu["status_id"]
+                }
+                for menu in menus
+            ]
+        except Exception as e:
+            return Response({"error": f"Error fetching menu items: {str(e)}"}, status=500)
+            
+        # Fetch menu ingredients
+        try:
+            menu_ingredients = supabase_anon.table("menu_ingredients").select("id, menu_id, inventory_id, quantity, unit_id").execute().data or []
+            
+            # Attach ingredients to menus - optimize by creating a dictionary first
+            menu_ingredients_dict = {}
+            for mi in menu_ingredients:
+                menu_id = mi.get("menu_id")
+                if menu_id not in menu_ingredients_dict:
+                    menu_ingredients_dict[menu_id] = []
+                menu_ingredients_dict[menu_id].append(mi)
+            
+            # Now attach ingredients to menus
+            for menu in formatted_menus:
+                menu["menu_ingredients"] = menu_ingredients_dict.get(menu["id"], [])
+        except Exception as e:
+            return Response({"error": f"Error fetching menu ingredients: {str(e)}"}, status=500)
+            
+        # Fetch other essential data
+        try:
+            discounts = supabase_anon.table("discounts").select("id", "type", "percentage").execute().data or []
+            payment_methods = supabase_anon.table("payment_methods").select("id", "name").execute().data or []
+            instore_categories = supabase_anon.table("instore_category").select("id, name", "base_amount").execute().data or []
+            order_status_types = supabase_anon.table("order_status_type").select("id, name").execute().data or []
+            gcash_references = supabase_anon.table("gcash_reference").select("id, name, attached_transaction, paid_amount").execute().data or []
+        except Exception as e:
+            return Response({"error": f"Error fetching essential data: {str(e)}"}, status=500)
+            
+        # Process employee data with better error handling and caching possibility
+        try:
+            # Get current date in YYYY-MM-DD format
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            
+            # Fetch all active employees first
+            active_status_id = 1  # Assuming 1 = Active
+            employees_response = supabase_anon.table("employee") \
+                .select(
+                    "id, first_name, last_name, "
+                    "employee_status:employee_status(id, status_name), "
+                    "attendance:attendance(attendance_status:attendance_status(id, status_name), "
+                    "attendance_time:attendance_time(time_in, time_out))"
+            ).eq("employee_status.id", active_status_id).execute()
+            
+            all_employees = employees_response.data if employees_response.data else []
+            
+            # Create an employee dictionary for quicker lookups later
+            employee_dict = {emp["id"]: emp for emp in all_employees if "id" in emp}
+            
+            # Filter for employees who have timed in today - more efficient processing
+            employees = []
+            for emp in all_employees:
+                # Get attendance records
+                attendance = emp.get("attendance", [])
+                
+                # Skip processing if no attendance records
+                if not attendance:
+                    continue
+                    
+                # Check if the employee has timed in today
+                time_in_today = False
                 if isinstance(attendance, list):
                     for record in attendance:
                         time_obj = record.get("attendance_time", {})
@@ -2814,75 +2841,113 @@ def fetch_order_data(request, transactionId=None):
                         if t_in and t_in.startswith(today_str):
                             time_in_today = True
                             break
+                
+                # Only include employees who have timed in today
+                if time_in_today:
+                    employees.append({
+                        "id": emp.get("id"),
+                        "first_name": emp.get("first_name", ""),
+                        "last_name": emp.get("last_name", ""),
+                        "status_id": active_status_id
+                    })
+        except Exception as e:
+            return Response({"error": f"Error processing employee data: {str(e)}"}, status=500)
             
-            # Only include employees who have timed in today
-            if time_in_today:
-                employees.append({
-                    "id": emp.get("id"),
-                    "first_name": emp.get("first_name", ""),
-                    "last_name": emp.get("last_name", ""),
-                    "status_id": active_status_id
+        # Process transaction data with optimized lookups
+        try:
+            # Create dictionaries for faster lookups
+            menu_dict = {menu["id"]: menu for menu in formatted_menus}
+            discount_dict = {discount["id"]: discount for discount in discounts}
+            instore_category_dict = {cat["id"]: cat for cat in instore_categories}
+            payment_method_dict = {method["id"]: method for method in payment_methods}
+            
+            # Fetch order details and transactions in separate queries to optimize
+            order_details = supabase_anon.table("order_details").select(
+                "id", "quantity", "menu_id", "discount_id", "instore_category", "transaction_id", "unli_wings_group"
+            ).execute().data or []
+            
+            # Group order details by transaction ID for faster lookups
+            order_details_by_transaction = {}
+            for order in order_details:
+                tx_id = order.get("transaction_id")
+                if tx_id not in order_details_by_transaction:
+                    order_details_by_transaction[tx_id] = []
+                order_details_by_transaction[tx_id].append(order)
+            
+            # Fetch transactions
+            transactions = supabase_anon.table("transaction").select(
+                "id, date, payment_amount, order_status(id, name), payment_method, employee_id"
+            ).execute().data or []
+            
+            # Group GCash references by transaction ID for faster lookups
+            gcash_refs_by_transaction = {}
+            for ref in gcash_references:
+                tx_id = ref.get("attached_transaction")
+                if tx_id:
+                    if tx_id not in gcash_refs_by_transaction:
+                        gcash_refs_by_transaction[tx_id] = []
+                    gcash_refs_by_transaction[tx_id].append(ref)
+            
+            # Process transactions with optimized lookups
+            formatted_transactions = []
+            for transaction in transactions:
+                tx_id = transaction.get("id")
+                related_orders = []
+                
+                # Get related order details
+                for order in order_details_by_transaction.get(tx_id, []):
+                    order_data = {
+                        "id": order["id"],
+                        "quantity": order["quantity"],
+                        "menu_item": menu_dict.get(order["menu_id"]),
+                        "discount": discount_dict.get(order["discount_id"]),
+                        "instore_category": instore_category_dict.get(order["instore_category"]),
+                        "unli_wings_group": order["unli_wings_group"]
+                    }
+                    related_orders.append(order_data)
+                
+                # Get GCash references
+                gcash_references_for_transaction = gcash_refs_by_transaction.get(tx_id, [])
+                
+                # Build transaction object
+                formatted_transactions.append({
+                    "id": transaction["id"],
+                    "date": transaction["date"],
+                    "payment_amount": transaction["payment_amount"],
+                    "order_status": transaction["order_status"],
+                    "payment_method": payment_method_dict.get(transaction["payment_method"]),
+                    "employee": employee_dict.get(transaction["employee_id"]),
+                    "order_details": related_orders,
+                    "gcash_references": gcash_references_for_transaction
                 })
-        
-        # Fetch order details
-        order_details = supabase_anon.table("order_details").select("id", "quantity", "menu_id", "discount_id", "instore_category", "transaction_id","unli_wings_group").execute().data or []
-        
-        # Fetch transactions - removed receipt_image
-        transactions = supabase_anon.table("transaction").select("id, date, payment_amount, order_status(id, name), payment_method, employee_id").execute().data or []
-        
-        # Combine transactions with order details
-        formatted_transactions = []
-        for transaction in transactions:
-            related_orders = [
-                {
-                    "id": order["id"],
-                    "quantity": order["quantity"],
-                    "menu_item": next((menu for menu in formatted_menus if menu["id"] == order["menu_id"]), None),
-                    "discount": next((discount for discount in discounts if discount["id"] == order["discount_id"]), None),
-                    "instore_category": next((category for category in instore_categories if category["id"] == order["instore_category"]), None),
-                    "unli_wings_group": order["unli_wings_group"]
-                }
-                for order in order_details if order["transaction_id"] == transaction["id"]
-            ]
-            
-            # Find GCash reference for this transaction (if any)
-            gcash_references_for_transaction = [ref for ref in gcash_references if ref["attached_transaction"] == transaction["id"]]
+                
+            # If a transactionId is provided, filter the transaction
+            if transactionId is not None:
+                filtered = [tx for tx in formatted_transactions if tx["id"] == transactionId]
+                if not filtered:
+                    return Response({"error": "Transaction not found."}, status=404)
+                return Response(filtered[0])
 
-            formatted_transactions.append({
-                "id": transaction["id"],
-                "date": transaction["date"],
-                "payment_amount": transaction["payment_amount"],
-                "order_status": transaction["order_status"],
-                "payment_method": next((method for method in payment_methods if method["id"] == transaction["payment_method"]), None),
-                "employee": next((emp for emp in all_employees if emp["id"] == transaction["employee_id"]), None), # Use all_employees for historical records
-                "order_details": related_orders,
-                "gcash_references": gcash_references_for_transaction  # Include all GCash references
+            return Response({
+                "menu_types": menu_types,
+                "menu_statuses": menu_statuses,
+                "menu_categories": menu_categories,
+                "menu_items": formatted_menus,
+                "menu_ingredients": menu_ingredients,
+                "discounts": discounts,
+                "payment_methods": payment_methods,
+                "instore_categories": instore_categories,
+                "order_status_types": order_status_types,
+                "employees": employees,
+                "transactions": formatted_transactions,
+                "gcash_references": gcash_references
             })
-        
-        # If a transactionId is provided, filter the transaction.
-        if transactionId is not None:
-            filtered = [tx for tx in formatted_transactions if tx["id"] == transactionId]
-            if not filtered:
-                return Response({"error": "Transaction not found."}, status=404)
-            return Response(filtered[0])
-
-        return Response({
-            "menu_types": menu_types,
-            "menu_statuses": menu_statuses,
-            "menu_categories": menu_categories,
-            "menu_items": formatted_menus,
-            "menu_ingredients": menu_ingredients,
-            "discounts": discounts,
-            "payment_methods": payment_methods,
-            "instore_categories": instore_categories,
-            "order_status_types": order_status_types,
-            "employees": employees, # This now contains only employees who've timed in today
-            "transactions": formatted_transactions,
-            "gcash_references": gcash_references  # Add all GCash references to the response
-        })
+            
+        except Exception as e:
+            return Response({"error": f"Error processing transaction data: {str(e)}"}, status=500)
     
     except Exception as e:
-        return Response({"error": str(e)}, status=500)
+        return Response({"error": f"Unexpected error: {str(e)}"}, status=500)
 
 @api_view(['GET'])
 @authentication_classes([])
@@ -4823,6 +4888,15 @@ def delete_expense(request, expense_id):
 @permission_classes([AllowAny])
 def fetch_dashboard_data(request):
     try:
+        # Get date parameter from request, default to today
+        date_filter = request.GET.get('date', None)
+        
+        # If no date provided, use today
+        if not date_filter:
+            today = datetime.now().strftime('%Y-%m-%d')
+        else:
+            today = date_filter
+        
         # Initialize response data structure
         dashboard_data = {
             'orders': {
@@ -4833,19 +4907,23 @@ def fetch_dashboard_data(request):
                 'total': 0,
                 'today': 0
             },
+            'expenses': {
+                'total': 0,
+                'today': 0
+            },
             'inventory': {
                 'low_stock': [],
                 'recent_stockin': [],
                 'recent_stockout': []
             },
             'sales_by_month': {
-                'current_year': [0] * 12,
-                'previous_year': [0] * 12
+                'current_month': [0] * 31,  # Changed from current_year to current_month
+                'previous_month': [0] * 31  # Changed from previous_year to previous_month
             }
         }
         
-        # Get today's date for filtering
-        today = datetime.now().strftime('%Y-%m-%d')
+        # Use the filtered date from the request parameter instead of resetting to today
+        filtered_date = today
         
         # Fetch all transactions
         all_transactions = supabase_anon.table('transaction').select('*').execute().data or []
@@ -4853,9 +4931,9 @@ def fetch_dashboard_data(request):
         # Count total orders
         dashboard_data['orders']['total'] = len(all_transactions)
         
-        # Count today's orders
-        today_transactions = [t for t in all_transactions if t.get('date') and t['date'].startswith(today)]
-        dashboard_data['orders']['today'] = len(today_transactions)
+        # Count filtered date orders
+        filtered_transactions = [t for t in all_transactions if t.get('date') and t['date'].startswith(filtered_date)]
+        dashboard_data['orders']['today'] = len(filtered_transactions)
         
         # Get completed transactions (status_id = 2)
         completed_transactions = supabase_anon.table('transaction').select('*').eq('order_status', 2).execute().data or []
@@ -4863,7 +4941,7 @@ def fetch_dashboard_data(request):
         # For calculating sales amount, we need order details with menu items
         order_details = supabase_anon.table('order_details').select('*').execute().data or []
         
-        # Create lookup dict for order details by transaction_id
+         # Create lookup dict for order details by transaction_id
         order_details_by_transaction = {}
         for detail in order_details:
             transaction_id = detail.get('transaction_id')
@@ -4890,11 +4968,20 @@ def fetch_dashboard_data(request):
         
         # Calculate total sales from completed transactions
         total_sales = 0
-        today_sales = 0
+        filtered_date_sales = 0
         
-        # For tracking sales by month
-        current_year = datetime.now().year
-        previous_year = current_year - 1
+        # Get current month and year for comparison
+        current_date = datetime.now()
+        current_month = current_date.month
+        current_year = current_date.year
+        
+        # Calculate previous month and year
+        if current_month == 1:
+            previous_month = 12
+            previous_year = current_year - 1
+        else:
+            previous_month = current_month - 1
+            previous_year = current_year
         
         # Process each completed transaction
         for transaction in completed_transactions:
@@ -4958,27 +5045,47 @@ def fetch_dashboard_data(request):
             # Add to total sales
             total_sales += transaction_total
             
-            # Check if it's today's transaction
-            if transaction_date.startswith(today):
-                today_sales += transaction_total
+            # Check if it's filtered date transaction
+            if transaction_date.startswith(filtered_date):
+                filtered_date_sales += transaction_total
             
-            # Record for monthly sales chart
+            # Record for monthly sales chart - DAILY data for current and previous month
             try:
                 transaction_date_obj = datetime.fromisoformat(transaction_date.replace('Z', '+00:00'))
-                month_index = transaction_date_obj.month - 1  # Zero-based
-                year = transaction_date_obj.year
+                trans_year = transaction_date_obj.year
+                trans_month = transaction_date_obj.month
+                trans_day = transaction_date_obj.day - 1  # Zero-indexed for array
                 
-                if year == current_year:
-                    dashboard_data['sales_by_month']['current_year'][month_index] += transaction_total
-                elif year == previous_year:
-                    dashboard_data['sales_by_month']['previous_year'][month_index] += transaction_total
+                # Current month data
+                if trans_year == current_year and trans_month == current_month:
+                    if 0 <= trans_day < 31:  # Ensure it fits in our array
+                        dashboard_data['sales_by_month']['current_month'][trans_day] += transaction_total
+                
+                # Previous month data
+                elif trans_year == previous_year and trans_month == previous_month:
+                    if 0 <= trans_day < 31:  # Ensure it fits in our array
+                        dashboard_data['sales_by_month']['previous_month'][trans_day] += transaction_total
             except (ValueError, TypeError):
                 pass
         
+        # Continue with the rest of the function...
+        
+        # Update sales data
         # Update sales data
         dashboard_data['sales']['total'] = total_sales
-        dashboard_data['sales']['today'] = today_sales
+        dashboard_data['sales']['today'] = filtered_date_sales
         
+        # Fetch expenses data
+        all_expenses = supabase_anon.table('expenses').select('id, date, cost').execute().data or []
+        
+        # Calculate total expenses
+        total_expenses = sum(expense.get('cost', 0) for expense in all_expenses)
+        dashboard_data['expenses']['total'] = total_expenses
+        
+        # Calculate filtered date expenses
+        filtered_date_expenses = sum(expense.get('cost', 0) for expense in all_expenses if expense.get('date') and expense['date'].startswith(filtered_date))
+        dashboard_data['expenses']['today'] = filtered_date_expenses
+
         unit_measurements = supabase_anon.table('unit_of_measurement').select('id, symbol').execute().data or []
         unit_measurements_dict = {unit['id']: unit for unit in unit_measurements}
 

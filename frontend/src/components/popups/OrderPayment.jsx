@@ -238,6 +238,9 @@ const OrderPayment = ({
                 }}
                 className="w-full p-2 border rounded-md focus:outline-none"
               >
+                <option value="" disabled>
+                  Select an employee
+                </option>
                 {timedInEmployees.map((emp) => {
                   // Find the corresponding employee in the full employee list
                   const employee = employees.find(

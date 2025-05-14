@@ -145,24 +145,21 @@ const TableWithDatePicker = ({
     return pages;
   };
 
-  // Default theme for the date picker
   const defaultTheme = {
     root: { base: "relative" },
     popup: {
       root: {
-        base: "absolute top-10 z-50 block pt-2",
-        inline: "relative top-0 z-auto",
-        inner:
-          "inline-block rounded-lg bg-white p-4 shadow-lg dark:bg-[#fceee8]",
+        base: "absolute block pt-2",
+        inline: "relative top-0",
+        inner: "inline-block rounded-lg bg-white p-4 shadow-lg",
       },
       header: {
         base: "",
-        title:
-          "px-2 py-3 text-center font-semibold text-gray-900 dark:text-white",
+        title: "px-2 py-3 text-center font-semibold text-[#CC5500]",
         selectors: {
           base: "mb-2 flex justify-between",
           button: {
-            base: "rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-[#fceee8] focus:outline-none focus:ring-2 focus:ring-[#fceee8] dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600",
+            base: "rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-[#CC5500] hover:bg-[#fceee8] focus:outline-none focus:ring-2 focus:ring-[#fceee8]",
             prev: "",
             next: "",
             view: "",
@@ -174,8 +171,7 @@ const TableWithDatePicker = ({
         base: "mt-2 flex space-x-2",
         button: {
           base: "w-full rounded-lg px-5 py-2 text-center text-sm font-medium focus:ring-4 focus:ring-[#b14900]",
-          today:
-            "bg-[#cc5500] text-white hover:bg-[#b14900] dark:bg-[#cc5500] dark:hover:bg-[#b14900]",
+          today: "bg-[#CC5500] text-white hover:bg-[#b14900]",
           clear: "hidden",
         },
       },
@@ -184,14 +180,13 @@ const TableWithDatePicker = ({
       days: {
         header: {
           base: "mb-1 grid grid-cols-7",
-          title:
-            "h-6 text-center text-sm font-medium leading-6 text-gray-500 dark:text-gray-400",
+          title: "h-6 text-center text-sm font-medium leading-6 text-[#CC5500]",
         },
         items: {
           base: "grid w-64 grid-cols-7",
           item: {
-            base: "block flex-1 cursor-pointer rounded-lg border-0 text-center text-sm font-semibold leading-9 text-gray-900 hover:bg-[#fceee8] dark:text-white dark:hover:bg-gray-600",
-            selected: "bg-[#cc5500] text-white hover:bg-[#b14900]",
+            base: "block flex-1 cursor-pointer rounded-lg border-0 text-center text-sm font-semibold leading-9 text-gray-900 hover:bg-[#fceee8]",
+            selected: "bg-[#CC5500] text-white hover:bg-[#b14900]",
             disabled: "text-gray-500",
           },
         },
@@ -200,8 +195,8 @@ const TableWithDatePicker = ({
         items: {
           base: "grid w-64 grid-cols-4",
           item: {
-            base: "block flex-1 cursor-pointer rounded-lg border-0 text-center text-sm font-semibold leading-9 text-gray-900 hover:bg-[#fceee8] dark:text-white dark:hover:bg-gray-600",
-            selected: "bg-[#cc5500] text-white hover:bg-[#b14900]",
+            base: "block flex-1 cursor-pointer rounded-lg border-0 text-center text-sm font-semibold leading-9 text-gray-900 hover:bg-[#fceee8]",
+            selected: "bg-[#CC5500] text-white hover:bg-[#b14900]",
             disabled: "text-gray-500",
           },
         },
@@ -210,8 +205,8 @@ const TableWithDatePicker = ({
         items: {
           base: "grid w-64 grid-cols-4",
           item: {
-            base: "block flex-1 cursor-pointer rounded-lg border-0 text-center text-sm font-semibold leading-9 text-gray-900 hover:bg-[#fceee8] dark:text-white dark:hover:bg-gray-600",
-            selected: "bg-[#cc5500] text-white hover:bg-[#b14900]",
+            base: "block flex-1 cursor-pointer rounded-lg border-0 text-center text-sm font-semibold leading-9 text-gray-900 hover:bg-[#fceee8]",
+            selected: "bg-[#CC5500] text-white hover:bg-[#b14900]",
             disabled: "text-gray-500",
           },
         },
@@ -220,8 +215,8 @@ const TableWithDatePicker = ({
         items: {
           base: "grid w-64 grid-cols-4",
           item: {
-            base: "block flex-1 cursor-pointer rounded-lg border-0 text-center text-sm font-semibold leading-9 text-gray-900 hover:bg-[#fceee8] dark:text-white dark:hover:bg-gray-600",
-            selected: "bg-[#cc5500] text-white hover:bg-[#b14900]",
+            base: "block flex-1 cursor-pointer rounded-lg border-0 text-center text-sm font-semibold leading-9 text-gray-900 hover:bg-[#fceee8]",
+            selected: "bg-[#CC5500] text-white hover:bg-[#b14900]",
             disabled: "text-gray-500",
           },
         },
@@ -333,7 +328,10 @@ const TableWithDatePicker = ({
                       rowOnClick ? "cursor-pointer" : ""
                     }
                   `}
-                  onClick={() => rowOnClick && rowOnClick(rowIndex)}
+                  onClick={() =>
+                    rowOnClick &&
+                    rowOnClick((currentPage - 1) * itemsPerPage + rowIndex)
+                  }
                 >
                   {row.map((cell, cellIndex) => (
                     <td

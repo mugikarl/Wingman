@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import Sidebar from "../components/navigations/Sidebar";
 import axios from "axios";
 import LoadingScreen from "../components/popups/LoadingScreen";
+import { HiChevronRight, HiChevronDown } from "react-icons/hi";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -37,84 +38,144 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
       total: 0,
       today: 0,
     },
+    expenses: {
+      total: 0,
+      today: 0,
+    },
     inventory: {
       low_stock: [],
       recent_stockin: [],
       recent_stockout: [],
     },
     sales_by_month: {
-      current_year: Array(12).fill(0),
-      previous_year: Array(12).fill(0),
+      current_month: Array(31).fill(0),
+      previous_month: Array(31).fill(0),
     },
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [filterDate, setFilterDate] = useState(new Date());
+  const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState(null);
+  const [isFetching, setIsFetching] = useState(false);
+
+  // Generate last 7 days for dropdown
+  const getLast7Days = () => {
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      days.push({
+        date: date,
+        formatted: date.toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        }),
+      });
+    }
+    return days;
+  };
+
+  const last7Days = getLast7Days();
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      setLoading(true);
-      try {
-        // Fetch dashboard data from our new endpoint
-        const response = await axios.get(
-          "http://127.0.0.1:8000/fetch-dashboard-data/"
-        );
+    if (!isFetching) {
+      fetchDashboardData();
+    }
+  }, [filterDate]);
 
-        if (response.data) {
-          setDashboardData(response.data);
-        }
-      } catch (err) {
-        console.error("Error fetching dashboard data:", err);
-        setError(err.message || "Error fetching data");
-      } finally {
-        setLoading(false);
+  const fetchDashboardData = async () => {
+    if (isFetching) return;
+
+    setIsFetching(true);
+    setLoading(true);
+    try {
+      // Format date for API request
+      const formattedDate = filterDate.toISOString().split("T")[0];
+
+      // Fetch dashboard data with date filter
+      const response = await axios.get(
+        `http://127.0.0.1:8000/fetch-dashboard-data/?date=${formattedDate}`
+      );
+
+      if (response.data) {
+        setDashboardData(response.data);
       }
-    };
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+      setError(err.message || "Error fetching data");
+    } finally {
+      setLoading(false);
+      setIsFetching(false);
+    }
+  };
 
-    fetchDashboardData();
-  }, []);
+  // Handle date selection
+  const handleDateChange = (date) => {
+    setFilterDate(date);
+    setDropdownVisible(false);
+  };
+
+  // Toggle dropdown visibility
+  const toggleDropdown = (dropdown) => {
+    if (activeDropdown === dropdown && dropdownVisible) {
+      setDropdownVisible(false);
+    } else {
+      setActiveDropdown(dropdown);
+      setDropdownVisible(true);
+    }
+  };
 
   // Calculate percentage change compared to previous period
   const calculatePercentageChange = () => {
-    const currentYearTotal = dashboardData.sales_by_month.current_year.reduce(
+    const currentMonthTotal = dashboardData.sales_by_month.current_month.reduce(
       (sum, val) => sum + val,
       0
     );
-    const previousYearTotal = dashboardData.sales_by_month.previous_year.reduce(
-      (sum, val) => sum + val,
-      0
-    );
+    const previousMonthTotal =
+      dashboardData.sales_by_month.previous_month.reduce(
+        (sum, val) => sum + val,
+        0
+      );
 
-    if (previousYearTotal === 0) return 0;
+    if (previousMonthTotal === 0) return 0;
     return Math.round(
-      ((currentYearTotal - previousYearTotal) / previousYearTotal) * 100
+      ((currentMonthTotal - previousMonthTotal) / previousMonthTotal) * 100
     );
   };
 
   const percentChange = calculatePercentageChange();
-  const currentYear = new Date().getFullYear();
+  const currentDate = new Date();
+  const currentMonth = currentDate.toLocaleString("default", { month: "long" });
+  const previousMonth = new Date(
+    currentDate.getFullYear(),
+    currentDate.getMonth() - 1
+  ).toLocaleString("default", { month: "long" });
+
+  // Generate day labels for the month (1-31)
+  const generateDayLabels = () => {
+    const daysInMonth = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      0
+    ).getDate();
+
+    return Array.from({ length: daysInMonth }, (_, i) => (i + 1).toString());
+  };
 
   // Prepare chart data to match the reference style
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-  ];
+  const dayLabels = generateDayLabels();
 
   const chartData = {
-    labels: months,
+    labels: dayLabels,
     datasets: [
       {
-        label: `${currentYear}`,
-        data: dashboardData.sales_by_month.current_year,
+        label: currentMonth,
+        data: dashboardData.sales_by_month.current_month.slice(
+          0,
+          dayLabels.length
+        ),
         borderColor: "#CC5500",
         backgroundColor: (context) => {
           const ctx = context.chart.ctx;
@@ -129,8 +190,11 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
         pointRadius: 0,
       },
       {
-        label: `${currentYear - 1}`,
-        data: dashboardData.sales_by_month.previous_year,
+        label: previousMonth,
+        data: dashboardData.sales_by_month.previous_month.slice(
+          0,
+          dayLabels.length
+        ),
         borderColor: "#F2B705",
         backgroundColor: (context) => {
           const ctx = context.chart.ctx;
@@ -250,6 +314,35 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
 
   const notifications = generateNotifications();
 
+  // Update the card label texts to reflect the selected date
+  const getDateLabel = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const filterDateCopy = new Date(filterDate);
+    filterDateCopy.setHours(0, 0, 0, 0);
+
+    // Check if selected date is today
+    if (filterDateCopy.getTime() === today.getTime()) {
+      return "Today";
+    }
+
+    // Check if selected date is yesterday
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (filterDateCopy.getTime() === yesterday.getTime()) {
+      return "Yesterday";
+    }
+
+    // Return date in short format for other dates
+    return filterDate.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const dateLabel = getDateLabel();
+
   if (loading) {
     return <LoadingScreen message={"Loading dashboard"} />;
   }
@@ -262,11 +355,40 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
     <div className="h-screen w-full flex flex-col p-6 bg-[#fcf4dc] overflow-hidden">
       {/* Dashboard content */}
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between shadow-xl">
-          <span className="text-white text-lg">Orders Today</span>
+        <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between shadow-xl relative">
+          <div className="flex justify-between items-center">
+            <span className="text-white text-lg">Orders {dateLabel}</span>
+            <button
+              onClick={() => toggleDropdown("orders")}
+              className="text-white hover:text-yellow-200 flex items-center"
+            >
+              {dropdownVisible && activeDropdown === "orders" ? (
+                <HiChevronDown size={24} />
+              ) : (
+                <HiChevronRight size={24} />
+              )}
+            </button>
+          </div>
           <div className="text-white text-3xl font-bold flex items-end">
             {dashboardData.orders.today}
           </div>
+          {dropdownVisible && activeDropdown === "orders" && (
+            <div className="absolute top-32 right-0 z-50 bg-white rounded-md shadow-lg py-1 w-48">
+              {last7Days.map((day, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleDateChange(day.date)}
+                  className={`w-full text-left px-4 py-2 hover:bg-[#fceee8] ${
+                    day.date.toDateString() === filterDate.toDateString()
+                      ? "bg-[#fceee8] text-[#CC5500] font-semibold"
+                      : "text-gray-700"
+                  }`}
+                >
+                  {day.formatted}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between">
           <span className="text-white text-lg">Total Orders</span>
@@ -276,8 +398,20 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
         </div>
         {isAdmin && (
           <>
-            <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between">
-              <span className="text-white text-lg">Sales Today</span>
+            <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between relative">
+              <div className="flex justify-between items-center">
+                <span className="text-white text-lg">Sales {dateLabel}</span>
+                <button
+                  onClick={() => toggleDropdown("sales")}
+                  className="text-white hover:text-yellow-200 flex items-center"
+                >
+                  {dropdownVisible && activeDropdown === "sales" ? (
+                    <HiChevronDown size={24} />
+                  ) : (
+                    <HiChevronRight size={24} />
+                  )}
+                </button>
+              </div>
               <div className="text-white text-3xl font-bold flex items-end">
                 ₱
                 {dashboardData.sales.today.toLocaleString("en-US", {
@@ -285,6 +419,23 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
                   maximumFractionDigits: 2,
                 })}
               </div>
+              {dropdownVisible && activeDropdown === "sales" && (
+                <div className="absolute top-32 right-0 z-50 bg-white rounded-md shadow-lg py-1 w-48">
+                  {last7Days.map((day, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleDateChange(day.date)}
+                      className={`w-full text-left px-4 py-2 hover:bg-[#fceee8] ${
+                        day.date.toDateString() === filterDate.toDateString()
+                          ? "bg-[#fceee8] text-[#CC5500] font-semibold"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      {day.formatted}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between">
               <span className="text-white text-lg">Total Sales</span>
@@ -299,6 +450,74 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
           </>
         )}
       </div>
+
+      {/* Expenses Row (Admin Only) */}
+      {isAdmin && (
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between shadow-xl relative">
+            <div className="flex justify-between items-center">
+              <span className="text-white text-lg">Expenses {dateLabel}</span>
+              <button
+                onClick={() => toggleDropdown("expenses")}
+                className="text-white hover:text-yellow-200 flex items-center"
+              >
+                {dropdownVisible && activeDropdown === "expenses" ? (
+                  <HiChevronDown size={24} />
+                ) : (
+                  <HiChevronRight size={24} />
+                )}
+              </button>
+            </div>
+            <div className="text-white text-3xl font-bold flex items-end">
+              ₱
+              {dashboardData.expenses.today.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </div>
+            {dropdownVisible && activeDropdown === "expenses" && (
+              <div className="absolute top-32 right-0 z-50 bg-white rounded-md shadow-lg py-1 w-48">
+                {last7Days.map((day, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleDateChange(day.date)}
+                    className={`w-full text-left px-4 py-2 hover:bg-[#fceee8] ${
+                      day.date.toDateString() === filterDate.toDateString()
+                        ? "bg-[#fceee8] text-[#CC5500] font-semibold"
+                        : "text-gray-700"
+                    }`}
+                  >
+                    {day.formatted}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="bg-[#CC5500] h-32 rounded-[15px] p-4 flex flex-col justify-between">
+            <span className="text-white text-lg">Total Expenses</span>
+            <div className="text-white text-3xl font-bold flex items-end">
+              ₱
+              {dashboardData.expenses.total.toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </div>
+          </div>
+          {/* <div className="col-span-2 flex">
+            <button
+              onClick={() => {
+                setFilterDate(new Date());
+              }}
+              className="bg-white/80 px-4 py-2 rounded-md text-center flex items-center hover:bg-white transition-colors duration-200"
+            >
+              <span className="text-[#CC5500] font-semibold mr-2">
+                Date Filter: {dateLabel}
+              </span>
+              <HiChevronRight size={20} className="text-[#CC5500]" />
+            </button>
+          </div> */}
+        </div>
+      )}
 
       {/* Bottom Section */}
       <div className="flex gap-4 flex-1 overflow-hidden">
@@ -317,7 +536,7 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
                   ({percentChange >= 0 ? "+" : ""}
                   {percentChange}%)
                 </span>
-                <span className="text-gray-500 ml-1">in {currentYear}</span>
+                <span className="text-gray-500 ml-1">vs {previousMonth}</span>
               </div>
             </div>
           </div>

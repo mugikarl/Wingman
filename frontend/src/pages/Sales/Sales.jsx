@@ -495,7 +495,7 @@ const Sales = () => {
       <div className="relative shadow-md rounded-b-sm border border-gray-300 border-t-0 flex flex-col">
         <div className="overflow-y-auto">
           <table className="w-full text-sm text-left text-gray-500 table-auto">
-            <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0 z-10">
+            <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
               <tr>
                 {["Date", "Sales", "Expenses", "Net Income"].map(
                   (column, index) => (
@@ -594,23 +594,6 @@ const Sales = () => {
                       </td>
                     </tr>
                   ))}
-                  {/* Fill remaining space with empty rows when fewer than itemsPerPage */}
-                  {displayData.length < itemsPerPage &&
-                    Array.from({
-                      length: itemsPerPage - displayData.length,
-                    }).map((_, index) => (
-                      <tr
-                        key={`empty-${index}`}
-                        className={`${
-                          (displayData.length + index) % 2 === 0
-                            ? "bg-white"
-                            : "bg-gray-50"
-                        } border-b`}
-                        style={{ height: "64px" }}
-                      >
-                        <td colSpan={4}>&nbsp;</td>
-                      </tr>
-                    ))}
                 </>
               ) : (
                 <>
@@ -629,7 +612,7 @@ const Sales = () => {
         </div>
 
         {/* Sticky footer and pagination */}
-        <div className="sticky bottom-0 left-0 right-0 bg-white z-10 w-full">
+        <div className="sticky bottom-0 left-0 right-0 bg-white w-full">
           {/* Totals row */}
           {!loading && data.some((row) => row.date === "Total") && (
             <table className="w-full text-sm text-left text-gray-500 table-auto">
