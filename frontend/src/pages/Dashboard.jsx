@@ -58,6 +58,7 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [isFetching, setIsFetching] = useState(false);
+  const [notificationFilter, setNotificationFilter] = useState("all");
 
   // Generate last 7 days for dropdown
   const getLast7Days = () => {
@@ -298,6 +299,7 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
       if (item.quantity === 0) {
         notifications.push({
           type: "danger", // New type for zero stock
+          category: "stock", // Add category for filtering
           message: `NO STOCK: ${item.name} (0/${item.stock_trigger} ${
             item.measurement || "units"
           })`,
@@ -305,6 +307,7 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
       } else {
         notifications.push({
           type: "warning",
+          category: "stock", // Add category for filtering
           message: `Low inventory: ${item.name} (${item.quantity}/${
             item.stock_trigger
           } ${item.measurement || "units"} left)`,
@@ -316,6 +319,7 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
     dashboardData.inventory.recent_stockin.forEach((item) => {
       notifications.push({
         type: "info",
+        category: "stockin", // Add category for filtering
         message: `Stock in: ${item.quantity_in} ${
           item.measurement || "units"
         } of ${item.item_name}`,
@@ -323,21 +327,45 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
       });
     });
 
-    // Recent stock out notifications
+    // Comment out Recent stock out notifications
+    /* 
     dashboardData.inventory.recent_stockout.forEach((item) => {
       notifications.push({
         type: "info",
+        category: "stockout", // Add category for filtering
         message: `Stock out: ${item.quantity_out} ${
           item.measurement || "units"
         } of ${item.item_name}`,
         date: item.date ? item.date : undefined,
       });
     });
+    */
 
     return notifications;
   };
 
-  const notifications = generateNotifications();
+  const allNotifications = generateNotifications();
+
+  // Filter notifications based on selected filter
+  const filteredNotifications = React.useMemo(() => {
+    if (notificationFilter === "all") {
+      return allNotifications;
+    } else if (notificationFilter === "stock") {
+      return allNotifications.filter((notif) => notif.category === "stock");
+    } else if (notificationFilter === "stockin") {
+      return allNotifications.filter((notif) => notif.category === "stockin");
+    }
+    return allNotifications;
+  }, [allNotifications, notificationFilter]);
+
+  // Handle filter button clicks
+  const handleFilterClick = (filter) => {
+    if (notificationFilter === filter) {
+      setNotificationFilter("all");
+    } else {
+      setNotificationFilter(filter);
+    }
+  };
 
   // Update the card label texts to reflect the selected date
   const getDateLabel = () => {
@@ -549,17 +577,50 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
           </div>
         </div>
         <div className="bg-white w-1/4 rounded-[15px] shadow flex flex-col overflow-hidden">
-          <div className="border-b mb-4">
-            <div className="flex justify-start items-center px-6 py-4">
+          <div className="border-b ">
+            <div className="flex justify-between items-center px-6 py-4">
               <span className="text-black font-semibold text-lg">
                 Notifications
               </span>
             </div>
+            {/* Add filter buttons row */}
+            <div className="flex gap-2 px-6 pb-4">
+              <button
+                onClick={() => setNotificationFilter("all")}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
+                  notificationFilter === "all"
+                    ? "bg-[#CC5500] text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => handleFilterClick("stock")}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
+                  notificationFilter === "stock"
+                    ? "bg-amber-500 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                Low/No Stocks
+              </button>
+              <button
+                onClick={() => handleFilterClick("stockin")}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors duration-200 ${
+                  notificationFilter === "stockin"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                Stock In
+              </button>
+            </div>
           </div>
-          <div className="flex-1 overflow-y-auto px-3 pb-3">
-            {notifications.length > 0 ? (
+          <div className="flex-1 overflow-y-auto px-3 py-3">
+            {filteredNotifications.length > 0 ? (
               <div className="space-y-3">
-                {notifications.map((notif, index) => (
+                {filteredNotifications.map((notif, index) => (
                   <div
                     key={index}
                     className={`p-3 rounded-md text-sm ${
