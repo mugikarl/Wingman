@@ -23,6 +23,7 @@ const TransactionModal = ({
   fetchOrderData,
   payment_methods,
   inventoryData,
+  fetchInventoryData,
 }) => {
   if (!isOpen || !transaction) return null;
 
@@ -43,13 +44,13 @@ const TransactionModal = ({
 
   // Order status and its dropdown
   const [orderStatus, setOrderStatus] = useState(() => {
-    // Get initial status from transaction
-    // First check order_status.name for status, then fall back to numeric status
+    // Always prioritize getting status from transaction.order_status.name
     if (transaction.order_status?.name) {
       return transaction.order_status.name;
     }
 
-    const statusId = Number(transaction.status);
+    // Fall back to numeric status if needed
+    const statusId = Number(transaction.status || transaction.order_status);
     switch (statusId) {
       case 1:
         return "Pending";
@@ -57,8 +58,10 @@ const TransactionModal = ({
         return "Completed";
       case 3:
         return "Cancelled";
+      case 4:
+        return "Complimentary";
       default:
-        console.log("Unknown status ID:", transaction.status);
+        console.log("Unknown status ID:", statusId);
         return "Pending"; // Default to Pending if status is missing or unknown
     }
   });
@@ -118,6 +121,9 @@ const TransactionModal = ({
           case 3:
             setOrderStatus("Cancelled");
             break;
+          case 4:
+            setOrderStatus("Complimentary");
+            break;
           default:
             setOrderStatus("Pending");
         }
@@ -136,6 +142,9 @@ const TransactionModal = ({
             break;
           case 3:
             setOrderStatus("Cancelled");
+            break;
+          case 4:
+            setOrderStatus("Complimentary");
             break;
           default:
             setOrderStatus("Pending");
@@ -168,11 +177,13 @@ const TransactionModal = ({
   const getOrderStatusClass = (status) => {
     switch (status) {
       case "Pending":
-        return "bg-orange-500 text-orange-500";
+        return "bg-orange-500 text-white";
       case "Completed":
         return "bg-green-500 text-white";
       case "Cancelled":
         return "bg-red-500 text-white";
+      case "Complimentary":
+        return "bg-blue-500 text-white";
       default:
         return "bg-gray-500 text-white";
     }
@@ -186,6 +197,8 @@ const TransactionModal = ({
         return "bg-green-600";
       case "Cancelled":
         return "bg-red-600";
+      case "Complimentary":
+        return "bg-blue-600";
       default:
         return "bg-gray-600";
     }
@@ -295,8 +308,10 @@ const TransactionModal = ({
   const isOrderNonEditable =
     orderStatus.toLowerCase() === "completed" ||
     orderStatus.toLowerCase() === "cancelled" ||
+    orderStatus.toLowerCase() === "complimentary" ||
     transaction.order_status === 2 || // Completed
-    transaction.order_status === 3; // Cancelled
+    transaction.order_status === 3 || // Cancelled
+    transaction.order_status === 4; // Complimentary
 
   // When an Update button is clicked:
   const handleUpdateClick = () => {
@@ -329,6 +344,8 @@ const TransactionModal = ({
           return 2;
         case "Cancelled":
           return 3;
+        case "Complimentary":
+          return 4;
         default:
           return 1;
       }
@@ -341,13 +358,9 @@ const TransactionModal = ({
       );
       if (isConfirmed) {
         setIsUpdatingStatus(true);
-        // Update local UI state
         setOrderStatus(newStatus);
         // Call API to update backend
-        const success = await updateOrderStatus(
-          transaction.id,
-          getStatusId(newStatus)
-        );
+        await updateOrderStatus(transaction.id, getStatusId(newStatus));
         setIsUpdatingStatus(false);
         if (success) onClose(); // Close modal after successful update
       }
@@ -358,9 +371,18 @@ const TransactionModal = ({
       );
       if (isConfirmed) {
         setIsUpdatingStatus(true);
-        // Update local UI state
         setOrderStatus(newStatus);
-        // Call API to update backend
+        await updateOrderStatus(transaction.id, getStatusId(newStatus));
+        setIsUpdatingStatus(false);
+      }
+    } else if (newStatus === "Complimentary") {
+      const isConfirmed = await confirm(
+        "Switching to Complimentary. This order will not contribute to sales totals. Are you sure?",
+        "Confirm Status Change"
+      );
+      if (isConfirmed) {
+        setIsUpdatingStatus(true);
+        setOrderStatus(newStatus);
         const success = await updateOrderStatus(
           transaction.id,
           getStatusId(newStatus)
@@ -373,10 +395,7 @@ const TransactionModal = ({
       setIsUpdatingStatus(true);
       setOrderStatus(newStatus);
       // Call API to update backend
-      const success = await updateOrderStatus(
-        transaction.id,
-        getStatusId(newStatus)
-      );
+      await updateOrderStatus(transaction.id, getStatusId(newStatus));
       setIsUpdatingStatus(false);
       if (success) onClose(); // Close modal after successful update
     }
@@ -405,10 +424,11 @@ const TransactionModal = ({
       console.log("Order status updated:", response.data);
 
       // Show detailed inventory information for completed orders
-      if (statusId === 2) {
-        // Completed
+      if (statusId === 2 || statusId === 4) {
+        // Completed or Complimentary
         // Extract deducted ingredients information from the response
         const deductedIngredients = response.data.deducted_ingredients || [];
+        const statusName = statusId === 2 ? "Completed" : "Complimentary";
 
         if (deductedIngredients.length > 0 && inventoryData) {
           // Create lookup maps for items and units
@@ -439,7 +459,9 @@ const TransactionModal = ({
 
           // Format the inventory information message
           let inventoryMessage =
-            "Order completed successfully. Inventory updated:\n\n";
+            statusId === 2
+              ? "Order completed successfully. Inventory updated:\n\n"
+              : "Complimentary order processed. Inventory updated:\n\n";
 
           deductedIngredients.forEach((item, index) => {
             // Get the item details
@@ -463,15 +485,27 @@ const TransactionModal = ({
           await alert(inventoryMessage, "Inventory Updated");
         } else {
           // Fallback to generic message
-          await alert(
-            "Order status updated to Completed. Ingredients have been deducted from inventory.",
-            "Status Updated"
-          );
+          const message =
+            statusId === 2
+              ? "Order status updated to Completed. Ingredients have been deducted from inventory."
+              : "Order status updated to Complimentary. Ingredients have been deducted from inventory (no sales recorded).";
+
+          await alert(message, "Status Updated");
         }
+      } else if (statusId === 3) {
+        // Cancelled
+        await alert("Order has been cancelled.", "Status Updated");
       }
 
-      // Refresh order data
-      fetchOrderData();
+      // Refresh both inventory and order data
+      await Promise.all([
+        fetchOrderData(),
+        fetchInventoryData && fetchInventoryData(),
+      ]);
+
+      // Close the modal after data refresh is complete
+      onClose();
+
       return true;
     } catch (error) {
       // Handle error
@@ -579,6 +613,7 @@ const TransactionModal = ({
                       <div className="absolute right-0 mt-2 w-40 rounded-md shadow-lg z-20">
                         <div className="bg-white rounded-md py-2">
                           {(transaction.status === 1 ||
+                            transaction.order_status === 1 ||
                             transaction.status === null ||
                             transaction.status === undefined) && (
                             <>
@@ -593,6 +628,12 @@ const TransactionModal = ({
                                 className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
                               >
                                 Cancelled
+                              </button>
+                              <button
+                                onClick={() => updateStatus("Complimentary")}
+                                className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                              >
+                                Complimentary
                               </button>
                             </>
                           )}

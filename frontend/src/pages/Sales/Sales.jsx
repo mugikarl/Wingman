@@ -13,6 +13,7 @@ import { PiStackPlus } from "react-icons/pi";
 import axios from "axios";
 import ExpensesType from "../../components/popups/ExpensesType";
 import DailySales from "../../components/popups/DailySales";
+import AddExpense from "../../components/popups/AddExpense";
 
 const Sales = () => {
   // State Management
@@ -20,6 +21,7 @@ const Sales = () => {
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState(null);
   const [salesData, setSalesData] = useState(null);
   const [data, setData] = useState([]);
@@ -47,14 +49,20 @@ const Sales = () => {
   const [isDailySalesOpen, setIsDailySalesOpen] = useState(false);
   const [selectedDateForDailySales, setSelectedDateForDailySales] =
     useState(null);
+  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
 
   useEffect(() => {
     setSelectedDate(month);
   }, [month]);
 
   // Data Fetching Function
-  const fetchSalesData = async () => {
-    setLoading(true);
+  const fetchSalesData = async (isInitialFetch = false) => {
+    if (isInitialFetch) {
+      setInitialLoading(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
       const response = await axios.get(
         `http://127.0.0.1:8000/fetch-sales-data/`
@@ -256,11 +264,23 @@ const Sales = () => {
       setData([]);
     } finally {
       setLoading(false);
+      if (isInitialFetch) {
+        setInitialLoading(false);
+      }
     }
   };
 
+  // Initial data fetch - use the isInitialFetch flag
   useEffect(() => {
-    fetchSalesData();
+    fetchSalesData(true);
+  }, []);
+
+  // Month change data fetch
+  useEffect(() => {
+    // Skip the first render which is handled by the initial data fetch
+    if (!initialLoading) {
+      fetchSalesData(false);
+    }
   }, [month]);
 
   // Generate page numbers for pagination
@@ -311,6 +331,7 @@ const Sales = () => {
 
   // Event Handlers
   const handleExportClick = () => setIsModalOpen(true);
+  const handleAddExpenseClick = () => setIsAddExpenseOpen(true);
   const handleAddExpenseTypeClick = () => setIsExpenseTypeModalOpen(true);
   const handlePreviousMonth = () => {
     const newMonth = new Date(month);
@@ -392,8 +413,23 @@ const Sales = () => {
     })}`;
   };
 
+  // Format date for input in the expense form
+  const formatDateForInput = (date) => {
+    if (!date) return "";
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   if (error) {
     return <div className="p-4 text-red-500">Error: {error}</div>;
+  }
+
+  // Show full-page LoadingScreen only during initial loading
+  if (initialLoading) {
+    return <LoadingScreen message="Loading sales data" />;
   }
 
   return (
@@ -401,6 +437,15 @@ const Sales = () => {
       {/* Buttons */}
       <div className="flex justify-between mb-4">
         <div className="flex gap-2">
+          <button
+            onClick={handleAddExpenseClick}
+            className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
+          >
+            <div className="flex items-center justify-center border-r p-2">
+              <FaPlus className="w-5 h-5 text-[#CC5500]" />
+            </div>
+            <span className="flex-1 text-left pl-3">Add Expense</span>
+          </button>
           <button
             onClick={handleAddExpenseTypeClick}
             className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
@@ -492,7 +537,7 @@ const Sales = () => {
       </div>
 
       {/* Table with sticky header & scrollable content */}
-      <div className="relative shadow-md rounded-b-sm border border-gray-300 border-t-0 flex flex-col">
+      <div className="relative border-t-0 flex flex-col">
         <div className="overflow-y-auto">
           <table className="w-full text-sm text-left text-gray-500 table-auto">
             <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
@@ -727,6 +772,19 @@ const Sales = () => {
           </div>
         </div>
       </div>
+
+      {/* Add the AddExpense component */}
+      {isAddExpenseOpen && (
+        <AddExpense
+          closePopup={() => setIsAddExpenseOpen(false)}
+          expenseTypes={salesData?.expenses_types || []}
+          onExpenseAdded={() => {
+            fetchSalesData();
+            setIsAddExpenseOpen(false);
+          }}
+          defaultDate={formatDateForInput(selectedDate)}
+        />
+      )}
 
       <ExportSales
         isOpen={isModalOpen}

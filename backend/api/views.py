@@ -3892,12 +3892,13 @@ def update_order_status(request, transaction_id):
             "order_status": status_id
         }).eq("id", transaction_id).execute()
 
-        # Only process ingredient deduction if changing to Completed status
+        # Only process ingredient deduction if changing to Completed or Complimentary status
         deducted_ingredients = []
         affected_menu_items = []
         
-        if int(status_id) == 2:  # Completed status
-            debug_steps.append("Status is Completed (2), will process ingredient deduction")
+        if int(status_id) == 2 or int(status_id) == 4:  # Completed or Complimentary status
+            status_name = "Completed" if int(status_id) == 2 else "Complimentary"
+            debug_steps.append(f"Status is {status_name} ({status_id}), will process ingredient deduction")
             # Import the conversion utility
             from .utils.conversion import convert_value
             
@@ -4010,10 +4011,13 @@ def update_order_status(request, transaction_id):
                                     })
                                     
                                      # Prepare disposal data
+                                    # For Complimentary orders, use reason_id: 4 (Complimentary)
+                                    reason_id = 5 if int(status_id) == 4 else 1
+                                    
                                     disposal_data = {
                                         "disposed_quantity": total_deduction,
                                         "inventory_id": inventory_id,
-                                        "reason_id": 1,
+                                        "reason_id": reason_id,
                                         "disposal_datetime": datetime.now().isoformat(),
                                         "disposed_unit": disposed_unit_id,
                                         "disposer": employee_id
@@ -4100,6 +4104,16 @@ def update_order_status(request, transaction_id):
                                 debug_steps.append(f"Error processing menu item {menu_id}: {str(menu_error)}")
                 except Exception as availability_error:
                     debug_steps.append(f"Error updating menu availability: {str(availability_error)}")
+
+                # For completed status only, display inventory details
+                if int(status_id) == 2:
+                    success_message = "Order status updated to Completed. Ingredients have been deducted from inventory."
+                else:
+                    success_message = "Order status updated to Complimentary. Ingredients have been deducted from inventory (no sales recorded)."
+                
+                # Add a specific message for Complimentary orders in the response
+                if int(status_id) == 4:
+                    debug_steps.append("Complimentary order: No sales will be recorded for this transaction")
         
         elif int(status_id) == 3:  # Cancelled status
             debug_steps.append("Status is Cancelled (3), no ingredient deduction needed")

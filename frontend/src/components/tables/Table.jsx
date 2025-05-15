@@ -121,7 +121,7 @@ const Table = ({
   return (
     <div className="w-full">
       <div
-        className="relative overflow-x-auto shadow-md sm:rounded-lg w-full border border-gray-300"
+        className="relative overflow-x-auto w-full "
         style={{ maxHeight, maxWidth }}
       >
         {/* Table header with table name */}

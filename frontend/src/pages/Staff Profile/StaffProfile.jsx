@@ -141,7 +141,7 @@ const StaffProfile = () => {
 
         {/* Table Section */}
         {loading ? (
-          <LoadingScreen />
+          <LoadingScreen message="Loading staff profile" />
         ) : (
           <div className="rounded-tr-lg">
             <Table
