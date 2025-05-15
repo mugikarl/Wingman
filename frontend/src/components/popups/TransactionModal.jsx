@@ -359,10 +359,8 @@ const TransactionModal = ({
       if (isConfirmed) {
         setIsUpdatingStatus(true);
         setOrderStatus(newStatus);
-        // Call API to update backend
         await updateOrderStatus(transaction.id, getStatusId(newStatus));
         setIsUpdatingStatus(false);
-        if (success) onClose(); // Close modal after successful update
       }
     } else if (newStatus === "Completed") {
       const isConfirmed = await confirm(
@@ -383,21 +381,15 @@ const TransactionModal = ({
       if (isConfirmed) {
         setIsUpdatingStatus(true);
         setOrderStatus(newStatus);
-        const success = await updateOrderStatus(
-          transaction.id,
-          getStatusId(newStatus)
-        );
+        await updateOrderStatus(transaction.id, getStatusId(newStatus));
         setIsUpdatingStatus(false);
-        if (success) onClose(); // Close modal after successful update
       }
     } else {
       // For Pending status
       setIsUpdatingStatus(true);
       setOrderStatus(newStatus);
-      // Call API to update backend
       await updateOrderStatus(transaction.id, getStatusId(newStatus));
       setIsUpdatingStatus(false);
-      if (success) onClose(); // Close modal after successful update
     }
     setIsStatusDropdownOpen(false);
   };
