@@ -195,11 +195,11 @@ const OrderTable = () => {
       <div className="flex justify-between items-start">
         <div>
           {/* Status Filters */}
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 flex-wrap">
             <button
               key="All"
               onClick={() => toggleStatus("All")}
-              className={`px-3 py-1 font-normal rounded-md transition-colors w-28 text-center border bg-white hover:bg-gray-200 shadow-s ${
+              className={`px-3 py-1 font-normal rounded-md transition-colors w-auto min-w-28 text-center border mb-2 mr-1 bg-white hover:bg-gray-200 shadow-sm ${
                 statusFilters.includes("All")
                   ? "border-l-4 border-[#CC5500] text-[#CC5500] hover:text-[#B34A00]"
                   : "border-gray-300 bg-white hover:bg-gray-200"
@@ -221,13 +221,16 @@ const OrderTable = () => {
                 } else if (status.name === "Cancelled") {
                   color =
                     "border-l-4 border-red-500 bg-white text-red-500 hover:text-red-600";
+                } else if (status.name === "Complimentary") {
+                  color =
+                    "border-l-4 border-blue-500 bg-white text-blue-500 hover:text-blue-600";
                 }
 
                 return (
                   <button
                     key={status.id}
                     onClick={() => toggleStatus(status.name)}
-                    className={`px-3 py-1 rounded-md transition-colors w-28 text-center border-gray-300 shadow-sm ${
+                    className={`px-3 py-1 rounded-md transition-colors w-auto min-w-28 text-center border-gray-300 shadow-sm mb-2 mr-1 ${
                       statusFilters.includes(status.name)
                         ? `${color} text-white border`
                         : "border bg-white hover:bg-gray-200"
@@ -302,7 +305,8 @@ const OrderTable = () => {
                 if (status === "Pending") return 1;
                 if (status === "Completed") return 2;
                 if (status === "Cancelled") return 3;
-                return 4; // Any other status
+                if (status === "Complimentary") return 4;
+                return 5; // Any other status
               };
 
               const statusA = a.order_status?.name || "";
@@ -367,6 +371,8 @@ const OrderTable = () => {
                 statusColor = "text-green-500 font-medium";
               } else if (status === "Cancelled") {
                 statusColor = "text-red-500 font-medium";
+              } else if (status === "Complimentary") {
+                statusColor = "text-blue-500 font-medium";
               }
 
               // Determine order type and its color
@@ -486,6 +492,7 @@ const OrderTable = () => {
         unliWingsCategory={unliWingsCategory}
         employees={orderData.employees}
         fetchOrderData={fetchOrderData}
+        fetchInventoryData={fetchInventoryData}
         payment_methods={orderData.payment_methods}
         inventoryData={inventoryData}
       />
