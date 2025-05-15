@@ -482,6 +482,9 @@ const Order = () => {
     employeeEmail,
     employeePasscode
   ) => {
+    // Add loading state
+    setLoading(true);
+
     // Construct order_details from selectedItems:
     const orderDetails = selectedItems.map((item) => {
       if (selectedMenuType && selectedMenuType.id === 1) {
@@ -535,11 +538,16 @@ const Order = () => {
         "Error placing order:",
         error.response ? error.response.data : error.message
       );
+      // Make sure to set loading to false in case of error
+      setLoading(false);
     }
   };
 
   return (
     <div className="h-screen w-full flex bg-[#fcf4dc] relative">
+      {/* Loading screen when submitting an order */}
+      {loading && <LoadingScreen message="Processing your order" />}
+
       {/* Disabled overlay for menu availability check */}
       {isCheckingMenuAvailability && (
         <div className="absolute inset-0 bg-gray-500 bg-opacity-50 z-10 flex items-center justify-center">

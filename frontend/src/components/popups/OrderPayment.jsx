@@ -176,31 +176,33 @@ const OrderPayment = ({
 
     // Proceed with order processing
     setIsProcessing(true);
-    setTimeout(() => {
-      if (selectedPaymentMethod.name.toLowerCase() === "cash") {
-        onPlaceOrder(
-          selectedEmployee.id,
-          selectedPaymentMethod.id,
-          Number.parseFloat(cashReceived) || 0,
-          null, // reference id for GCash
-          null, // receipt image for GCash
-          email, // Add employee email for verification
-          passcode // Add employee passcode for verification
-        );
-      } else if (selectedPaymentMethod.name.toLowerCase() === "gcash") {
-        onPlaceOrder(
-          selectedEmployee.id,
-          selectedPaymentMethod.id,
-          totalAmount,
-          gcashReferenceNo,
-          null, // Removed receipt image for GCash
-          email, // Add employee email for verification
-          passcode // Add employee passcode for verification
-        );
-      }
-      setIsProcessing(false);
-      onClose();
-    }, 1000);
+
+    // Call onPlaceOrder without setTimeout and without setting isProcessing to false or closing
+    if (selectedPaymentMethod.name.toLowerCase() === "cash") {
+      onPlaceOrder(
+        selectedEmployee.id,
+        selectedPaymentMethod.id,
+        Number.parseFloat(cashReceived) || 0,
+        null, // reference id for GCash
+        null, // receipt image for GCash
+        email, // Add employee email for verification
+        passcode // Add employee passcode for verification
+      );
+    } else if (selectedPaymentMethod.name.toLowerCase() === "gcash") {
+      onPlaceOrder(
+        selectedEmployee.id,
+        selectedPaymentMethod.id,
+        totalAmount,
+        gcashReferenceNo,
+        null, // Removed receipt image for GCash
+        email, // Add employee email for verification
+        passcode // Add employee passcode for verification
+      );
+    }
+
+    // Close the payment modal but don't set isProcessing to false
+    // Let the loading screen in the Order component handle the visual feedback
+    onClose();
   };
 
   if (!isOpen) return null;
