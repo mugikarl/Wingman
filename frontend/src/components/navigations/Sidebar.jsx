@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa"; // Import icons
@@ -26,8 +26,17 @@ const Sidebar = ({ isAdmin, setIsAdmin }) => {
     delete axios.defaults.headers.common["Authorization"];
 
     setIsAdmin(false);
+    setActiveButton(null);
+    setActiveDropdownButton(null);
+    setIsInventoryDropdownOpen(false);
     navigate("/dashboard");
   };
+
+  useEffect(() => {
+    setActiveButton(null);
+    setActiveDropdownButton(null);
+    setIsInventoryDropdownOpen(false);
+  }, [isAdmin]);
 
   const toggleInventoryDropdown = () => {
     setIsInventoryDropdownOpen((prev) => !prev);

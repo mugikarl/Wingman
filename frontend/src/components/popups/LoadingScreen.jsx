@@ -3,7 +3,7 @@ import LoadingVideo from "./LoadingScreen.gif";
 
 const LoadingScreen = ({ message }) => {
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 bg-[#fcf4dc]">
+    <div className="fixed inset-0 flex items-center justify-center z-40 bg-[#fcf4dc] ml-52">
       {/* GIF Container */}
       <div className="flex flex-col items-center z-10 relative">
         {/* GIF Image */}

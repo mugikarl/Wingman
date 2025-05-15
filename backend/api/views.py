@@ -2735,50 +2735,165 @@ def delete_menu_item(request, menu_id):
 @permission_classes([AllowAny])   
 def fetch_order_data(request, transactionId=None):
     try:
-        # Use exception handling for each database query to provide better error messages
+        # If transactionId is provided, only fetch data relevant to that transaction
+        if transactionId is not None:
+            try:
+                # Fetch just the specific transaction
+                transaction = supabase_anon.table("transaction").select(
+                    "id, date, payment_amount, order_status(id, name), payment_method, employee_id"
+                ).eq("id", transactionId).single().execute().data
+                
+                if not transaction:
+                    return Response({"error": "Transaction not found."}, status=404)
+                
+                # Fetch only the order details for this transaction
+                order_details = supabase_anon.table("order_details").select(
+                    "id, quantity, menu_id, discount_id, instore_category, transaction_id, unli_wings_group"
+                ).eq("transaction_id", transactionId).execute().data or []
+                
+                # Fetch only the data we need for this specific transaction
+                menu_ids = [od.get("menu_id") for od in order_details if od.get("menu_id")]
+                discount_ids = [od.get("discount_id") for od in order_details if od.get("discount_id")]
+                instore_category_ids = [od.get("instore_category") for od in order_details if od.get("instore_category")]
+                
+                # Only fetch the related data
+                menus = supabase_anon.table("menu_items").select(
+                    "id, name, type_id, price, image, status_id, category_id"
+                ).in_("id", menu_ids).execute().data or []
+                
+                # Always fetch all discounts for the component
+                discounts = supabase_anon.table("discounts").select("id, type, percentage").execute().data or []
+                
+                instore_categories = supabase_anon.table("instore_category").select(
+                    "id, name, base_amount"
+                ).in_("id", instore_category_ids).execute().data or []
+                
+                payment_methods = supabase_anon.table("payment_methods").select(
+                    "id, name"
+                ).eq("id", transaction.get("payment_method")).execute().data or []
+                
+                # Only fetch the specific employee
+                employee = None
+                if transaction.get("employee_id"):
+                    employee = supabase_anon.table("employee").select(
+                        "id, first_name, last_name"
+                    ).eq("id", transaction.get("employee_id")).single().execute().data
+                
+                # Create dictionaries for faster lookups
+                menu_dict = {menu["id"]: menu for menu in menus}
+                discount_dict = {discount["id"]: discount for discount in discounts}
+                instore_category_dict = {cat["id"]: cat for cat in instore_categories}
+                
+                # Process order details for this transaction
+                related_orders = []
+                for order in order_details:
+                    order_data = {
+                        "id": order["id"],
+                        "quantity": order["quantity"],
+                        "menu_item": menu_dict.get(order["menu_id"]),
+                        "discount": discount_dict.get(order["discount_id"]),
+                        "instore_category": instore_category_dict.get(order["instore_category"]),
+                        "unli_wings_group": order["unli_wings_group"]
+                    }
+                    related_orders.append(order_data)
+                
+                # Fetch GCash references for this transaction
+                gcash_references = supabase_anon.table("gcash_reference").select(
+                    "id, name, attached_transaction, paid_amount"
+                ).eq("attached_transaction", transactionId).execute().data or []
+                
+                # Build the transaction response
+                formatted_transaction = {
+                    "id": transaction["id"],
+                    "date": transaction["date"],
+                    "payment_amount": transaction["payment_amount"],
+                    "order_status": transaction["order_status"],
+                    "payment_method": payment_methods[0] if payment_methods else None,
+                    "employee": employee,
+                    "order_details": related_orders,
+                    "gcash_references": gcash_references
+                }
+                
+                return Response(formatted_transaction)
+            
+            except Exception as e:
+                return Response({"error": f"Error fetching transaction data: {str(e)}"}, status=500)
         
-        # Fetch menu types
+        # For the main list view, implement pagination
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 50))  # Default to 50 items per page
+        offset = (page - 1) * page_size
+        
+        # Fetch essential reference data first
         try:
             menu_types = supabase_anon.table("menu_type").select("id, name, deduction_percentage").execute().data or []
-        except Exception as e:
-            return Response({"error": f"Error fetching menu types: {str(e)}"}, status=500)
-            
-        # Fetch menu statuses
-        try:
             menu_statuses = supabase_anon.table("menu_status").select("id, name").execute().data or []
-        except Exception as e:
-            return Response({"error": f"Error fetching menu statuses: {str(e)}"}, status=500)
-            
-        # Fetch menu categories
-        try:
             menu_categories = supabase_anon.table("menu_category").select("id, name").execute().data or []
-        except Exception as e:
-            return Response({"error": f"Error fetching menu categories: {str(e)}"}, status=500)
+            order_status_types = supabase_anon.table("order_status_type").select("id, name").execute().data or []
             
-        # Fetch menus - implement pagination if there are many menu items
-        try:
-            menus = supabase_anon.table("menu_items").select("id, name, type_id, price, image, status_id, category_id").execute().data or []
+            # Always fetch ALL discounts since they're needed for the OrderEssentials component
+            discounts = supabase_anon.table("discounts").select("id, type, percentage").execute().data or []
             
-            formatted_menus = [
-                {
+            # Always fetch payment methods for OrderEssentials component
+            payment_methods = supabase_anon.table("payment_methods").select("id, name").execute().data or []
+            
+            # Always fetch instore categories for OrderEssentials component
+            instore_categories = supabase_anon.table("instore_category").select("id, name, base_amount").execute().data or []
+            
+            # Only fetch and process transactions with pagination
+            transactions = supabase_anon.table("transaction").select(
+                "id, date, payment_amount, order_status(id, name), payment_method, employee_id"
+            ).order("date", desc=True).range(offset, offset + page_size - 1).execute().data or []
+            
+            # Only fetch order details for these transactions
+            transaction_ids = [tx.get("id") for tx in transactions]
+            if not transaction_ids:
+                # Return early with empty transactions but include reference data
+                return Response({
+                    "menu_types": menu_types,
+                    "menu_statuses": menu_statuses,
+                    "menu_categories": menu_categories,
+                    "order_status_types": order_status_types,
+                    "discounts": discounts,
+                    "payment_methods": payment_methods,
+                    "instore_categories": instore_categories,
+                    "transactions": []
+                })
+            
+            # Fetch only order details for the paginated transactions
+            order_details = supabase_anon.table("order_details").select(
+                "id, quantity, menu_id, discount_id, instore_category, transaction_id, unli_wings_group"
+            ).in_("transaction_id", transaction_ids).execute().data or []
+            
+            # Extract all unique IDs needed for related data
+            menu_ids = list(set([od.get("menu_id") for od in order_details if od.get("menu_id")]))
+            
+            # Fetch only the data needed for these transactions
+            menus = supabase_anon.table("menu_items").select(
+                "id, name, type_id, price, status_id, category_id, image"
+            ).in_("id", menu_ids).execute().data or []
+            
+            # Only add image URLs for menus that have images
+            formatted_menus = []
+            for menu in menus:
+                menu_data = {
                     "id": menu["id"],
                     "name": menu["name"],
                     "type_id": menu["type_id"],
                     "category_id": menu["category_id"],
                     "price": menu["price"],
-                    "image": supabase_anon.storage.from_("menu-images").get_public_url(menu["image"]) if menu.get("image") else None,
                     "status_id": menu["status_id"]
                 }
-                for menu in menus
-            ]
-        except Exception as e:
-            return Response({"error": f"Error fetching menu items: {str(e)}"}, status=500)
+                if menu.get("image"):
+                    menu_data["image"] = supabase_anon.storage.from_("menu-images").get_public_url(menu["image"])
+                formatted_menus.append(menu_data)
             
-        # Fetch menu ingredients
-        try:
-            menu_ingredients = supabase_anon.table("menu_ingredients").select("id, menu_id, inventory_id, quantity, unit_id").execute().data or []
+            # Fetch menu ingredients for the specific menu items only if needed
+            menu_ingredients = supabase_anon.table("menu_ingredients").select(
+                "id, menu_id, inventory_id, quantity, unit_id"
+            ).in_("menu_id", menu_ids).execute().data or []
             
-            # Attach ingredients to menus - optimize by creating a dictionary first
+            # Organize menu ingredients by menu_id for faster lookup
             menu_ingredients_dict = {}
             for mi in menu_ingredients:
                 menu_id = mi.get("menu_id")
@@ -2786,85 +2901,29 @@ def fetch_order_data(request, transactionId=None):
                     menu_ingredients_dict[menu_id] = []
                 menu_ingredients_dict[menu_id].append(mi)
             
-            # Now attach ingredients to menus
+            # Attach ingredients to menus
             for menu in formatted_menus:
                 menu["menu_ingredients"] = menu_ingredients_dict.get(menu["id"], [])
-        except Exception as e:
-            return Response({"error": f"Error fetching menu ingredients: {str(e)}"}, status=500)
+                
+            # Fetch GCash references related to these transactions
+            gcash_references = supabase_anon.table("gcash_reference").select(
+                "id, name, attached_transaction, paid_amount"
+            ).in_("attached_transaction", transaction_ids).execute().data or []
             
-        # Fetch other essential data
-        try:
-            discounts = supabase_anon.table("discounts").select("id", "type", "percentage").execute().data or []
-            payment_methods = supabase_anon.table("payment_methods").select("id", "name").execute().data or []
-            instore_categories = supabase_anon.table("instore_category").select("id, name", "base_amount").execute().data or []
-            order_status_types = supabase_anon.table("order_status_type").select("id, name").execute().data or []
-            gcash_references = supabase_anon.table("gcash_reference").select("id, name, attached_transaction, paid_amount").execute().data or []
-        except Exception as e:
-            return Response({"error": f"Error fetching essential data: {str(e)}"}, status=500)
-            
-        # Process employee data with better error handling and caching possibility
-        try:
-            # Get current date in YYYY-MM-DD format
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            
-            # Fetch all active employees first
-            active_status_id = 1  # Assuming 1 = Active
-            employees_response = supabase_anon.table("employee") \
-                .select(
-                    "id, first_name, last_name, "
-                    "employee_status:employee_status(id, status_name), "
-                    "attendance:attendance(attendance_status:attendance_status(id, status_name), "
-                    "attendance_time:attendance_time(time_in, time_out))"
-            ).eq("employee_status.id", active_status_id).execute()
-            
-            all_employees = employees_response.data if employees_response.data else []
-            
-            # Create an employee dictionary for quicker lookups later
-            employee_dict = {emp["id"]: emp for emp in all_employees if "id" in emp}
-            
-            # Filter for employees who have timed in today - more efficient processing
+            # Get relevant employees based on transaction data
+            employee_ids = list(set([tx.get("employee_id") for tx in transactions if tx.get("employee_id")]))
             employees = []
-            for emp in all_employees:
-                # Get attendance records
-                attendance = emp.get("attendance", [])
-                
-                # Skip processing if no attendance records
-                if not attendance:
-                    continue
-                    
-                # Check if the employee has timed in today
-                time_in_today = False
-                if isinstance(attendance, list):
-                    for record in attendance:
-                        time_obj = record.get("attendance_time", {})
-                        t_in = time_obj.get("time_in")
-                        if t_in and t_in.startswith(today_str):
-                            time_in_today = True
-                            break
-                
-                # Only include employees who have timed in today
-                if time_in_today:
-                    employees.append({
-                        "id": emp.get("id"),
-                        "first_name": emp.get("first_name", ""),
-                        "last_name": emp.get("last_name", ""),
-                        "status_id": active_status_id
-                    })
-        except Exception as e:
-            return Response({"error": f"Error processing employee data: {str(e)}"}, status=500)
+            if employee_ids:
+                employees = supabase_anon.table("employee").select(
+                    "id, first_name, last_name"
+                ).in_("id", employee_ids).execute().data or []
             
-        # Process transaction data with optimized lookups
-        try:
             # Create dictionaries for faster lookups
             menu_dict = {menu["id"]: menu for menu in formatted_menus}
             discount_dict = {discount["id"]: discount for discount in discounts}
             instore_category_dict = {cat["id"]: cat for cat in instore_categories}
             payment_method_dict = {method["id"]: method for method in payment_methods}
-            
-            # Fetch order details and transactions in separate queries to optimize
-            order_details = supabase_anon.table("order_details").select(
-                "id", "quantity", "menu_id", "discount_id", "instore_category", "transaction_id", "unli_wings_group"
-            ).execute().data or []
+            employee_dict = {emp["id"]: emp for emp in employees}
             
             # Group order details by transaction ID for faster lookups
             order_details_by_transaction = {}
@@ -2873,11 +2932,6 @@ def fetch_order_data(request, transactionId=None):
                 if tx_id not in order_details_by_transaction:
                     order_details_by_transaction[tx_id] = []
                 order_details_by_transaction[tx_id].append(order)
-            
-            # Fetch transactions
-            transactions = supabase_anon.table("transaction").select(
-                "id, date, payment_amount, order_status(id, name), payment_method, employee_id"
-            ).execute().data or []
             
             # Group GCash references by transaction ID for faster lookups
             gcash_refs_by_transaction = {}
@@ -2920,14 +2974,8 @@ def fetch_order_data(request, transactionId=None):
                     "order_details": related_orders,
                     "gcash_references": gcash_references_for_transaction
                 })
-                
-            # If a transactionId is provided, filter the transaction
-            if transactionId is not None:
-                filtered = [tx for tx in formatted_transactions if tx["id"] == transactionId]
-                if not filtered:
-                    return Response({"error": "Transaction not found."}, status=404)
-                return Response(filtered[0])
-
+            
+            # Return the data needed for the order table and components
             return Response({
                 "menu_types": menu_types,
                 "menu_statuses": menu_statuses,
@@ -2944,7 +2992,7 @@ def fetch_order_data(request, transactionId=None):
             })
             
         except Exception as e:
-            return Response({"error": f"Error processing transaction data: {str(e)}"}, status=500)
+            return Response({"error": f"Error fetching order data: {str(e)}"}, status=500)
     
     except Exception as e:
         return Response({"error": f"Unexpected error: {str(e)}"}, status=500)
@@ -3892,13 +3940,12 @@ def update_order_status(request, transaction_id):
             "order_status": status_id
         }).eq("id", transaction_id).execute()
 
-        # Only process ingredient deduction if changing to Completed or Complimentary status
+        # Only process ingredient deduction if changing to Completed status
         deducted_ingredients = []
         affected_menu_items = []
         
-        if int(status_id) == 2 or int(status_id) == 4:  # Completed or Complimentary status
-            status_name = "Completed" if int(status_id) == 2 else "Complimentary"
-            debug_steps.append(f"Status is {status_name} ({status_id}), will process ingredient deduction")
+        if int(status_id) == 2:  # Completed status
+            debug_steps.append("Status is Completed (2), will process ingredient deduction")
             # Import the conversion utility
             from .utils.conversion import convert_value
             
@@ -4011,13 +4058,10 @@ def update_order_status(request, transaction_id):
                                     })
                                     
                                      # Prepare disposal data
-                                    # For Complimentary orders, use reason_id: 4 (Complimentary)
-                                    reason_id = 5 if int(status_id) == 4 else 1
-                                    
                                     disposal_data = {
                                         "disposed_quantity": total_deduction,
                                         "inventory_id": inventory_id,
-                                        "reason_id": reason_id,
+                                        "reason_id": 1,
                                         "disposal_datetime": datetime.now().isoformat(),
                                         "disposed_unit": disposed_unit_id,
                                         "disposer": employee_id
@@ -4104,16 +4148,6 @@ def update_order_status(request, transaction_id):
                                 debug_steps.append(f"Error processing menu item {menu_id}: {str(menu_error)}")
                 except Exception as availability_error:
                     debug_steps.append(f"Error updating menu availability: {str(availability_error)}")
-
-                # For completed status only, display inventory details
-                if int(status_id) == 2:
-                    success_message = "Order status updated to Completed. Ingredients have been deducted from inventory."
-                else:
-                    success_message = "Order status updated to Complimentary. Ingredients have been deducted from inventory (no sales recorded)."
-                
-                # Add a specific message for Complimentary orders in the response
-                if int(status_id) == 4:
-                    debug_steps.append("Complimentary order: No sales will be recorded for this transaction")
         
         elif int(status_id) == 3:  # Cancelled status
             debug_steps.append("Status is Cancelled (3), no ingredient deduction needed")
