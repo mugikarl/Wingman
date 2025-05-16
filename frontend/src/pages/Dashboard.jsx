@@ -52,13 +52,17 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
       previous_month: Array(31).fill(0),
     },
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterDate, setFilterDate] = useState(new Date());
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [isFetching, setIsFetching] = useState(false);
   const [notificationFilter, setNotificationFilter] = useState("all");
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [expensesLoading, setExpensesLoading] = useState(false);
 
   // Generate last 7 days for dropdown
   const getLast7Days = () => {
@@ -90,7 +94,15 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
     if (isFetching) return;
 
     setIsFetching(true);
-    setLoading(true);
+
+    if (initialLoading) {
+      setInitialLoading(true);
+    } else {
+      setOrdersLoading(true);
+      setSalesLoading(true);
+      setExpensesLoading(true);
+    }
+
     try {
       // Format date for API request
       const formattedDate = filterDate.toISOString().split("T")[0];
@@ -107,7 +119,10 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
       console.error("Error fetching dashboard data:", err);
       setError(err.message || "Error fetching data");
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setOrdersLoading(false);
+      setSalesLoading(false);
+      setExpensesLoading(false);
       setIsFetching(false);
     }
   };
@@ -396,13 +411,21 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
 
   const dateLabel = getDateLabel();
 
-  if (loading) {
+  // Show full-page loading screen only for initial loading
+  if (initialLoading) {
     return <LoadingScreen message={"Loading dashboard"} />;
   }
 
   if (error) {
     return <div className="p-4 text-red-500">Error: {error}</div>;
   }
+
+  // Card Loading Spinner Component
+  const CardLoadingSpinner = () => (
+    <div className="flex justify-center items-center h-full">
+      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+    </div>
+  );
 
   return (
     <div className="h-screen w-full flex flex-col p-6 bg-[#fcf4dc] overflow-hidden">
@@ -422,8 +445,12 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
               )}
             </button>
           </div>
-          <div className="text-white text-3xl font-bold flex items-end">
-            {dashboardData.orders.today}
+          <div className="text-white text-3xl font-bold flex items-center">
+            {ordersLoading ? (
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-2"></div>
+            ) : (
+              dashboardData.orders.today
+            )}
           </div>
           <div className="text-white/80 text-sm mt-1">
             All Time Orders: {dashboardData.orders.total}
@@ -463,12 +490,16 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
                   )}
                 </button>
               </div>
-              <div className="text-white text-3xl font-bold flex items-end">
+              <div className="text-white text-3xl font-bold flex items-center">
                 ₱
-                {dashboardData.sales.today.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+                {salesLoading ? (
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white ml-2"></div>
+                ) : (
+                  dashboardData.sales.today.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })
+                )}
               </div>
               <div className="text-white/80 text-sm mt-1">
                 All Time Sales: ₱
@@ -510,12 +541,16 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
                   )}
                 </button>
               </div>
-              <div className="text-white text-3xl font-bold flex items-end">
+              <div className="text-white text-3xl font-bold flex items-center">
                 ₱
-                {dashboardData.expenses.today.toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+                {expensesLoading ? (
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white ml-2"></div>
+                ) : (
+                  dashboardData.expenses.today.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })
+                )}
               </div>
               <div className="text-white/80 text-sm mt-1">
                 All Time Expenses: ₱
