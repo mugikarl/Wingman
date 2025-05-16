@@ -58,6 +58,8 @@ const Login = ({ setIsAdmin }) => {
       }
 
       localStorage.setItem("access_token", access_token);
+      // Also store the user's email for identification
+      localStorage.setItem("user_email", email);
       axios.defaults.headers.common["Authorization"] = `Bearer ${access_token}`;
 
       // Proceed only if the user is an admin.
@@ -68,6 +70,7 @@ const Login = ({ setIsAdmin }) => {
       } else {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
+        localStorage.removeItem("user_email");
         setError("Access denied: Only Admins can log in");
         setIsLoading(false);
       }

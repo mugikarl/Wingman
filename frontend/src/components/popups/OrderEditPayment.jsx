@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { FaMoneyBill, FaCreditCard } from "react-icons/fa6";
 import { useModal } from "../utils/modalUtils";
 import EmployeeVerification from "./EmployeeVerification";
+import axios from "axios";
 
 const OrderEditPayment = ({
   isOpen,
@@ -127,8 +128,53 @@ const OrderEditPayment = ({
       }
     }
 
-    // Open verification modal to verify the employee
-    setIsVerificationModalOpen(true);
+    // Check if user is admin
+    const isAdmin = localStorage.getItem("role") === "Admin";
+    const token = localStorage.getItem("access_token");
+
+    if (isAdmin && token) {
+      // Admin can place order directly without verification
+      setIsProcessing(true);
+
+      // Ensure header is set
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+      // Build payload details
+      const newPaymentAmount =
+        selectedPaymentMethod.name.toLowerCase() === "cash"
+          ? (Number.parseFloat(cashReceived) || 0) - change
+          : extraPaymentRequired;
+
+      // Create the payload with payment details
+      const payload = {
+        employee_id: transaction.employee.id,
+        payment_method: selectedPaymentMethod.id,
+        payment_amount: transaction.payment_amount + newPaymentAmount,
+        reference_id: gcashReferenceNo || transaction.reference_id,
+        additional_payment: extraPaymentRequired, // Add the extra payment amount needed
+      };
+
+      console.log("Admin submitting payment with payload:", payload);
+
+      handleEditOrder(payload)
+        .then((data) => {
+          onUpdateComplete(data);
+          onClose();
+          fetchOrderData();
+        })
+        .catch((error) => {
+          console.error(
+            "Error updating order:",
+            error.response ? error.response.data : error.message
+          );
+        })
+        .finally(() => {
+          setIsProcessing(false);
+        });
+    } else {
+      // Open verification modal for non-admin users
+      setIsVerificationModalOpen(true);
+    }
   };
 
   const handleVerificationSuccess = (email, passcode) => {
@@ -144,18 +190,31 @@ const OrderEditPayment = ({
         ? (Number.parseFloat(cashReceived) || 0) - change
         : extraPaymentRequired;
 
+    // Check if the user is admin
+    const isAdmin = localStorage.getItem("role") === "Admin";
+    const token = localStorage.getItem("access_token");
+
     // Create the payload with payment details and verification info
     const payload = {
       employee_id: transaction.employee.id,
       payment_method: selectedPaymentMethod.id,
       payment_amount: transaction.payment_amount + newPaymentAmount,
       reference_id: gcashReferenceNo || transaction.reference_id,
-      employee_email: email, // Add employee email for verification
-      employee_passcode: passcode, // Add employee passcode for verification
       additional_payment: extraPaymentRequired, // Add the extra payment amount needed
     };
 
+    // Only include verification fields if not admin
+    if (!isAdmin) {
+      payload.email = email;
+      payload.passcode = passcode;
+    }
+
     console.log("Submitting payment with payload:", payload);
+
+    // Make sure Authorization header is set if admin
+    if (isAdmin && token) {
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    }
 
     handleEditOrder(payload)
       .then((data) => {

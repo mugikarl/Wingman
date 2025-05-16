@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
-import { PiMagnifyingGlass, PiCirclesThreePlusLight, PiCaretDown } from "react-icons/pi";
+import {
+  PiMagnifyingGlass,
+  PiCirclesThreePlusLight,
+  PiCaretDown,
+} from "react-icons/pi";
 import { BiFoodMenu } from "react-icons/bi";
 import { MdCheckBox, MdCheckBoxOutlineBlank } from "react-icons/md";
 import ChooseOrder from "../../components/popups/ChooseOrder";
@@ -23,6 +27,7 @@ const OrderTable = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [inventoryData, setInventoryData] = useState(null);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const statusDropdownRef = useRef(null);
   const location = useLocation();
 
@@ -129,7 +134,9 @@ const OrderTable = () => {
   };
 
   useEffect(() => {
-    console.log("Location state:", location.state); // Debug log
+    const role = localStorage.getItem("role");
+    setIsAdmin(role === "Admin");
+    console.log("Location state:", location.state);
     if (location.state?.refresh) {
       fetchOrderData();
       fetchInventoryData();
@@ -142,7 +149,10 @@ const OrderTable = () => {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
+      if (
+        statusDropdownRef.current &&
+        !statusDropdownRef.current.contains(event.target)
+      ) {
         setIsStatusDropdownOpen(false);
       }
     };
@@ -224,19 +234,29 @@ const OrderTable = () => {
           {/* Filters Row - Status dropdown and Transaction Type buttons in same row */}
           <div className="flex space-x-2 flex-wrap">
             {/* Status Filters Dropdown */}
-            <div className="relative" ref={statusDropdownRef}>
+            <div className="justify-between" ref={statusDropdownRef}>
               <button
                 onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
                 className="px-3 py-1 font-normal rounded-md transition-colors w- text-center border mb-2 mr-1 bg-white hover:bg-gray-200 shadow-sm flex justify-between items-center"
               >
-                <span>{statusFilters.includes("All") ? "All" : statusFilters.length > 1 ? `${statusFilters.length} selected` : statusFilters[0]}</span>
-                <PiCaretDown className={`transform ${isStatusDropdownOpen ? 'rotate-180' : ''} transition-transform`} />
+                <span>
+                  {statusFilters.includes("All")
+                    ? "All"
+                    : statusFilters.length > 1
+                    ? `${statusFilters.length} selected`
+                    : statusFilters[0]}
+                </span>
+                <PiCaretDown
+                  className={`transform ${
+                    isStatusDropdownOpen ? "rotate-180" : ""
+                  } transition-transform`}
+                />
               </button>
-              
+
               {isStatusDropdownOpen && (
                 <div className="absolute z-10 w-56 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
                   <div className="p-2 border-b">
-                    <div 
+                    <div
                       className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md"
                       onClick={() => {
                         toggleStatus("All");
@@ -257,7 +277,7 @@ const OrderTable = () => {
                       .sort((a, b) => a.id - b.id)
                       .map((status) => {
                         let textColor = "text-gray-700";
-                        
+
                         if (status.name === "Pending") {
                           textColor = "text-yellow-400";
                         } else if (status.name === "Completed") {
@@ -269,7 +289,7 @@ const OrderTable = () => {
                         }
 
                         return (
-                          <div 
+                          <div
                             key={status.id}
                             className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md mx-2"
                             onClick={() => toggleStatus(status.name)}
@@ -279,7 +299,13 @@ const OrderTable = () => {
                             ) : (
                               <MdCheckBoxOutlineBlank className="mr-2 text-gray-400" />
                             )}
-                            <span className={statusFilters.includes(status.name) ? textColor : ""}>
+                            <span
+                              className={
+                                statusFilters.includes(status.name)
+                                  ? textColor
+                                  : ""
+                              }
+                            >
                               {status.name}
                             </span>
                           </div>
@@ -318,8 +344,8 @@ const OrderTable = () => {
           </div>
         </div>
 
-        {/* Order Essentials button in second row */}
-        <div className="mt-2">
+        {/* Order Essentials*/}
+        {isAdmin && (
           <button
             onClick={openOrderEssentialsModal}
             className="flex items-center bg-white border hover:bg-gray-200 text-[#CC5500] shadow-sm rounded-sm duration-200 w-48 overflow-hidden"
@@ -329,7 +355,7 @@ const OrderTable = () => {
             </div>
             <span className="flex-1 text-left pl-3">Order Essentials</span>
           </button>
-        </div>
+        )}
       </div>
 
       <div className="mt-4">

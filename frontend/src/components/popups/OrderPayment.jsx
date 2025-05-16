@@ -10,7 +10,7 @@ const OrderPayment = ({
   totalAmount,
   onPlaceOrder,
   paymentMethods,
-  employees, // Array of employee objects
+  employees,
 }) => {
   // Instead of a string, store the selected payment method object
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
@@ -26,8 +26,11 @@ const OrderPayment = ({
   const [loading, setLoading] = useState(false);
   // Verification modal
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
-
   const { alert } = useModal();
+  // Add a new state to track if the user is admin
+  const [isAdmin, setIsAdmin] = useState(false);
+  // State to store the current user's email
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
 
   // Helper to get today's date in YYYY-MM-DD format (in local timezone)
   const getTodayDateString = () => {
@@ -39,53 +42,132 @@ const OrderPayment = ({
     return `${year}-${month}-${day}`;
   };
 
+  // This function fetches currently logged-in admin data
+  const fetchCurrentAdminData = async (token, userEmail) => {
+    try {
+      console.log("Fetching admin data for email:", userEmail);
+      // Use the token to fetch employee data (which includes roles)
+      const response = await axios.get(
+        "http://127.0.0.1:8000/fetch-employee-data/",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data && response.data.employees) {
+        const allEmployees = response.data.employees;
+        console.log("All employees from admin API:", allEmployees);
+
+        // Find the employee that matches the logged-in user's email
+        const currentAdmin = allEmployees.find(
+          (emp) =>
+            emp.email && emp.email.toLowerCase() === userEmail.toLowerCase()
+        );
+
+        if (currentAdmin) {
+          console.log("Found current admin:", currentAdmin);
+          return currentAdmin;
+        } else {
+          console.log("Current admin not found in employee list");
+          return null;
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching current admin data:", error);
+      return null;
+    }
+  };
+
   // Fetch employees who have timed in for current day
   useEffect(() => {
     if (isOpen) {
+      const role = localStorage.getItem("role");
+      const token = localStorage.getItem("access_token");
+      const userEmail = localStorage.getItem("user_email");
+      setCurrentUserEmail(userEmail || "");
+
+      // Check if user is admin
+      const isAdminUser = role === "Admin" && token;
+      setIsAdmin(isAdminUser);
+
+      // Log what we have
+      console.log("User is admin:", isAdminUser);
+      console.log("User email from localStorage:", userEmail);
+
       setLoading(true);
 
       // Get today's date in the format expected by the API
       const todayDate = getTodayDateString();
       const url = `http://127.0.0.1:8000/fetch-attendance-data/?date=${todayDate}`;
 
-      axios
-        .get(url)
-        .then((response) => {
+      // Define async function to handle both API calls
+      const fetchData = async () => {
+        try {
+          // First fetch attendance data
+          const attendanceResponse = await axios.get(url);
+
           // Filter for active employees who have timed in
-          const timedIn = response.data.filter(
-            (emp) => emp.employeeStatus === "ACTIVE" && emp.timeIn
+          const timedIn = attendanceResponse.data.filter(
+            (emp) =>
+              emp.employeeStatus === "ACTIVE" &&
+              emp.timeIn &&
+              emp.timeIn !== "-"
           );
 
+          // Set timed in employees for display in dropdown
           setTimedInEmployees(timedIn);
-          console.log("Timed in employees:", timedIn.length);
 
-          // Set default to first timed in employee if available
-          if (timedIn.length > 0) {
-            // Find corresponding employee from the full employees list
-            const matchedEmployee = employees?.find(
-              (emp) => String(emp.id) === String(timedIn[0].id)
+          if (isAdminUser && userEmail) {
+            // For admin users, we want to find the logged-in admin in the employees array
+
+            // First check if the admin is in the provided employees list
+            let adminEmployee = employees?.find(
+              (emp) =>
+                // Check if this employee has the admin role
+                emp.employee_role?.some((role) => role.role_id === 1) &&
+                // Check if this employee is active
+                emp.status_id === 1
             );
-            setSelectedEmployee(matchedEmployee || null);
-            console.log("Set default employee:", matchedEmployee?.id);
+
+            if (!adminEmployee && token) {
+              // If admin not found in employees list, fetch directly from API
+              adminEmployee = await fetchCurrentAdminData(token, userEmail);
+            }
+
+            if (adminEmployee) {
+              console.log("Setting admin employee:", adminEmployee);
+              setSelectedEmployee(adminEmployee);
+            } else {
+              console.log("No admin employee found");
+            }
           } else {
-            setSelectedEmployee(null);
-            console.log("No timed-in employees available");
+            // For non-admin, only show employees who have timed in
+            if (timedIn.length > 0) {
+              const matchedEmployee = employees?.find(
+                (emp) => String(emp.id) === String(timedIn[0].id)
+              );
+              setSelectedEmployee(matchedEmployee || null);
+            } else {
+              setSelectedEmployee(null);
+            }
           }
-        })
-        .catch((error) => {
-          console.error("Error fetching timed in employees:", error);
-        })
-        .finally(() => {
+        } catch (error) {
+          console.error("Error fetching data:", error);
+        } finally {
           setLoading(false);
-        });
+        }
+      };
+
+      // Call the async function
+      fetchData();
 
       // Set default payment method
       if (paymentMethods && paymentMethods.length > 0) {
         setSelectedPaymentMethod(paymentMethods[0]);
-        console.log("Set default payment method:", paymentMethods[0].id);
       } else {
         setSelectedPaymentMethod(null);
-        console.log("No payment methods available");
       }
 
       // Reset other form fields
@@ -165,8 +247,40 @@ const OrderPayment = ({
       }
     }
 
-    // Open verification modal instead of proceeding directly
-    setIsVerificationModalOpen(true);
+    // Check if user is admin
+    const role = localStorage.getItem("role");
+    const token = localStorage.getItem("access_token");
+    const userEmail = localStorage.getItem("user_email");
+
+    if (role === "Admin" && token) {
+      // Admin can place order directly without verification
+      setIsProcessing(true);
+
+      // For admin users, ensure the Authorization header is sent
+      // This requires modifying the axios configuration in your app
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+      if (selectedPaymentMethod.name.toLowerCase() === "cash") {
+        onPlaceOrder(
+          selectedEmployee.id,
+          selectedPaymentMethod.id,
+          Number.parseFloat(cashReceived) || 0,
+          null, // reference id for GCash
+          null // receipt image for GCash
+        );
+      } else if (selectedPaymentMethod.name.toLowerCase() === "gcash") {
+        onPlaceOrder(
+          selectedEmployee.id,
+          selectedPaymentMethod.id,
+          totalAmount,
+          gcashReferenceNo,
+          null // receipt image for GCash
+        );
+      }
+      onClose();
+    } else {
+      setIsVerificationModalOpen(true);
+    }
   };
 
   // This is called when verification is successful
@@ -229,7 +343,17 @@ const OrderPayment = ({
               <div className="w-full p-2 border rounded-md bg-gray-100">
                 Loading...
               </div>
+            ) : isAdmin ? (
+              // For Admin, display the admin name directly (not a dropdown)
+              <div className="w-full p-2 border rounded-md bg-gray-50 font-medium text-gray-800">
+                {selectedEmployee
+                  ? `${selectedEmployee.first_name || ""} ${
+                      selectedEmployee.last_name || ""
+                    } (Admin)`
+                  : "Admin User"}
+              </div>
             ) : timedInEmployees.length > 0 ? (
+              // For non-admin, show only employees who have timed in
               <select
                 value={selectedEmployee ? selectedEmployee.id : ""}
                 onChange={(e) => {
@@ -252,7 +376,7 @@ const OrderPayment = ({
 
                   return (
                     <option key={emp.id} value={emp.id}>
-                      {employee.first_name} {employee.last_name}
+                      {employee.first_name || ""} {employee.last_name || ""}
                     </option>
                   );
                 })}

@@ -316,8 +316,15 @@ const TransactionModal = ({
   // When an Update button is clicked:
   const handleUpdateClick = () => {
     if (isOrderNonEditable) return;
+
+    // Make sure admin token is included in the request if the user is an admin
+    const isAdmin = localStorage.getItem("role") === "Admin";
+    if (isAdmin) {
+      const token = localStorage.getItem("access_token");
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    }
+
     setIsEditModalOpen(true);
-    // Do not call onClose() here so that OrderEditModal (rendered below) remains in the tree.
   };
 
   // Callback for when OrderEditModal completes update
@@ -781,10 +788,14 @@ const TransactionModal = ({
                                   <div className="h-[200px] overflow-y-auto overflow-x-hidden w-full">
                                     <Table
                                       columns={["Menu Item", "Quantity"]}
-                                      data={groupOrders.map((detail) => [
-                                        detail?.menu_item?.name || "N/A",
-                                        detail?.quantity || 0,
-                                      ])}
+                                      data={
+                                        groupOrders && groupOrders.length > 0
+                                          ? groupOrders.map((detail) => [
+                                              detail?.menu_item?.name || "N/A",
+                                              detail?.quantity || 0,
+                                            ])
+                                          : []
+                                      }
                                       maxHeight="100%"
                                     />
                                     {/* {!isOrderNonEditable && (
@@ -823,21 +834,25 @@ const TransactionModal = ({
                               "Discounts",
                               "Total",
                             ]}
-                            data={alaCarteOrders.map((detail) => {
-                              const quantity = detail?.quantity || 0;
-                              const price = detail?.menu_item?.price || 0;
-                              const discount =
-                                detail?.discount?.percentage || 0;
-                              const computedTotal =
-                                quantity * price * (1 - discount);
-                              return [
-                                detail?.menu_item?.name || "N/A",
-                                detail?.quantity || 0,
-                                `₱${price.toFixed(2)}`,
-                                `${(discount * 100).toFixed(0)}%`,
-                                `₱${computedTotal.toFixed(2)}`,
-                              ];
-                            })}
+                            data={
+                              alaCarteOrders && alaCarteOrders.length > 0
+                                ? alaCarteOrders.map((detail) => {
+                                    const quantity = detail?.quantity || 0;
+                                    const price = detail?.menu_item?.price || 0;
+                                    const discount =
+                                      detail?.discount?.percentage || 0;
+                                    const computedTotal =
+                                      quantity * price * (1 - discount);
+                                    return [
+                                      detail?.menu_item?.name || "N/A",
+                                      detail?.quantity || 0,
+                                      `₱${price.toFixed(2)}`,
+                                      `${(discount * 100).toFixed(0)}%`,
+                                      `₱${computedTotal.toFixed(2)}`,
+                                    ];
+                                  })
+                                : []
+                            }
                           />
                         ) : (
                           <div className="bg-gray-100 p-4 rounded-lg text-gray-500 text-center">
@@ -863,15 +878,19 @@ const TransactionModal = ({
                     {orderDetails.length > 0 ? (
                       <Table
                         columns={["Menu Item", "Quantity", "Price"]}
-                        data={orderDetails.map((detail) => {
-                          const quantity = detail?.quantity || 0;
-                          const price = detail?.menu_item?.price || 0;
-                          return [
-                            detail?.menu_item?.name || "N/A",
-                            quantity,
-                            `₱${price.toFixed(2)}`,
-                          ];
-                        })}
+                        data={
+                          orderDetails && orderDetails.length > 0
+                            ? orderDetails.map((detail) => {
+                                const quantity = detail?.quantity || 0;
+                                const price = detail?.menu_item?.price || 0;
+                                return [
+                                  detail?.menu_item?.name || "N/A",
+                                  quantity,
+                                  `₱${price.toFixed(2)}`,
+                                ];
+                              })
+                            : []
+                        }
                       />
                     ) : (
                       <div className="bg-gray-100 p-4 rounded-lg text-gray-500 text-center">

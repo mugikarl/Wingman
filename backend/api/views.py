@@ -2910,13 +2910,10 @@ def fetch_order_data(request, transactionId=None):
                 "id, name, attached_transaction, paid_amount"
             ).in_("attached_transaction", transaction_ids).execute().data or []
             
-            # Get relevant employees based on transaction data
-            employee_ids = list(set([tx.get("employee_id") for tx in transactions if tx.get("employee_id")]))
-            employees = []
-            if employee_ids:
-                employees = supabase_anon.table("employee").select(
-                    "id, first_name, last_name"
-                ).in_("id", employee_ids).execute().data or []
+            # Get relevant employees based on their active status
+            employees = supabase_anon.table("employee").select(
+                "id, first_name, last_name, employee_role(role_id)"
+            ).eq("status_id", 1).execute().data or []
             
             # Create dictionaries for faster lookups
             menu_dict = {menu["id"]: menu for menu in formatted_menus}
@@ -3334,47 +3331,92 @@ def add_order(request):
         if not order_details:
             return Response({"error": "No order details provided."}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Verify employee credentials - similar to time_in function
-        if not employee_id or not entered_passcode or not provided_email:
-            return Response({"error": "Missing employee verification fields."}, status=400)
-            
-        # Query the employee record
-        employee_response = (
-            supabase_service.table("employee")
-            .select("id, user_id, first_name, last_name")
-            .eq("id", employee_id)
-            .single()
-            .execute()
-        )
-        if not employee_response.data:
-            return Response({"error": "Employee not found."}, status=404)
-            
-        employee = employee_response.data
-        if not employee.get("user_id"):
-            return Response({"error": "Employee not linked to an auth user."}, status=400)
-            
-        # Fetch user details using the admin client
-        user_response = supabase_service.auth.admin.get_user_by_id(employee["user_id"])
-        if not (user_response and user_response.user):
-            return Response({"error": "Unable to fetch user authentication details."}, status=404)
-            
-        # Ensure the provided email matches the employee's registered email
-        if provided_email.lower() != user_response.user.email.lower():
-            return Response(
-                {"error": "Provided email does not match the selected employee's email."},
-                status=400,
-            )
-            
-        # Attempt to sign in using the provided email and passcode
-        sign_in_response = supabase_service.auth.sign_in_with_password({
-            "email": provided_email,
-            "password": entered_passcode
-        })
-        if not getattr(sign_in_response, "user", None):
-            return Response({"error": "Invalid passcode."}, status=401)
-        # Sign out after successful sign in
-        supabase_service.auth.sign_out()
+        # Check if we need to verify the employee (skip verification for admin users)
+        is_admin = False
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            if token and is_valid_supabase_token(token):
+                # Check if this token belongs to an admin user
+                try:
+                    user_response = supabase_service.auth.get_user(token)
+                    if user_response and user_response.user:
+                        auth_user_uuid = user_response.user.id
+                        
+                        # Look up the employee by user_id
+                        employee_lookup = supabase_service.table("employee") \
+                            .select("id") \
+                            .eq("user_id", auth_user_uuid) \
+                            .single() \
+                            .execute()
+                        
+                        if employee_lookup.data:
+                            admin_employee_pk = employee_lookup.data["id"]
+                            
+                            # Check if this employee has admin role
+                            role_mapping = supabase_service.table("employee_role") \
+                                .select("role_id") \
+                                .eq("employee_id", admin_employee_pk) \
+                                .execute()
+                            
+                            if role_mapping.data:
+                                role_ids = [entry["role_id"] for entry in role_mapping.data]
+                                
+                                # Get admin role ID
+                                admin_role = supabase_service.table("role") \
+                                    .select("id") \
+                                    .eq("role_name", "Admin") \
+                                    .single() \
+                                    .execute()
+                                
+                                if admin_role.data and admin_role.data["id"] in role_ids:
+                                    is_admin = True
+                except Exception as e:
+                    print(f"Error checking admin status: {str(e)}")
         
+        # Skip verification for admin users
+        if not is_admin:
+            # Verify employee credentials - similar to time_in function
+            if not employee_id or not entered_passcode or not provided_email:
+                return Response({"error": "Missing employee verification fields."}, status=400)
+            
+            # Query the employee record
+            employee_response = (
+                supabase_service.table("employee")
+                .select("id, user_id, first_name, last_name")
+                .eq("id", employee_id)
+                .single()
+                .execute()
+            )
+            if not employee_response.data:
+                return Response({"error": "Employee not found."}, status=404)
+                
+            employee = employee_response.data
+            if not employee.get("user_id"):
+                return Response({"error": "Employee not linked to an auth user."}, status=400)
+                
+            # Fetch user details using the admin client
+            user_response = supabase_service.auth.admin.get_user_by_id(employee["user_id"])
+            if not (user_response and user_response.user):
+                return Response({"error": "Unable to fetch user authentication details."}, status=404)
+                
+            # Ensure the provided email matches the employee's registered email
+            if provided_email.lower() != user_response.user.email.lower():
+                return Response(
+                    {"error": "Provided email does not match the selected employee's email."},
+                    status=400,
+                )
+                
+            # Attempt to sign in using the provided email and passcode
+            sign_in_response = supabase_service.auth.sign_in_with_password({
+                "email": provided_email,
+                "password": entered_passcode
+            })
+            if not getattr(sign_in_response, "user", None):
+                return Response({"error": "Invalid passcode."}, status=401)
+            # Sign out after successful sign in
+            supabase_service.auth.sign_out()
+  
         # Continue with original add_order logic
         # Validate employee
         employee = supabase_anon.table("employee").select("id").eq("id", employee_id).execute().data
@@ -3624,10 +3666,115 @@ def edit_order(request, transaction_id):
         payment_amount = data.get("payment_amount")  # New/updated payment amount
         reference_id = data.get("reference_id")
         order_details = data.get("order_details", [])
+        provided_email = data.get("email")
+        entered_passcode = data.get("passcode")
         
         if not order_details:
             return Response({"error": "No order details provided."}, status=400)
         
+        # Check if we need to verify the employee (skip verification for admin users)
+        is_admin = False
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            if token and is_valid_supabase_token(token):
+                # Check if this token belongs to an admin user
+                try:
+                    user_response = supabase_service.auth.get_user(token)
+                    if user_response and user_response.user:
+                        auth_user_uuid = user_response.user.id
+                        
+                        # Look up the employee by user_id
+                        employee_lookup = supabase_service.table("employee") \
+                            .select("id") \
+                            .eq("user_id", auth_user_uuid) \
+                            .single() \
+                            .execute()
+                        
+                        if employee_lookup.data:
+                            admin_employee_pk = employee_lookup.data["id"]
+                            
+                            # Check if this employee has admin role
+                            role_mapping = supabase_service.table("employee_role") \
+                                .select("role_id") \
+                                .eq("employee_id", admin_employee_pk) \
+                                .execute()
+                            
+                            if role_mapping.data:
+                                role_ids = [entry["role_id"] for entry in role_mapping.data]
+                                
+                                # Get admin role ID
+                                admin_role = supabase_service.table("role") \
+                                    .select("id") \
+                                    .eq("role_name", "Admin") \
+                                    .single() \
+                                    .execute()
+                                
+                                if admin_role.data and admin_role.data["id"] in role_ids:
+                                    is_admin = True
+                except Exception as e:
+                    print(f"Error checking admin status: {str(e)}")
+        
+        # Skip verification for admin users
+        if not is_admin:
+            # Only perform verification if the user is not an admin
+            if not employee_id or not entered_passcode or not provided_email:
+                return Response({"error": "Missing employee verification fields."}, status=400)
+                
+            # Query the employee record
+            employee_response = (
+                supabase_service.table("employee")
+                .select("id, user_id, first_name, last_name")
+                .eq("id", employee_id)
+                .single()
+                .execute()
+            )
+            if not employee_response.data:
+                return Response({"error": "Employee not found."}, status=404)
+                
+            employee = employee_response.data
+            if not employee.get("user_id"):
+                return Response({"error": "Employee not linked to an auth user."}, status=400)
+                
+            # Fetch user details using the admin client
+            user_response = supabase_service.auth.admin.get_user_by_id(employee["user_id"])
+            if not (user_response and user_response.user):
+                return Response({"error": "Unable to fetch user authentication details."}, status=404)
+                
+            # Ensure the provided email matches the employee's registered email
+            if provided_email.lower() != user_response.user.email.lower():
+                return Response(
+                    {"error": "Provided email does not match the selected employee's email."},
+                    status=400,
+                )
+                
+            # Attempt to sign in using the provided email and passcode
+            sign_in_response = supabase_service.auth.sign_in_with_password({
+                "email": provided_email,
+                "password": entered_passcode
+            })
+            if not getattr(sign_in_response, "user", None):
+                return Response({"error": "Invalid passcode."}, status=401)
+            # Sign out after successful sign in
+            supabase_service.auth.sign_out()
+        
+        # Continue with the existing order editing logic
+        existing_order_details = None
+        try:
+            existing_response = supabase_anon.table("order_details").select("*").eq("transaction_id", transaction_id).execute()
+            if existing_response and existing_response.data:
+                existing_order_details = {
+                    f"{detail.get('menu_id')}-{detail.get('unli_wings_group')}": detail.get('base_amount') 
+                    for detail in existing_response.data 
+                    if detail.get('unli_wings_group')
+                }
+        except Exception as e:
+            print(f"Error fetching existing order details: {str(e)}")
+            
+        # Validate the existing transaction record
+        existing_transaction_response = supabase_anon.table("transaction").select("id").eq("id", transaction_id).execute()
+        if not existing_transaction_response.data:
+            return Response({"error": f"Transaction with ID {transaction_id} not found."}, status=400)
         existing_order_details = None
         try:
             existing_response = supabase_anon.table("order_details").select("*").eq("transaction_id", transaction_id).execute()

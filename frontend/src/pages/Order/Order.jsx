@@ -507,10 +507,11 @@ const Order = () => {
       }
     });
 
+    // Check if this is an admin order (no employee verification needed)
+    const isAdmin = localStorage.getItem("role") === "Admin";
+
     const payload = {
       employee_id: employeeId,
-      email: employeeEmail,
-      passcode: employeePasscode,
       payment_method: paymentMethod,
       payment_amount: Number(cashReceived) || 0,
       reference_id: gcashReferenceNo || null,
@@ -518,7 +519,19 @@ const Order = () => {
       order_details: orderDetails,
     };
 
+    // Only include verification fields if they exist (for non-admin users)
+    if (employeeEmail && employeePasscode) {
+      payload.email = employeeEmail;
+      payload.passcode = employeePasscode;
+    }
+
     try {
+      // Make sure Authorization header is set if admin
+      if (isAdmin) {
+        const token = localStorage.getItem("access_token");
+        axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      }
+
       const response = await axios.post(
         "http://127.0.0.1:8000/add-order/",
         payload,
