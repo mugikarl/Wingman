@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
-import { PiMagnifyingGlass, PiCirclesThreePlusLight } from "react-icons/pi";
+import { PiMagnifyingGlass, PiCirclesThreePlusLight, PiCaretDown } from "react-icons/pi";
 import { BiFoodMenu } from "react-icons/bi";
+import { MdCheckBox, MdCheckBoxOutlineBlank } from "react-icons/md";
 import ChooseOrder from "../../components/popups/ChooseOrder";
 import Table from "../../components/tables/Table";
 import OrderEssentials from "../../components/popups/OrderEssentials";
@@ -21,6 +22,8 @@ const OrderTable = () => {
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [inventoryData, setInventoryData] = useState(null);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef(null);
   const location = useLocation();
 
   const openOrderEssentialsModal = () => {
@@ -136,6 +139,20 @@ const OrderTable = () => {
     }
   }, [location.state]);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target)) {
+        setIsStatusDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   if (loading) {
     return <LoadingScreen message={"Loading orders"} />;
   }
@@ -157,6 +174,16 @@ const OrderTable = () => {
         {formattedDate} <br /> {formattedTime}
       </>
     );
+  };
+
+  const getSelectedStatusesText = () => {
+    if (statusFilters.includes("All")) {
+      return "All";
+    }
+    if (statusFilters.length === 1) {
+      return statusFilters[0];
+    }
+    return `${statusFilters.length} selected`;
   };
 
   return (
@@ -194,56 +221,76 @@ const OrderTable = () => {
 
       <div className="flex justify-between items-start">
         <div>
-          {/* Status Filters */}
+          {/* Filters Row - Status dropdown and Transaction Type buttons in same row */}
           <div className="flex space-x-2 flex-wrap">
-            <button
-              key="All"
-              onClick={() => toggleStatus("All")}
-              className={`px-3 py-1 font-normal rounded-md transition-colors w-auto min-w-28 text-center border mb-2 mr-1 bg-white hover:bg-gray-200 shadow-sm ${
-                statusFilters.includes("All")
-                  ? "border-l-4 border-[#CC5500] text-[#CC5500] hover:text-[#B34A00]"
-                  : "border-gray-300 bg-white hover:bg-gray-200"
-              }`}
-            >
-              All
-            </button>
-            {orderData?.order_status_types
-              ?.slice()
-              .sort((a, b) => a.id - b.id)
-              .map((status) => {
-                let color = "bg-white hover:bg-gray-200";
-                if (status.name === "Pending") {
-                  color =
-                    "border-l-4 border-yellow-400 bg-white text-yellow-400 hover:text-yellow-500";
-                } else if (status.name === "Completed") {
-                  color =
-                    "border-l-4 border-green-500 bg-white text-green-500 hover:text-green-600";
-                } else if (status.name === "Cancelled") {
-                  color =
-                    "border-l-4 border-red-500 bg-white text-red-500 hover:text-red-600";
-                } else if (status.name === "Complimentary") {
-                  color =
-                    "border-l-4 border-blue-500 bg-white text-blue-500 hover:text-blue-600";
-                }
+            {/* Status Filters Dropdown */}
+            <div className="relative" ref={statusDropdownRef}>
+              <button
+                onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                className="px-3 py-1 font-normal rounded-md transition-colors w- text-center border mb-2 mr-1 bg-white hover:bg-gray-200 shadow-sm flex justify-between items-center"
+              >
+                <span>{statusFilters.includes("All") ? "All" : statusFilters.length > 1 ? `${statusFilters.length} selected` : statusFilters[0]}</span>
+                <PiCaretDown className={`transform ${isStatusDropdownOpen ? 'rotate-180' : ''} transition-transform`} />
+              </button>
+              
+              {isStatusDropdownOpen && (
+                <div className="absolute z-10 w-56 mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                  <div className="p-2 border-b">
+                    <div 
+                      className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md"
+                      onClick={() => {
+                        toggleStatus("All");
+                        setIsStatusDropdownOpen(false);
+                      }}
+                    >
+                      {statusFilters.includes("All") ? (
+                        <MdCheckBox className="mr-2 text-[#CC5500]" />
+                      ) : (
+                        <MdCheckBoxOutlineBlank className="mr-2 text-gray-400" />
+                      )}
+                      <span>All</span>
+                    </div>
+                  </div>
+                  <div className="max-h-60 overflow-auto">
+                    {orderData?.order_status_types
+                      ?.slice()
+                      .sort((a, b) => a.id - b.id)
+                      .map((status) => {
+                        let textColor = "text-gray-700";
+                        
+                        if (status.name === "Pending") {
+                          textColor = "text-yellow-400";
+                        } else if (status.name === "Completed") {
+                          textColor = "text-green-500";
+                        } else if (status.name === "Cancelled") {
+                          textColor = "text-red-500";
+                        } else if (status.name === "Complimentary") {
+                          textColor = "text-blue-500";
+                        }
 
-                return (
-                  <button
-                    key={status.id}
-                    onClick={() => toggleStatus(status.name)}
-                    className={`px-3 py-1 rounded-md transition-colors w-auto min-w-28 text-center border-gray-300 shadow-sm mb-2 mr-1 ${
-                      statusFilters.includes(status.name)
-                        ? `${color} text-white border`
-                        : "border bg-white hover:bg-gray-200"
-                    }`}
-                  >
-                    {status.name}
-                  </button>
-                );
-              })}
-          </div>
+                        return (
+                          <div 
+                            key={status.id}
+                            className="flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-md mx-2"
+                            onClick={() => toggleStatus(status.name)}
+                          >
+                            {statusFilters.includes(status.name) ? (
+                              <MdCheckBox className={`mr-2 ${textColor}`} />
+                            ) : (
+                              <MdCheckBoxOutlineBlank className="mr-2 text-gray-400" />
+                            )}
+                            <span className={statusFilters.includes(status.name) ? textColor : ""}>
+                              {status.name}
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+            </div>
 
-          {/* Menu Type Filters */}
-          <div className="flex mt-2 space-x-2">
+            {/* Menu Type Filters - Now in the same row as status dropdown */}
             {orderData?.menu_types?.map((type) => {
               let color = "bg-white hover:bg-gray-200";
               if (type.name === "In-Store") {
@@ -258,7 +305,7 @@ const OrderTable = () => {
                 <button
                   key={type.id}
                   onClick={() => toggleFilter(type.name)}
-                  className={`px-3 py-1 rounded-md transition-colors w-28 text-center border border-gray-300 shadow-sm ${
+                  className={`px-3 py-1 rounded-md transition-colors w-28 text-center border border-gray-300 shadow-sm mb-2 ${
                     selectedFilters.includes(type.name)
                       ? `${color} text-white`
                       : "bg-white hover:bg-gray-200"

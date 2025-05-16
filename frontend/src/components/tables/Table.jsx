@@ -7,7 +7,7 @@ const Table = ({
   rowOnClick,
   maxHeight = "100%",
   maxWidth = "100%",
-  tableName = "Table", // New prop for table name
+  tableName = "Table", 
   emptyMessage = "No Data Available",
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -18,8 +18,8 @@ const Table = ({
   );
   const [displayData, setDisplayData] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
+  const [sortedDataWithIndexes, setSortedDataWithIndexes] = useState([]);
 
-  // Function to handle sorting
   const requestSort = (key) => {
     let direction = "ascending";
 
@@ -35,14 +35,41 @@ const Table = ({
     setSortConfig({ key, direction });
   };
 
-  // Sort data if sort config exists
-  const sortedData = React.useMemo(() => {
-    let sortableData = [...data];
+  useEffect(() => {
+    const dataWithIndexes = data.map((row, index) => ({
+      originalIndex: index,
+      data: row
+    }));
+    setSortedDataWithIndexes(dataWithIndexes);
+  }, [data]);
+
+  useEffect(() => {
+    let sortableData = [...sortedDataWithIndexes];
+    
     if (sortConfig.key !== null && sortConfig.direction !== null) {
       sortableData.sort((a, b) => {
-        // Get values at the specified column index
-        const aValue = a[sortConfig.key];
-        const bValue = b[sortConfig.key];
+        const aValue = a.data[sortConfig.key];
+        const bValue = b.data[sortConfig.key];
+
+        // Handle date sorting (column index 1)
+        if (sortConfig.key === 1) {
+          const getDateFromFormatted = (formatted) => {
+            if (typeof formatted === 'object' && formatted.props && formatted.props.children) {
+              const dateParts = formatted.props.children.filter(part => typeof part === 'string');
+              return new Date(dateParts[0]);
+            } else if (typeof formatted === 'string') {
+              return new Date(formatted.split(' ')[0]);
+            }
+            return new Date(0);
+          };
+
+          const aDate = getDateFromFormatted(aValue);
+          const bDate = getDateFromFormatted(bValue);
+
+          return sortConfig.direction === "ascending"
+            ? aDate - bDate
+            : bDate - aDate;
+        }
 
         // Handle numeric values
         if (!isNaN(aValue) && !isNaN(bValue)) {
@@ -61,45 +88,39 @@ const Table = ({
         return 0;
       });
     }
-    return sortableData;
-  }, [data, sortConfig]);
+    
+    setSortedDataWithIndexes(sortableData);
+  }, [sortConfig]);
 
-  // Calculate page details when dependencies change
   useEffect(() => {
-    setTotalItems(sortedData.length);
-    setTotalPages(Math.ceil(sortedData.length / itemsPerPage));
+    setTotalItems(sortedDataWithIndexes.length);
+    setTotalPages(Math.ceil(sortedDataWithIndexes.length / itemsPerPage));
 
-    // Calculate the visible data for the current page
     const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, sortedData.length);
-    setDisplayData(sortedData.slice(startIndex, endIndex));
-  }, [sortedData, currentPage, itemsPerPage]);
+    const endIndex = Math.min(startIndex + itemsPerPage, sortedDataWithIndexes.length);
+    setDisplayData(sortedDataWithIndexes.slice(startIndex, endIndex));
+  }, [sortedDataWithIndexes, currentPage, itemsPerPage]);
 
-  // Handle page change
   const handlePageChange = (page) => {
     if (page < 1 || page > totalPages) return;
     setCurrentPage(page);
   };
 
-  // Handle items per page change
   const handleItemsPerPageChange = (e) => {
     const value = parseInt(e.target.value);
     setItemsPerPage(value);
-    setCurrentPage(1); // Reset to first page when changing items per page
+    setCurrentPage(1);
   };
 
-  // Generate page numbers for pagination
   const getPageNumbers = () => {
     const pages = [];
     const maxPagesToShow = 5;
 
     if (totalPages <= maxPagesToShow) {
-      // Show all pages if total pages is less than max to show
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
       }
     } else {
-      // Show first page, current page, and surrounding pages
       if (currentPage <= 3) {
         for (let i = 1; i <= 5; i++) {
           pages.push(i);
@@ -124,9 +145,6 @@ const Table = ({
         className="relative overflow-x-auto w-full "
         style={{ maxHeight, maxWidth }}
       >
-        {/* Table header with table name */}
-
-        {/* Table Component */}
         <table className="w-full text-sm text-left rtl:text-right text-gray-500 table-auto">
           <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
             <tr>
@@ -135,15 +153,15 @@ const Table = ({
                   key={index}
                   scope="col"
                   className={`px-6 py-4 font-medium text-left ${
-                    index === 0 ? "cursor-pointer" : ""
+                    index === 0 || index === 1 ? "cursor-pointer" : ""
                   }`}
-                  onClick={() => (index === 0 ? requestSort(index) : null)}
+                  onClick={() => (index === 0 || index === 1 ? requestSort(index) : null)}
                 >
                   <div className="flex items-center">
                     {column}
-                    {index === 0 && (
+                    {(index === 0 || index === 1) && (
                       <>
-                        {sortConfig.key === 0 ? (
+                        {sortConfig.key === index ? (
                           <span className="ml-1.5">
                             {sortConfig.direction === "ascending" ? (
                               <FaSortUp className="inline h-3 w-3 text-white" />
@@ -173,7 +191,7 @@ const Table = ({
           </thead>
           <tbody>
             {displayData.length > 0 ? (
-              displayData.map((row, rowIndex) => (
+              displayData.map((item, rowIndex) => (
                 <tr
                   key={rowIndex}
                   className={`
@@ -181,11 +199,9 @@ const Table = ({
                     border-b hover:bg-gray-200 group
                     ${rowOnClick ? "cursor-pointer" : ""}
                   `}
-                  onClick={() =>
-                    rowOnClick && rowOnClick(sortedData.indexOf(row))
-                  }
+                  onClick={() => rowOnClick && rowOnClick(item.originalIndex)}
                 >
-                  {row.map((cell, cellIndex) => (
+                  {item.data.map((cell, cellIndex) => (
                     <td
                       key={cellIndex}
                       className="px-6 py-4 font-normal text-left text-gray-700 group-hover:text-gray-900"
@@ -209,7 +225,6 @@ const Table = ({
           </tbody>
         </table>
 
-        {/* Bottom Pagination - now within the same border */}
         <div className="bg-gray-100 border-t border-gray-300 px-6 py-3">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="text-sm text-gray-700 mb-2 md:mb-0">
