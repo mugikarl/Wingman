@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { FaSortUp, FaSortDown } from "react-icons/fa";
+import { FaSortUp, FaSortDown, FaTimes } from "react-icons/fa";
+import { BiSortAlt2 } from "react-icons/bi";
 
 const Table = ({
   columns,
@@ -7,8 +8,9 @@ const Table = ({
   rowOnClick,
   maxHeight = "100%",
   maxWidth = "100%",
-  tableName = "Table", 
+  tableName = "Table",
   emptyMessage = "No Data Available",
+  sortableColumns = [0], // Default to only first column being sortable
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
@@ -20,45 +22,69 @@ const Table = ({
   const [sortConfig, setSortConfig] = useState({ key: null, direction: null });
   const [sortedDataWithIndexes, setSortedDataWithIndexes] = useState([]);
 
-  const requestSort = (key) => {
-    let direction = "ascending";
-
-    if (sortConfig.key === key) {
-      direction =
-        sortConfig.direction === "ascending"
-          ? "descending"
-          : sortConfig.direction === "descending"
-          ? null
-          : "ascending";
+  // Modified to set specific direction instead of cycling
+  const setSortDirection = (key, direction) => {
+    // If clicking the same direction that's already active, clear the sort
+    if (sortConfig.key === key && sortConfig.direction === direction) {
+      setSortConfig({ key: null, direction: null });
+    } else {
+      setSortConfig({ key, direction });
     }
+  };
 
-    setSortConfig({ key, direction });
+  // Clear sorting for a specific column
+  const clearSorting = (e) => {
+    e.stopPropagation(); // Prevent triggering the column header click
+    setSortConfig({ key: null, direction: null });
   };
 
   useEffect(() => {
     const dataWithIndexes = data.map((row, index) => ({
       originalIndex: index,
-      data: row
+      data: row,
     }));
     setSortedDataWithIndexes(dataWithIndexes);
   }, [data]);
 
-  useEffect(() => {
+  const sortedData = React.useMemo(() => {
     let sortableData = [...sortedDataWithIndexes];
-    
+
     if (sortConfig.key !== null && sortConfig.direction !== null) {
       sortableData.sort((a, b) => {
         const aValue = a.data[sortConfig.key];
         const bValue = b.data[sortConfig.key];
 
+        // Skip sorting if values are undefined or null
+        if (aValue === undefined || aValue === null) return 1;
+        if (bValue === undefined || bValue === null) return -1;
+
         // Handle date sorting (column index 1)
-        if (sortConfig.key === 1) {
+        if (
+          sortConfig.key === 1 &&
+          ((typeof aValue === "object" &&
+            aValue.props &&
+            aValue.props.children) ||
+            (typeof bValue === "object" &&
+              bValue.props &&
+              bValue.props.children) ||
+            (typeof aValue === "string" && aValue.includes("-")) ||
+            (typeof bValue === "string" && bValue.includes("-")))
+        ) {
           const getDateFromFormatted = (formatted) => {
-            if (typeof formatted === 'object' && formatted.props && formatted.props.children) {
-              const dateParts = formatted.props.children.filter(part => typeof part === 'string');
+            if (
+              typeof formatted === "object" &&
+              formatted.props &&
+              formatted.props.children
+            ) {
+              const dateParts = formatted.props.children.filter(
+                (part) => typeof part === "string"
+              );
               return new Date(dateParts[0]);
-            } else if (typeof formatted === 'string') {
-              return new Date(formatted.split(' ')[0]);
+            } else if (typeof formatted === "string") {
+              // Try to parse as date if it contains date separators
+              if (formatted.includes("-") || formatted.includes("/")) {
+                return new Date(formatted.split(" ")[0]);
+              }
             }
             return new Date(0);
           };
@@ -71,35 +97,59 @@ const Table = ({
             : bDate - aDate;
         }
 
+        // Extract text content from React elements if needed
+        const getTextValue = (value) => {
+          if (typeof value === "object" && value !== null) {
+            if (value.props && value.props.children) {
+              // For React elements, try to extract text content
+              if (Array.isArray(value.props.children)) {
+                return value.props.children
+                  .filter((child) => typeof child === "string")
+                  .join("");
+              }
+              return String(value.props.children);
+            }
+            // For other objects, try to convert to string
+            return String(value);
+          }
+          return value;
+        };
+
+        const aTextValue = getTextValue(aValue);
+        const bTextValue = getTextValue(bValue);
+
         // Handle numeric values
-        if (!isNaN(aValue) && !isNaN(bValue)) {
+        if (!isNaN(aTextValue) && !isNaN(bTextValue)) {
           return sortConfig.direction === "ascending"
-            ? Number(aValue) - Number(bValue)
-            : Number(bValue) - Number(aValue);
+            ? Number(aTextValue) - Number(bTextValue)
+            : Number(bTextValue) - Number(aTextValue);
         }
 
         // Handle string values
-        if (aValue < bValue) {
+        const aString = String(aTextValue).toLowerCase();
+        const bString = String(bTextValue).toLowerCase();
+
+        if (aString < bString) {
           return sortConfig.direction === "ascending" ? -1 : 1;
         }
-        if (aValue > bValue) {
+        if (aString > bString) {
           return sortConfig.direction === "ascending" ? 1 : -1;
         }
         return 0;
       });
     }
-    
-    setSortedDataWithIndexes(sortableData);
-  }, [sortConfig]);
+
+    return sortableData;
+  }, [sortedDataWithIndexes, sortConfig]);
 
   useEffect(() => {
-    setTotalItems(sortedDataWithIndexes.length);
-    setTotalPages(Math.ceil(sortedDataWithIndexes.length / itemsPerPage));
+    setTotalItems(sortedData.length);
+    setTotalPages(Math.ceil(sortedData.length / itemsPerPage));
 
     const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, sortedDataWithIndexes.length);
-    setDisplayData(sortedDataWithIndexes.slice(startIndex, endIndex));
-  }, [sortedDataWithIndexes, currentPage, itemsPerPage]);
+    const endIndex = Math.min(startIndex + itemsPerPage, sortedData.length);
+    setDisplayData(sortedData.slice(startIndex, endIndex));
+  }, [sortedData, currentPage, itemsPerPage]);
 
   const handlePageChange = (page) => {
     if (page < 1 || page > totalPages) return;
@@ -152,37 +202,60 @@ const Table = ({
                 <th
                   key={index}
                   scope="col"
-                  className={`px-6 py-4 font-medium text-left ${
-                    index === 0 || index === 1 ? "cursor-pointer" : ""
-                  }`}
-                  onClick={() => (index === 0 || index === 1 ? requestSort(index) : null)}
+                  className="px-6 py-4 font-medium text-left"
                 >
                   <div className="flex items-center">
-                    {column}
-                    {(index === 0 || index === 1) && (
-                      <>
-                        {sortConfig.key === index ? (
-                          <span className="ml-1.5">
-                            {sortConfig.direction === "ascending" ? (
-                              <FaSortUp className="inline h-3 w-3 text-white" />
-                            ) : (
-                              <FaSortDown className="inline h-3 w-3 text-white" />
-                            )}
-                          </span>
-                        ) : (
-                          <span className="ml-1.5 text-gray-300 opacity-30">
-                            <svg
-                              className="w-3 h-3"
-                              aria-hidden="true"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path d="M8.574 11.024h6.852a2.075 2.075 0 0 0 1.847-1.086 1.9 1.9 0 0 0-.11-1.986L13.736 2.9a2.122 2.122 0 0 0-3.472 0L6.837 7.952a1.9 1.9 0 0 0-.11 1.986 2.074 2.074 0 0 0 1.847 1.086Zm6.852 1.952H8.574a2.072 2.072 0 0 0-1.847 1.087 1.9 1.9 0 0 0 .11 1.985l3.426 5.05a2.123 2.123 0 0 0 3.472 0l3.427-5.05a1.9 1.9 0 0 0 .11-1.985 2.074 2.074 0 0 0-1.846-1.087Z" />
-                            </svg>
-                          </span>
+                    <span className="mr-2">{column}</span>
+                    {sortableColumns.includes(index) && (
+                      <div className="flex items-center space-x-1">
+                        {/* Sort controls */}
+                        <div className="flex flex-col -space-y-1">
+                          {/* Up arrow */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSortDirection(index, "ascending");
+                            }}
+                            className={`focus:outline-none -mb-1 ${
+                              sortConfig.key === index &&
+                              sortConfig.direction === "ascending"
+                                ? "text-white"
+                                : "text-gray-300 opacity-50 hover:opacity-100"
+                            }`}
+                            title="Sort ascending"
+                          >
+                            <FaSortUp className="h-3 w-3" />
+                          </button>
+
+                          {/* Down arrow */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSortDirection(index, "descending");
+                            }}
+                            className={`focus:outline-none -mt-1 ${
+                              sortConfig.key === index &&
+                              sortConfig.direction === "descending"
+                                ? "text-white"
+                                : "text-gray-300 opacity-50 hover:opacity-100"
+                            }`}
+                            title="Sort descending"
+                          >
+                            <FaSortDown className="h-3 w-3" />
+                          </button>
+                        </div>
+
+                        {/* Clear button - only show when this column is being sorted */}
+                        {sortConfig.key === index && (
+                          <button
+                            onClick={clearSorting}
+                            className="ml-1 hover:bg-[#B34700] rounded-full p-0.5 transition-colors focus:outline-none"
+                            title="Clear sorting"
+                          >
+                            <FaTimes className="h-2.5 w-2.5 text-white" />
+                          </button>
                         )}
-                      </>
+                      </div>
                     )}
                   </div>
                 </th>

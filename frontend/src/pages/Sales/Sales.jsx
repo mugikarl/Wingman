@@ -5,10 +5,12 @@ import {
   FaChartBar,
   FaFileExport,
   FaPlus,
+  FaSortUp,
+  FaSortDown,
+  FaTimes,
 } from "react-icons/fa";
 import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
 import ExportSales from "../../components/popups/ExportSales";
-import { FaSortUp, FaSortDown } from "react-icons/fa";
 import { PiStackPlus } from "react-icons/pi";
 import axios from "axios";
 import ExpensesType from "../../components/popups/ExpensesType";
@@ -372,8 +374,10 @@ const Sales = () => {
 
   const getSortedData = () => {
     const dataToSort = [...data];
+
+    // When no sort is applied (sortConfig.key is null)
     if (!sortConfig.key) {
-      // Default sort by date (earliest to latest) when no sort is applied
+      // Default sort by date (earliest to latest)
       return dataToSort.sort((a, b) => {
         if (a.date === "Total") return 1; // Always keep Total at the end
         if (b.date === "Total") return -1;
@@ -542,58 +546,96 @@ const Sales = () => {
           <table className="w-full text-sm text-left text-gray-500 table-auto">
             <thead className="text-sm text-white uppercase bg-[#CC5500] sticky top-0">
               <tr>
-                {["Date", "Sales", "Expenses", "Net Income"].map(
-                  (column, index) => (
-                    <th
-                      key={index}
-                      scope="col"
-                      className="px-6 py-4 font-medium text-left cursor-pointer"
-                      onClick={() =>
-                        requestSort(
-                          index === 0
-                            ? "date"
-                            : index === 1
-                            ? "sales"
-                            : index === 2
-                            ? "expenses"
-                            : "netIncome"
-                        )
-                      }
-                    >
-                      <div className="flex items-center">
-                        {column}
-                        {sortConfig.key ===
-                        (index === 0
-                          ? "date"
-                          : index === 1
-                          ? "sales"
-                          : index === 2
-                          ? "expenses"
-                          : "netIncome") ? (
-                          <span className="ml-1.5">
-                            {sortConfig.direction === "ascending" ? (
-                              <FaSortUp className="inline h-3 w-3 text-white" />
-                            ) : (
-                              <FaSortDown className="inline h-3 w-3 text-white" />
-                            )}
-                          </span>
-                        ) : (
-                          <span className="ml-1.5 text-gray-300 opacity-30">
-                            <svg
-                              className="w-3 h-3"
-                              aria-hidden="true"
-                              xmlns="http://www.w3.org/2000/svg"
-                              fill="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path d="M8.574 11.024h6.852a2.075 2.075 0 0 0 1.847-1.086 1.9 1.9 0 0 0-.11-1.986L13.736 2.9a2.122 2.122 0 0 0-3.472 0L6.837 7.952a1.9 1.9 0 0 0-.11 1.986 2.074 2.074 0 0 0 1.847 1.086Zm6.852 1.952H8.574a2.072 2.072 0 0 0-1.847 1.087 1.9 1.9 0 0 0 .11 1.985l3.426 5.05a2.123 2.123 0 0 0 3.472 0l3.427-5.05a1.9 1.9 0 0 0 .11-1.985 2.074 2.074 0 0 0-1.846-1.087Z" />
-                            </svg>
-                          </span>
+                {[
+                  { key: "date", label: "Date" },
+                  { key: "sales", label: "Sales" },
+                  { key: "expenses", label: "Expenses" },
+                  { key: "netIncome", label: "Net Income" },
+                ].map((column, index) => (
+                  <th
+                    key={index}
+                    scope="col"
+                    className="px-6 py-4 font-medium text-left"
+                  >
+                    <div className="flex items-center">
+                      <span className="mr-2">{column.label}</span>
+                      <div className="flex items-center space-x-1">
+                        {/* Sort controls */}
+                        <div className="flex flex-col -space-y-1">
+                          {/* Up arrow */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // If already sorted ascending by this column, clear sort
+                              if (
+                                sortConfig.key === column.key &&
+                                sortConfig.direction === "ascending"
+                              ) {
+                                setSortConfig({ key: null, direction: null });
+                              } else {
+                                setSortConfig({
+                                  key: column.key,
+                                  direction: "ascending",
+                                });
+                              }
+                            }}
+                            className={`focus:outline-none -mb-1 ${
+                              sortConfig.key === column.key &&
+                              sortConfig.direction === "ascending"
+                                ? "text-white"
+                                : "text-gray-300 opacity-50 hover:opacity-100"
+                            }`}
+                            title={`Sort ${column.label} ascending`}
+                          >
+                            <FaSortUp className="h-3 w-3" />
+                          </button>
+
+                          {/* Down arrow */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // If already sorted descending by this column, clear sort
+                              if (
+                                sortConfig.key === column.key &&
+                                sortConfig.direction === "descending"
+                              ) {
+                                setSortConfig({ key: null, direction: null });
+                              } else {
+                                setSortConfig({
+                                  key: column.key,
+                                  direction: "descending",
+                                });
+                              }
+                            }}
+                            className={`focus:outline-none -mt-1 ${
+                              sortConfig.key === column.key &&
+                              sortConfig.direction === "descending"
+                                ? "text-white"
+                                : "text-gray-300 opacity-50 hover:opacity-100"
+                            }`}
+                            title={`Sort ${column.label} descending`}
+                          >
+                            <FaSortDown className="h-3 w-3" />
+                          </button>
+                        </div>
+
+                        {/* Clear button - only show when this column is being sorted */}
+                        {sortConfig.key === column.key && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSortConfig({ key: null, direction: null });
+                            }}
+                            className="ml-1 hover:bg-[#B34700] rounded-full p-0.5 transition-colors focus:outline-none"
+                            title="Clear sorting"
+                          >
+                            <FaTimes className="h-2.5 w-2.5 text-white" />
+                          </button>
                         )}
                       </div>
-                    </th>
-                  )
-                )}
+                    </div>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>

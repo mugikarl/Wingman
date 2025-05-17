@@ -162,6 +162,7 @@ const Items = () => {
               ];
             })}
             rowOnClick={(rowIndex) => openEditModal(filteredItems[rowIndex])}
+            sortableColumns={[0, 1, 3]}
           />
         )}
 

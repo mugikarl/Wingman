@@ -306,6 +306,7 @@ const StockIn = () => {
               }
             }}
             maxHeight={calculatedHeight}
+            sortableColumns={[0, 1, 2]}
           />
         )}
       </div>

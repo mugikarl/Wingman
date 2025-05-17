@@ -797,6 +797,7 @@ const TransactionModal = ({
                                           : []
                                       }
                                       maxHeight="100%"
+                                      sortableColumns={[0]}
                                     />
                                     {/* {!isOrderNonEditable && (
                                       <button
@@ -853,6 +854,7 @@ const TransactionModal = ({
                                   })
                                 : []
                             }
+                            sortableColumns={[0]}
                           />
                         ) : (
                           <div className="bg-gray-100 p-4 rounded-lg text-gray-500 text-center">
@@ -891,6 +893,7 @@ const TransactionModal = ({
                               })
                             : []
                         }
+                        sortableColumns={[0]}
                       />
                     ) : (
                       <div className="bg-gray-100 p-4 rounded-lg text-gray-500 text-center">

@@ -149,6 +149,7 @@ const StaffProfile = () => {
               data={transformEmployeesForTable(sortedEmployees)}
               rowOnClick={handleRowClick}
               maxHeight="700px"
+              sortableColumns={[0]}
             />
           </div>
         )}

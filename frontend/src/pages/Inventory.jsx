@@ -176,6 +176,7 @@ const Inventory = () => {
           rowOnClick={(rowIndex) =>
             openDisposedModal(filteredInventoryData[rowIndex])
           }
+          sortableColumns={[0, 1]}
         />
       )}
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Datepicker } from "flowbite-react";
-import { FaSortUp, FaSortDown } from "react-icons/fa";
+import { FaSortUp, FaSortDown, FaTimes } from "react-icons/fa";
 import { HiChevronLeft, HiChevronRight } from "react-icons/hi2";
 
 // Helper: Converts a Date object to a "YYYY-MM-DD" string in local time.
@@ -17,6 +17,7 @@ const TableWithDatePicker = ({
   onDateChange,
   customTheme = {},
   emptyMessage = "No Data Available",
+  sortableColumns = [0], // Default to only first column being sortable
 }) => {
   const [selectedDate, setSelectedDate] = useState(
     getLocalDateString(initialDate)
@@ -32,6 +33,7 @@ const TableWithDatePicker = ({
     Math.ceil(data.length / itemsPerPage)
   );
   const [displayData, setDisplayData] = useState([]);
+  const [sortedDataWithIndexes, setSortedDataWithIndexes] = useState([]);
 
   // Display the selected date in a human-friendly format
   const displayDate = new Date(selectedDate).toDateString();
@@ -53,50 +55,125 @@ const TableWithDatePicker = ({
     if (onDateChange) onDateChange(newDate);
   };
 
-  // Function to handle sorting
-  const requestSort = (key) => {
-    let direction = "ascending";
-
-    if (sortConfig.key === key) {
-      direction =
-        sortConfig.direction === "ascending"
-          ? "descending"
-          : sortConfig.direction === "descending"
-          ? null
-          : "ascending";
+  // Modified to set specific direction instead of cycling
+  const setSortDirection = (key, direction) => {
+    // If clicking the same direction that's already active, clear the sort
+    if (sortConfig.key === key && sortConfig.direction === direction) {
+      setSortConfig({ key: null, direction: null });
+    } else {
+      setSortConfig({ key, direction });
     }
-
-    setSortConfig({ key, direction });
   };
 
-  // Sort data if sort config exists
+  // Clear sorting for a specific column
+  const clearSorting = (e) => {
+    e.stopPropagation(); // Prevent triggering the column header click
+    setSortConfig({ key: null, direction: null });
+  };
+
+  useEffect(() => {
+    const dataWithIndexes = data.map((row, index) => ({
+      originalIndex: index,
+      data: row,
+    }));
+    setSortedDataWithIndexes(dataWithIndexes);
+  }, [data]);
+
   const sortedData = React.useMemo(() => {
-    let sortableData = [...data];
+    let sortableData = [...sortedDataWithIndexes];
+
     if (sortConfig.key !== null && sortConfig.direction !== null) {
       sortableData.sort((a, b) => {
-        // Get values at the specified column index
-        const aValue = a[sortConfig.key];
-        const bValue = b[sortConfig.key];
+        const aValue = a.data[sortConfig.key];
+        const bValue = b.data[sortConfig.key];
+
+        // Skip sorting if values are undefined or null
+        if (aValue === undefined || aValue === null) return 1;
+        if (bValue === undefined || bValue === null) return -1;
+
+        // Handle date sorting (column index 1)
+        if (
+          sortConfig.key === 1 &&
+          ((typeof aValue === "object" &&
+            aValue.props &&
+            aValue.props.children) ||
+            (typeof bValue === "object" &&
+              bValue.props &&
+              bValue.props.children) ||
+            (typeof aValue === "string" && aValue.includes("-")) ||
+            (typeof bValue === "string" && bValue.includes("-")))
+        ) {
+          const getDateFromFormatted = (formatted) => {
+            if (
+              typeof formatted === "object" &&
+              formatted.props &&
+              formatted.props.children
+            ) {
+              const dateParts = formatted.props.children.filter(
+                (part) => typeof part === "string"
+              );
+              return new Date(dateParts[0]);
+            } else if (typeof formatted === "string") {
+              // Try to parse as date if it contains date separators
+              if (formatted.includes("-") || formatted.includes("/")) {
+                return new Date(formatted.split(" ")[0]);
+              }
+            }
+            return new Date(0);
+          };
+
+          const aDate = getDateFromFormatted(aValue);
+          const bDate = getDateFromFormatted(bValue);
+
+          return sortConfig.direction === "ascending"
+            ? aDate - bDate
+            : bDate - aDate;
+        }
+
+        // Extract text content from React elements if needed
+        const getTextValue = (value) => {
+          if (typeof value === "object" && value !== null) {
+            if (value.props && value.props.children) {
+              // For React elements, try to extract text content
+              if (Array.isArray(value.props.children)) {
+                return value.props.children
+                  .filter((child) => typeof child === "string")
+                  .join("");
+              }
+              return String(value.props.children);
+            }
+            // For other objects, try to convert to string
+            return String(value);
+          }
+          return value;
+        };
+
+        const aTextValue = getTextValue(aValue);
+        const bTextValue = getTextValue(bValue);
 
         // Handle numeric values
-        if (!isNaN(aValue) && !isNaN(bValue)) {
+        if (!isNaN(aTextValue) && !isNaN(bTextValue)) {
           return sortConfig.direction === "ascending"
-            ? Number(aValue) - Number(bValue)
-            : Number(bValue) - Number(aValue);
+            ? Number(aTextValue) - Number(bTextValue)
+            : Number(bTextValue) - Number(aTextValue);
         }
 
         // Handle string values
-        if (aValue < bValue) {
+        const aString = String(aTextValue).toLowerCase();
+        const bString = String(bTextValue).toLowerCase();
+
+        if (aString < bString) {
           return sortConfig.direction === "ascending" ? -1 : 1;
         }
-        if (aValue > bValue) {
+        if (aString > bString) {
           return sortConfig.direction === "ascending" ? 1 : -1;
         }
         return 0;
       });
     }
+
     return sortableData;
-  }, [data, sortConfig]);
+  }, [sortedDataWithIndexes, sortConfig]);
 
   // Calculate page details when dependencies change
   useEffect(() => {
@@ -276,7 +353,7 @@ const TableWithDatePicker = ({
 
       {/* Table - with sticky header and scrollable content */}
       <div
-        className="relative  overflow-y-auto border-t-0"
+        className="relative overflow-y-auto border-t-0"
         style={{ maxHeight }}
       >
         <table className="w-full text-sm text-left rtl:text-right text-gray-500 table-auto">
@@ -286,31 +363,62 @@ const TableWithDatePicker = ({
                 <th
                   key={index}
                   scope="col"
-                  className="px-6 py-4 font-medium text-left cursor-pointer"
-                  onClick={() => requestSort(index)}
+                  className={`px-6 py-4 font-medium text-left ${
+                    sortableColumns.includes(index) ? "cursor-pointer" : ""
+                  }`}
                 >
                   <div className="flex items-center">
-                    {column}
-                    {sortConfig.key === index ? (
-                      <span className="ml-1.5">
-                        {sortConfig.direction === "ascending" ? (
-                          <FaSortUp className="inline h-3 w-3 text-white" />
-                        ) : (
-                          <FaSortDown className="inline h-3 w-3 text-white" />
+                    <span className="mr-2">{column}</span>
+                    {sortableColumns.includes(index) && (
+                      <div className="flex items-center space-x-1">
+                        {/* Sort controls */}
+                        <div className="flex flex-col -space-y-1">
+                          {/* Up arrow */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSortDirection(index, "ascending");
+                            }}
+                            className={`focus:outline-none -mb-1 ${
+                              sortConfig.key === index &&
+                              sortConfig.direction === "ascending"
+                                ? "text-white"
+                                : "text-gray-300 opacity-50 hover:opacity-100"
+                            }`}
+                            title="Sort ascending"
+                          >
+                            <FaSortUp className="h-3 w-3" />
+                          </button>
+
+                          {/* Down arrow */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSortDirection(index, "descending");
+                            }}
+                            className={`focus:outline-none -mt-1 ${
+                              sortConfig.key === index &&
+                              sortConfig.direction === "descending"
+                                ? "text-white"
+                                : "text-gray-300 opacity-50 hover:opacity-100"
+                            }`}
+                            title="Sort descending"
+                          >
+                            <FaSortDown className="h-3 w-3" />
+                          </button>
+                        </div>
+
+                        {/* Clear button - only show when this column is being sorted */}
+                        {sortConfig.key === index && (
+                          <button
+                            onClick={clearSorting}
+                            className="ml-1 hover:bg-[#B34700] rounded-full p-0.5 transition-colors focus:outline-none"
+                            title="Clear sorting"
+                          >
+                            <FaTimes className="h-2.5 w-2.5 text-white" />
+                          </button>
                         )}
-                      </span>
-                    ) : (
-                      <span className="ml-1.5 text-gray-300 opacity-30">
-                        <svg
-                          className="w-3 h-3"
-                          aria-hidden="true"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path d="M8.574 11.024h6.852a2.075 2.075 0 0 0 1.847-1.086 1.9 1.9 0 0 0-.11-1.986L13.736 2.9a2.122 2.122 0 0 0-3.472 0L6.837 7.952a1.9 1.9 0 0 0-.11 1.986 2.074 2.074 0 0 0 1.847 1.086Zm6.852 1.952H8.574a2.072 2.072 0 0 0-1.847 1.087 1.9 1.9 0 0 0 .11 1.985l3.426 5.05a2.123 2.123 0 0 0 3.472 0l3.427-5.05a1.9 1.9 0 0 0 .11-1.985 2.074 2.074 0 0 0-1.846-1.087Z" />
-                        </svg>
-                      </span>
+                      </div>
                     )}
                   </div>
                 </th>
@@ -319,21 +427,17 @@ const TableWithDatePicker = ({
           </thead>
           <tbody>
             {displayData.length > 0 ? (
-              displayData.map((row, rowIndex) => (
+              displayData.map((item, rowIndex) => (
                 <tr
                   key={rowIndex}
                   className={`
-                    ${rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                    border-b hover:bg-gray-200 group ${
-                      rowOnClick ? "cursor-pointer" : ""
-                    }
+                    ${rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50"} 
+                    border-b hover:bg-gray-200 group
+                    ${rowOnClick ? "cursor-pointer" : ""}
                   `}
-                  onClick={() =>
-                    rowOnClick &&
-                    rowOnClick((currentPage - 1) * itemsPerPage + rowIndex)
-                  }
+                  onClick={() => rowOnClick && rowOnClick(item.originalIndex)}
                 >
-                  {row.map((cell, cellIndex) => (
+                  {item.data.map((cell, cellIndex) => (
                     <td
                       key={cellIndex}
                       className="px-6 py-4 font-normal text-left text-gray-700 group-hover:text-gray-900"

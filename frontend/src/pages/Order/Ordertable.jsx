@@ -541,6 +541,7 @@ const OrderTable = () => {
             openTransactionModal(filteredTransactions[rowIndex])
           }
           maxHeight="500px"
+          sortableColumns={[0, 1]}
         />
       </div>
 

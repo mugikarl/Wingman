@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import LoadingScreen from "../../components/popups/LoadingScreen";
-import TableWithDatePicker from "../../components/tables/TablewithDatePicker";
+import TableWithDatePicker from "../../components/tables/TableWithDatePicker";
 
 const StockOut = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -72,6 +72,7 @@ const StockOut = () => {
               ? "No Disposed Items for Today."
               : "No Data Available"
           }
+          sortableColumns={[0, 1]}
         />
       )}
     </div>
