@@ -425,7 +425,6 @@ const TransactionModal = ({
       // Show detailed inventory information for completed orders
       if (statusId === 2 || statusId === 4) {
         // Completed or Complimentary
-        // Extract deducted ingredients information from the response
         const deductedIngredients = response.data.deducted_ingredients || [];
         const statusName = statusId === 2 ? "Completed" : "Complimentary";
 
@@ -469,15 +468,43 @@ const TransactionModal = ({
             // Get item name
             const itemName = itemData ? itemData.name : `Item #${item.item_id}`;
 
-            // Get unit symbol
-            const unitSymbol = itemData ? itemData.unit_symbol : "units";
+            // Get the original measurement from menu_ingredients (e.g., "12 g" for Chicken)
+            const menuItem = menuItems.find((mi) =>
+              mi.menu_ingredients?.some(
+                (ing) => ing.inventory_id === item.item_id
+              )
+            );
+            const menuIngredient = menuItem?.menu_ingredients?.find(
+              (ing) => ing.inventory_id === item.item_id
+            );
 
-            const deductedAmount = parseFloat(item.deducted_amount).toFixed(2);
+            const originalQuantity = menuIngredient?.quantity || 0;
+            const unitId = menuIngredient?.unit_id;
+            const unitSymbol =
+              unitId === 1
+                ? "mg"
+                : unitId === 2
+                ? "g"
+                : unitId === 3
+                ? "kg"
+                : unitId === 4
+                ? "ml"
+                : unitId === 5
+                ? "l"
+                : unitId === 7
+                ? "pc"
+                : "units";
+
+            // Use the original unit for the deducted amount (e.g., "12 g" or "100 ml")
+            const deductedDisplay = `${originalQuantity} ${unitSymbol}`;
+
+            // Use the inventory's base unit for the remaining quantity (e.g., "kg" or "l")
+            const remainingUnitSymbol = itemData?.unit_symbol || "units";
             const newQuantity = parseFloat(item.new_quantity).toFixed(2);
 
             inventoryMessage += `${
               index + 1
-            }. ${itemName}: -${deductedAmount} ${unitSymbol} (Remaining: ${newQuantity} ${unitSymbol})\n`;
+            }. ${itemName}: -${deductedDisplay} (Remaining: ${newQuantity} ${remainingUnitSymbol})\n`;
           });
 
           // Display the detailed inventory alert
