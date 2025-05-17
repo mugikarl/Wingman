@@ -729,7 +729,6 @@ const EditStockInDetails = ({
                           {[
                             "ID",
                             "ITEM NAME",
-                            "UNIT",
                             "QUANTITY",
                             "COST",
                             "TOTAL COST",
@@ -768,24 +767,31 @@ const EditStockInDetails = ({
                                 {stock.name}
                               </td>
                               <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
-                                {stock.measurement}
-                              </td>
-                              <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
                                 {isEditing ? (
-                                  <input
-                                    type="number"
-                                    value={stock.quantity}
-                                    onChange={(e) =>
-                                      handleStockChange(
-                                        index,
-                                        "quantity",
-                                        e.target.value
-                                      )
-                                    }
-                                    className="p-1 border rounded w-20"
-                                  />
+                                  <div className="flex items-center">
+                                    <input
+                                      type="number"
+                                      value={stock.quantity}
+                                      onChange={(e) =>
+                                        handleStockChange(
+                                          index,
+                                          "quantity",
+                                          e.target.value
+                                        )
+                                      }
+                                      className="p-1 border rounded w-20 mr-2"
+                                    />
+                                    <span className="text-gray-500">
+                                      {stock.measurement}
+                                    </span>
+                                  </div>
                                 ) : (
-                                  stock.quantity
+                                  <div className="flex items-center">
+                                    <span>{stock.quantity}</span>
+                                    <span className="text-gray-500 ml-1">
+                                      {stock.measurement}
+                                    </span>
+                                  </div>
                                 )}
                               </td>
                               <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
@@ -849,7 +855,7 @@ const EditStockInDetails = ({
                           <tr className="bg-white border-b">
                             <td
                               className="px-4 py-3 text-center font-normal text-gray-500 italic"
-                              colSpan={6}
+                              colSpan={5}
                             >
                               No Stock Data Available
                             </td>
@@ -877,29 +883,24 @@ const EditStockInDetails = ({
                               </select>
                             </td>
                             <td className="px-4 py-3 font-normal text-gray-700">
-                              <input
-                                type="text"
-                                placeholder="Unit"
-                                className="p-1 border rounded bg-gray-100 w-full"
-                                name="measurement"
-                                value={selectedStock.measurement}
-                                disabled
-                              />
+                              <div className="flex items-center">
+                                <input
+                                  type="number"
+                                  placeholder="Quantity"
+                                  className="p-1 border rounded w-20 mr-2"
+                                  name="quantity"
+                                  value={selectedStock.quantity}
+                                  onChange={handleStockInputChange}
+                                />
+                                <span className="text-gray-500">
+                                  {selectedStock.measurement}
+                                </span>
+                              </div>
                             </td>
                             <td className="px-4 py-3 font-normal text-gray-700">
                               <input
                                 type="number"
-                                placeholder="Quantity"
-                                className="p-1 border rounded w-full"
-                                name="quantity"
-                                value={selectedStock.quantity}
-                                onChange={handleStockInputChange}
-                              />
-                            </td>
-                            <td className="px-4 py-3 font-normal text-gray-700">
-                              <input
-                                type="number"
-                                placeholder="Cost/Unit"
+                                placeholder="Cost"
                                 className="p-1 border rounded w-full"
                                 name="price"
                                 value={selectedStock.price}

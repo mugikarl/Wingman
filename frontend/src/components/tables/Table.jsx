@@ -222,7 +222,6 @@ const Table = ({
                                 ? "text-white"
                                 : "text-gray-300 opacity-50 hover:opacity-100"
                             }`}
-                            title="Sort ascending"
                           >
                             <FaSortUp className="h-3 w-3" />
                           </button>
@@ -239,7 +238,6 @@ const Table = ({
                                 ? "text-white"
                                 : "text-gray-300 opacity-50 hover:opacity-100"
                             }`}
-                            title="Sort descending"
                           >
                             <FaSortDown className="h-3 w-3" />
                           </button>
@@ -250,7 +248,6 @@ const Table = ({
                           <button
                             onClick={clearSorting}
                             className="ml-1 hover:bg-[#B34700] rounded-full p-0.5 transition-colors focus:outline-none"
-                            title="Clear sorting"
                           >
                             <FaTimes className="h-2.5 w-2.5 text-white" />
                           </button>

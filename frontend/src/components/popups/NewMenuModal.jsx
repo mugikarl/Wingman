@@ -446,8 +446,7 @@ const NewMenuModal = ({
                         <thead className="text-sm text-white uppercase bg-[#CC5500]">
                           <tr>
                             <th className="px-6 py-4 font-medium">ITEM NAME</th>
-                            <th className="px-6 py-4 font-medium">QTY</th>
-                            <th className="px-6 py-4 font-medium">UNIT</th>
+                            <th className="px-6 py-4 font-medium">QUANTITY</th>
                             <th className="px-6 py-4 font-medium"></th>
                           </tr>
                         </thead>
@@ -463,10 +462,12 @@ const NewMenuModal = ({
                                 {recipe.inventory_name}
                               </td>
                               <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                                {recipe.quantity}
-                              </td>
-                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                                {recipe.unit}
+                                <div className="flex items-center">
+                                  <span>{recipe.quantity}</span>
+                                  <span className="text-gray-500 ml-1">
+                                    {recipe.unit}
+                                  </span>
+                                </div>
                               </td>
                               <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900 text-right">
                                 <button
@@ -485,8 +486,7 @@ const NewMenuModal = ({
                         <thead className="text-sm text-white uppercase bg-[#CC5500]">
                           <tr>
                             <th className="px-6 py-4 font-medium">ITEM NAME</th>
-                            <th className="px-6 py-4 font-medium">QTY</th>
-                            <th className="px-6 py-4 font-medium">UNIT</th>
+                            <th className="px-6 py-4 font-medium">QUANTITY</th>
                             <th className="px-6 py-4 font-medium"></th>
                           </tr>
                         </thead>
@@ -494,7 +494,7 @@ const NewMenuModal = ({
                           <tr className="bg-white border-b">
                             <td
                               className="px-6 py-4 text-center font-normal text-gray-500 italic"
-                              colSpan={4}
+                              colSpan={3}
                             >
                               No ingredients added yet
                             </td>

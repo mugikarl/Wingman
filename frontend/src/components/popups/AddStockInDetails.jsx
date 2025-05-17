@@ -324,7 +324,7 @@ const AddStockInDetails = ({
                   <h3 className="text-lg font-medium mb-4">Stock Items</h3>
 
                   {/* Add Stock Form */}
-                  <div className="grid grid-cols-5 gap-2 mb-4">
+                  <div className="grid grid-cols-4 gap-2 mb-4">
                     <div className="col-span-2">
                       <select
                         name="item_id"
@@ -341,24 +341,19 @@ const AddStockInDetails = ({
                       </select>
                     </div>
                     <div>
-                      <input
-                        type="text"
-                        name="unit"
-                        placeholder="Unit"
-                        value={newEntry.unit}
-                        readOnly
-                        className="p-2 border rounded w-full bg-gray-100"
-                      />
-                    </div>
-                    <div>
-                      <input
-                        type="number"
-                        name="quantity"
-                        placeholder="Quantity"
-                        value={newEntry.quantity}
-                        onChange={handleEntryChange}
-                        className="p-2 border rounded w-full"
-                      />
+                      <div className="flex items-center">
+                        <input
+                          type="number"
+                          name="quantity"
+                          placeholder="Quantity"
+                          value={newEntry.quantity}
+                          onChange={handleEntryChange}
+                          className="p-2 border rounded w-full"
+                        />
+                        <span className="ml-2 text-gray-500">
+                          {newEntry.unit}
+                        </span>
+                      </div>
                     </div>
                     <div>
                       <input
@@ -390,9 +385,8 @@ const AddStockInDetails = ({
                             {[
                               "ID",
                               "ITEM NAME",
-                              "UNIT",
-                              "COST",
                               "QUANTITY",
+                              "COST",
                               "TOTAL COST",
                             ].map((column, index) => (
                               <th
@@ -430,13 +424,15 @@ const AddStockInDetails = ({
                                   {row.name}
                                 </td>
                                 <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
-                                  {row.unit}
+                                  <div className="flex items-center">
+                                    <span>{row.quantity}</span>
+                                    <span className="text-gray-500 ml-1">
+                                      {row.unit}
+                                    </span>
+                                  </div>
                                 </td>
                                 <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
                                   {row.cost}
-                                </td>
-                                <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
-                                  {row.quantity}
                                 </td>
                                 <td className="px-4 py-3 font-normal text-gray-700 group-hover:text-gray-900">
                                   <div className="flex items-center justify-between">
@@ -458,7 +454,7 @@ const AddStockInDetails = ({
                             <tr className="bg-white border-b">
                               <td
                                 className="px-4 py-3 text-center font-normal text-gray-500 italic"
-                                colSpan={6}
+                                colSpan={5}
                               >
                                 No Stock Data Available
                               </td>

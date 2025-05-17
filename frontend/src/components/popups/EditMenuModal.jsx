@@ -621,8 +621,7 @@ const EditMenuModal = ({
                         <thead className="text-sm text-white uppercase bg-[#CC5500]">
                           <tr>
                             <th className="px-6 py-4 font-medium">ITEM NAME</th>
-                            <th className="px-6 py-4 font-medium">QTY</th>
-                            <th className="px-6 py-4 font-medium">UNIT</th>
+                            <th className="px-6 py-4 font-medium">QUANTITY</th>
                             {isEditing && (
                               <th className="px-6 py-4 font-medium"></th>
                             )}
@@ -644,14 +643,16 @@ const EditMenuModal = ({
                                   "Unknown"}
                               </td>
                               <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                                {recipe.quantity}
-                              </td>
-                              <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900">
-                                {recipe.unit ||
-                                  units.find(
-                                    (u) => u.id === Number(recipe.unit_id)
-                                  )?.symbol ||
-                                  "Unknown"}
+                                <div className="flex items-center">
+                                  <span>{recipe.quantity}</span>
+                                  <span className="text-gray-500 ml-1">
+                                    {recipe.unit ||
+                                      units.find(
+                                        (u) => u.id === Number(recipe.unit_id)
+                                      )?.symbol ||
+                                      "Unknown"}
+                                  </span>
+                                </div>
                               </td>
                               {isEditing && (
                                 <td className="px-6 py-4 font-normal text-gray-700 group-hover:text-gray-900 text-right">
@@ -672,8 +673,7 @@ const EditMenuModal = ({
                         <thead className="text-sm text-white uppercase bg-[#CC5500]">
                           <tr>
                             <th className="px-6 py-4 font-medium">ITEM NAME</th>
-                            <th className="px-6 py-4 font-medium">QTY</th>
-                            <th className="px-6 py-4 font-medium">UNIT</th>
+                            <th className="px-6 py-4 font-medium">QUANTITY</th>
                             {isEditing && (
                               <th className="px-6 py-4 font-medium"></th>
                             )}
@@ -683,7 +683,7 @@ const EditMenuModal = ({
                           <tr className="bg-white border-b">
                             <td
                               className="px-6 py-4 text-center font-normal text-gray-500 italic"
-                              colSpan={isEditing ? 4 : 3}
+                              colSpan={isEditing ? 3 : 2}
                             >
                               No ingredients added yet
                             </td>
