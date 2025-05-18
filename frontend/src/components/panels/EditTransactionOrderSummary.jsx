@@ -5,6 +5,7 @@ import OrderEditPayment from "../popups/OrderEditPayment";
 import axios from "axios";
 import { useModal } from "../utils/modalUtils";
 import { FaArrowLeft } from "react-icons/fa";
+import { FaPlus, FaMinus } from "react-icons/fa6";
 
 const EditTransactionOrderSummary = ({
   orderDetails,
@@ -32,13 +33,18 @@ const EditTransactionOrderSummary = ({
   setIsAddingUnliWings,
   pendingUnliGroupNumber,
   setPendingUnliGroupNumber,
+  onCancelUpdate,
 }) => {
+  const [activeSection, setActiveSection] = useState(null);
   const [openAccordion, setOpenAccordion] = useState({});
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false); // Loading state
   const [buttonText, setButtonText] = useState("Save All Changes"); // Button text state
   const loadingIntervalRef = useRef(null); // Ref for the loading interval
   const { alert, confirm } = useModal();
+  // Default function for onCancelUpdate if not provided
+  const handleCancelUpdate =
+    onCancelUpdate || (() => console.log("Cancel update"));
   // Compute orders directly from orderDetails prop.
   const alaCarteOrders = orderDetails.filter(
     (detail) => detail.instore_category?.id === 1
@@ -475,6 +481,8 @@ const EditTransactionOrderSummary = ({
       alaCarte: true,
       unliWings: true,
     });
+    // Set alaCarte as the default active section
+    setActiveSection("alaCarte");
   }, []);
 
   // Also add this to ensure unliWings is open when activeUnliWingsGroup changes
@@ -484,6 +492,7 @@ const EditTransactionOrderSummary = ({
         ...prev,
         unliWings: true,
       }));
+      setActiveSection("unliWings");
     }
   }, [activeUnliWingsGroup]);
 
@@ -497,201 +506,312 @@ const EditTransactionOrderSummary = ({
           {menuType === "In-Store" ? (
             <>
               {/* Ala Carte Section */}
-              <div>
-                <button
-                  className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200 rounded"
-                  onClick={() => toggleAccordion("alaCarte")}
+              <div className="mt-3">
+                <div
+                  className={`flex rounded-sm overflow-hidden ${
+                    activeSection === "alaCarte" ? "ring-2 ring-[#CC5500]" : ""
+                  }`}
                 >
-                  <span className="font-semibold">
-                    Ala Carte Orders - ₱{alaCarteSubtotal.toFixed(2)}
-                  </span>
-                  {openAccordion["alaCarte"] ? (
-                    <span>&#9650;</span>
-                  ) : (
-                    <span>&#9660;</span>
-                  )}
-                </button>
+                  {/* Section selector button - always sets active section */}
+                  <button
+                    onClick={() => {
+                      setActiveSection("alaCarte");
+                      if (!openAccordion.alaCarte)
+                        setOpenAccordion((prev) => ({
+                          ...prev,
+                          alaCarte: true,
+                        }));
+                    }}
+                    className={`flex-1 py-3 px-4 text-left ${
+                      activeSection === "alaCarte"
+                        ? "bg-[#CC5500] text-white"
+                        : "bg-gray-100 hover:bg-gray-200"
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <span className="font-semibold">
+                        Ala Carte Orders - ₱{alaCarteSubtotal.toFixed(2)}
+                      </span>
+                      {activeSection === "alaCarte" && (
+                        <span className="ml-2 text-xs bg-white text-[#CC5500] px-2 py-0.5 rounded-full">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Separate toggle button for accordion */}
+                  <button
+                    onClick={() => toggleAccordion("alaCarte")}
+                    className={`px-3 ${
+                      activeSection === "alaCarte"
+                        ? "bg-[#CC5500] text-white"
+                        : "bg-gray-100 hover:bg-gray-200"
+                    }`}
+                  >
+                    {openAccordion["alaCarte"] ? (
+                      <FaMinus
+                        className={
+                          activeSection === "alaCarte"
+                            ? "text-white"
+                            : "text-gray-600"
+                        }
+                      />
+                    ) : (
+                      <FaPlus
+                        className={
+                          activeSection === "alaCarte"
+                            ? "text-white"
+                            : "text-gray-600"
+                        }
+                      />
+                    )}
+                  </button>
+                </div>
+
                 {openAccordion["alaCarte"] &&
                   (alaCarteOrders.length === 0 ? (
-                    <p className="text-gray-500 text-center">
+                    <p className="text-gray-500 text-center p-4 mt-2">
                       No Order Details Found
                     </p>
                   ) : (
-                    alaCarteOrders.map((item) => (
-                      <EditableProductCard
-                        key={getItemKey(item, { id: 1, name: "In-Store" })}
-                        item={item}
-                        onQuantityChange={onQuantityChange}
-                        discounts={discounts}
-                        onDiscountChange={onDiscountChange}
-                      />
-                    ))
+                    <div className="p-3 space-y-3 mt-2">
+                      {alaCarteOrders.map((item) => (
+                        <EditableProductCard
+                          key={getItemKey(item, { id: 1, name: "In-Store" })}
+                          item={item}
+                          onQuantityChange={onQuantityChange}
+                          discounts={discounts}
+                          onDiscountChange={onDiscountChange}
+                        />
+                      ))}
+                    </div>
                   ))}
               </div>
-              {/* Unli Wings Section */}
-              <div className="mt-2">
-                <button
-                  className="w-full flex justify-between items-center px-2 py-3 bg-gray-100 hover:bg-gray-200 rounded"
-                  onClick={() => toggleAccordion("unliWings")}
-                >
-                  <span className="font-semibold">
-                    Unli Wings Orders - ₱{unliWingsSubtotal.toFixed(2)}
-                  </span>
-                  {openAccordion["unliWings"] ? (
-                    <span>&#9650;</span>
-                  ) : (
-                    <span>&#9660;</span>
-                  )}
-                </button>
-                {openAccordion["unliWings"] &&
-                  Object.keys(groupedUnliWingsOrders).map((groupKey) => {
-                    const groupOrders = groupedUnliWingsOrders[groupKey];
-                    const baseAmount = getUnliWingsBaseAmount(groupOrders);
-                    // Convert groupKey to a number for accurate comparison.
-                    const isActive = Number(groupKey) === activeUnliWingsGroup;
-                    return (
-                      <div
-                        key={groupKey}
-                        className={`border rounded mb-2 p-2 ${
-                          isActive ? "border-green-900" : "border-gray-300"
-                        }`}
-                      >
-                        <div className="flex justify-between items-center mb-2">
-                          <h4 className="font-bold text-sm">
-                            Unli Wings Order #{groupKey} - ₱
-                            {baseAmount && baseAmount.toFixed(2)}
-                          </h4>
-                          {isActive ? (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => {
-                                  // Get the original items for this group from the transaction data
-                                  const originalGroupItems =
-                                    transaction.order_details.filter(
-                                      (detail) =>
-                                        detail.instore_category?.id === 2 &&
-                                        detail.unli_wings_group ===
-                                          activeUnliWingsGroup
-                                    );
 
-                                  if (originalGroupItems.length > 0) {
-                                    // Remove all current items in this group
-                                    const updatedDetails = orderDetails.filter(
-                                      (detail) =>
-                                        !(
+              {/* Unli Wings Section */}
+              <div className="mt-3 mb-4">
+                <div
+                  className={`flex rounded-sm overflow-hidden ${
+                    activeSection === "unliWings" ? "ring-2 ring-[#CC5500]" : ""
+                  }`}
+                >
+                  {/* Section selector button - always sets active section */}
+                  <button
+                    onClick={() => {
+                      setActiveSection("unliWings");
+                      if (!openAccordion.unliWings)
+                        setOpenAccordion((prev) => ({
+                          ...prev,
+                          unliWings: true,
+                        }));
+                    }}
+                    className={`flex-1 py-3 px-4 text-left ${
+                      activeSection === "unliWings"
+                        ? "bg-[#CC5500] text-white"
+                        : "bg-gray-100 hover:bg-gray-200"
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <span className="font-semibold">
+                        Unli Wings Orders - ₱{unliWingsSubtotal.toFixed(2)}
+                      </span>
+                      {activeSection === "unliWings" && (
+                        <span className="ml-2 text-xs bg-white text-[#CC5500] px-2 py-0.5 rounded-full">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Separate toggle button for accordion */}
+                  <button
+                    onClick={() => toggleAccordion("unliWings")}
+                    className={`px-3 ${
+                      activeSection === "unliWings"
+                        ? "bg-[#CC5500] text-white"
+                        : "bg-gray-100 hover:bg-gray-200"
+                    }`}
+                  >
+                    {openAccordion["unliWings"] ? (
+                      <FaMinus
+                        className={
+                          activeSection === "unliWings"
+                            ? "text-white"
+                            : "text-gray-600"
+                        }
+                      />
+                    ) : (
+                      <FaPlus
+                        className={
+                          activeSection === "unliWings"
+                            ? "text-white"
+                            : "text-gray-600"
+                        }
+                      />
+                    )}
+                  </button>
+                </div>
+
+                {openAccordion["unliWings"] && (
+                  <div className="p-3 mt-2">
+                    {Object.keys(groupedUnliWingsOrders).map((groupKey) => {
+                      const groupOrders = groupedUnliWingsOrders[groupKey];
+                      const baseAmount = getUnliWingsBaseAmount(groupOrders);
+                      // Convert groupKey to a number for accurate comparison.
+                      const isActive =
+                        Number(groupKey) === activeUnliWingsGroup;
+                      return (
+                        <div
+                          key={groupKey}
+                          className={`border rounded mb-4 p-3 ${
+                            isActive ? "border-green-900" : "border-gray-300"
+                          }`}
+                        >
+                          <div className="flex justify-between items-center mb-2">
+                            <h4 className="font-bold text-sm">
+                              Unli Wings Order #{groupKey} - ₱
+                              {baseAmount && baseAmount.toFixed(2)}
+                            </h4>
+                            {isActive ? (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    // Get the original items for this group from the transaction data
+                                    const originalGroupItems =
+                                      transaction.order_details.filter(
+                                        (detail) =>
                                           detail.instore_category?.id === 2 &&
                                           detail.unli_wings_group ===
                                             activeUnliWingsGroup
-                                        )
-                                    );
+                                      );
 
-                                    // Add back the original items
-                                    originalGroupItems.forEach((item) => {
-                                      onQuantityChange(item, item.quantity);
-                                    });
-                                  }
+                                    if (originalGroupItems.length > 0) {
+                                      // Remove all current items in this group
+                                      const updatedDetails =
+                                        orderDetails.filter(
+                                          (detail) =>
+                                            !(
+                                              detail.instore_category?.id ===
+                                                2 &&
+                                              detail.unli_wings_group ===
+                                                activeUnliWingsGroup
+                                            )
+                                        );
 
-                                  // Exit edit mode
-                                  setActiveUnliWingsGroup(null);
-                                }}
-                                className="px-2 py-1 rounded text-xs bg-red-500 text-white"
-                              >
-                                Cancel
-                              </button>
+                                      // Add back the original items
+                                      originalGroupItems.forEach((item) => {
+                                        onQuantityChange(item, item.quantity);
+                                      });
+                                    }
+
+                                    // Exit edit mode
+                                    setActiveUnliWingsGroup(null);
+                                  }}
+                                  className="px-2 py-1 rounded text-xs bg-red-500 text-white"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    // Check if the current group has any items
+                                    const currentGroupItems =
+                                      groupedUnliWingsOrders[
+                                        activeUnliWingsGroup
+                                      ] || [];
+                                    if (currentGroupItems.length === 0) {
+                                      // Show alert requiring at least one item in the Unli Wings order
+                                      alert(
+                                        "Please add at least one Unli Wings item before completing this group.",
+                                        "Required Item"
+                                      );
+                                    } else {
+                                      // Don't call handleEditOrder here - just exit edit mode
+                                      setActiveUnliWingsGroup(null);
+                                    }
+                                  }}
+                                  className="px-2 py-1 rounded text-xs bg-green-500 text-white"
+                                >
+                                  Done Editing
+                                </button>
+                              </div>
+                            ) : (
                               <button
                                 onClick={() => {
-                                  // Check if the current group has any items
-                                  const currentGroupItems =
-                                    groupedUnliWingsOrders[
-                                      activeUnliWingsGroup
-                                    ] || [];
-                                  if (currentGroupItems.length === 0) {
-                                    // Show alert requiring at least one item in the Unli Wings order
-                                    alert(
-                                      "Please add at least one Unli Wings item before completing this group.",
-                                      "Required Item"
-                                    );
-                                  } else {
-                                    // Don't call handleEditOrder here - just exit edit mode
-                                    setActiveUnliWingsGroup(null);
-                                  }
+                                  setActiveUnliWingsGroup(Number(groupKey));
                                 }}
-                                className="px-2 py-1 rounded text-xs bg-green-500 text-white"
+                                className="px-2 py-1 rounded text-xs bg-orange-500 text-white"
                               >
-                                Done Editing
+                                Update
                               </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                setActiveUnliWingsGroup(Number(groupKey));
-                              }}
-                              className="px-2 py-1 rounded text-xs bg-orange-500 text-white"
-                            >
-                              Update
-                            </button>
+                            )}
+                          </div>
+                          {/* If there are no items, show a placeholder */}
+                          {groupOrders.length === 0 && (
+                            <p className="text-gray-500 text-center">
+                              No items added yet
+                            </p>
                           )}
+                          {groupOrders.map((item) => (
+                            <EditableProductCard
+                              key={getItemKey(item, {
+                                id: 1,
+                                name: "In-Store",
+                              })}
+                              item={item}
+                              onQuantityChange={onQuantityChange}
+                            />
+                          ))}
                         </div>
-                        {/* If there are no items, show a placeholder */}
-                        {groupOrders.length === 0 && (
-                          <p className="text-gray-500 text-center">
-                            No items added yet
-                          </p>
-                        )}
-                        {groupOrders.map((item) => (
-                          <EditableProductCard
-                            key={getItemKey(item, { id: 1, name: "In-Store" })}
-                            item={item}
-                            onQuantityChange={onQuantityChange}
-                          />
-                        ))}
-                      </div>
-                    );
-                  })}
-                {/* Add New Unli Wings Order Button */}
-                {openAccordion["unliWings"] && (
-                  <div className="mb-2">
-                    <button
-                      onClick={() => {
-                        console.log("Add New Unli Wings Order button clicked");
+                      );
+                    })}
 
-                        // Force the unliWings accordion to be open
-                        setOpenAccordion({
-                          alaCarte: openAccordion.alaCarte,
-                          unliWings: true,
-                        });
+                    {/* Add New Unli Wings Order Button */}
+                    <div className="mb-2">
+                      <button
+                        onClick={() => {
+                          console.log(
+                            "Add New Unli Wings Order button clicked"
+                          );
 
-                        // Get current group numbers
-                        const currentGroups = orderDetails
-                          .filter(
-                            (item) =>
-                              item.instore_category?.id === 2 &&
-                              item.unli_wings_group
-                          )
-                          .map((item) => item.unli_wings_group)
-                          .filter(Boolean);
+                          // Force the unliWings accordion to be open
+                          setOpenAccordion({
+                            alaCarte: openAccordion.alaCarte,
+                            unliWings: true,
+                          });
 
-                        console.log("Current unli groups:", currentGroups);
+                          // Get current group numbers
+                          const currentGroups = orderDetails
+                            .filter(
+                              (item) =>
+                                item.instore_category?.id === 2 &&
+                                item.unli_wings_group
+                            )
+                            .map((item) => item.unli_wings_group)
+                            .filter(Boolean);
 
-                        // Calculate next group number
-                        const newGroupNumber =
-                          currentGroups.length > 0
-                            ? Math.max(...currentGroups) + 1
-                            : 1;
+                          console.log("Current unli groups:", currentGroups);
 
-                        console.log(
-                          "Creating new Unli Wings group #",
-                          newGroupNumber
-                        );
+                          // Calculate next group number
+                          const newGroupNumber =
+                            currentGroups.length > 0
+                              ? Math.max(...currentGroups) + 1
+                              : 1;
 
-                        // Enter "Add Unli Wings" mode
-                        setIsAddingUnliWings(true);
-                        setPendingUnliGroupNumber(newGroupNumber);
-                      }}
-                      className="w-full px-3 py-2 bg-[#CC5500] text-white rounded"
-                    >
-                      Add New Unli Wings Order
-                    </button>
+                          console.log(
+                            "Creating new Unli Wings group #",
+                            newGroupNumber
+                          );
+
+                          // Enter "Add Unli Wings" mode
+                          setIsAddingUnliWings(true);
+                          setPendingUnliGroupNumber(newGroupNumber);
+                        }}
+                        className="w-full px-3 py-2 bg-[#CC5500] text-white rounded"
+                      >
+                        Add New Unli Wings Order
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -705,7 +825,6 @@ const EditTransactionOrderSummary = ({
               ) : (
                 orderDetails.map((item) => (
                   <EditableProductCard
-                    E88504
                     key={getItemKey(item, { id: 2, name: "Delivery" })}
                     item={item}
                     onQuantityChange={onQuantityChange}
@@ -742,7 +861,7 @@ const EditTransactionOrderSummary = ({
               <div className="flex justify-between gap-2 mt-4">
                 <button
                   className="w-1/2 px-3 py-2 bg-red-500 text-white rounded"
-                  onClick={onCancelUpdate}
+                  onClick={handleCancelUpdate}
                 >
                   Cancel
                 </button>
