@@ -39,7 +39,7 @@ const AlertModal = ({
 
         {/* Body */}
         <div className="p-6">
-          <p className="text-gray-700 mb-4">{message}</p>
+          <p className="text-gray-700 mb-4 whitespace-pre-wrap">{message}</p>
 
           {/* Input field for prompt */}
           {type === "prompt" && (

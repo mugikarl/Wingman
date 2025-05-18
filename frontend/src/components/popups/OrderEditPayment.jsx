@@ -3,6 +3,8 @@ import { FaMoneyBill, FaCreditCard } from "react-icons/fa6";
 import { useModal } from "../utils/modalUtils";
 import EmployeeVerification from "./EmployeeVerification";
 import axios from "axios";
+import LoadingScreen from "./LoadingScreen";
+import { createPortal } from "react-dom";
 
 const OrderEditPayment = ({
   isOpen,
@@ -24,6 +26,9 @@ const OrderEditPayment = ({
   const [gcashReferenceNo, setGcashReferenceNo] = useState("");
   const [gcashReferenceImage, setGcashReferenceImage] = useState(null);
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+  // New states for loading screen
+  const [showPortalLoading, setShowPortalLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
 
   const { alert } = useModal();
 
@@ -133,33 +138,35 @@ const OrderEditPayment = ({
     const token = localStorage.getItem("access_token");
 
     if (isAdmin && token) {
-      // Admin can place order directly without verification
-      setIsProcessing(true);
+      // Set portal loading state to true BEFORE closing modal
+      setLoadingMessage("Editing order...");
+      setShowPortalLoading(true);
 
-      // Ensure header is set
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
-      // Build payload details
+      // Create payload
       const newPaymentAmount =
         selectedPaymentMethod.name.toLowerCase() === "cash"
           ? (Number.parseFloat(cashReceived) || 0) - change
           : extraPaymentRequired;
 
-      // Create the payload with payment details
       const payload = {
         employee_id: transaction.employee.id,
         payment_method: selectedPaymentMethod.id,
         payment_amount: transaction.payment_amount + newPaymentAmount,
         reference_id: gcashReferenceNo || transaction.reference_id,
-        additional_payment: extraPaymentRequired, // Add the extra payment amount needed
+        additional_payment: extraPaymentRequired,
       };
 
       console.log("Admin submitting payment with payload:", payload);
 
+      // Ensure header is set
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+      // Close this modal AFTER setting up the portal loading
+      onClose();
+
       handleEditOrder(payload)
         .then((data) => {
           onUpdateComplete(data);
-          onClose();
           fetchOrderData();
         })
         .catch((error) => {
@@ -169,7 +176,8 @@ const OrderEditPayment = ({
           );
         })
         .finally(() => {
-          setIsProcessing(false);
+          // Turn off portal loading when done
+          setShowPortalLoading(false);
         });
     } else {
       // Open verification modal for non-admin users
@@ -181,8 +189,9 @@ const OrderEditPayment = ({
     // Close verification modal
     setIsVerificationModalOpen(false);
 
-    // Proceed with processing the order
-    setIsProcessing(true);
+    // Show loading in portal
+    setLoadingMessage("Editing order...");
+    setShowPortalLoading(true);
 
     // Build payload details
     const newPaymentAmount =
@@ -190,36 +199,26 @@ const OrderEditPayment = ({
         ? (Number.parseFloat(cashReceived) || 0) - change
         : extraPaymentRequired;
 
-    // Check if the user is admin
-    const isAdmin = localStorage.getItem("role") === "Admin";
-    const token = localStorage.getItem("access_token");
-
-    // Create the payload with payment details and verification info
+    // Create the payload
     const payload = {
       employee_id: transaction.employee.id,
       payment_method: selectedPaymentMethod.id,
       payment_amount: transaction.payment_amount + newPaymentAmount,
       reference_id: gcashReferenceNo || transaction.reference_id,
-      additional_payment: extraPaymentRequired, // Add the extra payment amount needed
+      additional_payment: extraPaymentRequired,
+      email: email,
+      passcode: passcode,
     };
-
-    // Only include verification fields if not admin
-    if (!isAdmin) {
-      payload.email = email;
-      payload.passcode = passcode;
-    }
 
     console.log("Submitting payment with payload:", payload);
 
-    // Make sure Authorization header is set if admin
-    if (isAdmin && token) {
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    }
+    // Close the modal
+    onClose();
 
+    // Make API call
     handleEditOrder(payload)
       .then((data) => {
         onUpdateComplete(data);
-        onClose();
         fetchOrderData();
       })
       .catch((error) => {
@@ -229,9 +228,19 @@ const OrderEditPayment = ({
         );
       })
       .finally(() => {
-        setIsProcessing(false);
+        setShowPortalLoading(false);
       });
   };
+
+  // Create portal for loading screen that persists even when this component unmounts
+  useEffect(() => {
+    // Cleanup function to ensure we remove the loading screen if component unmounts
+    return () => {
+      if (showPortalLoading) {
+        setShowPortalLoading(false);
+      }
+    };
+  }, [showPortalLoading]);
 
   if (!isOpen) return null;
 
@@ -241,115 +250,157 @@ const OrderEditPayment = ({
   const isGcash = paymentMethodName.toLowerCase() === "gcash";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-lg mx-4 overflow-hidden max-h-[90vh]">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-xl font-semibold">Payment</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 focus:outline-none"
-          >
-            &times;
-          </button>
-        </div>
-        {/* Content */}
-        <div className="p-4">
-          {/* Scrollable section */}
-          <div className="space-y-6 max-h-[60vh] overflow-y-auto">
-            {/* Display Current Order Total */}
-            <div className="flex items-center justify-between border-b pb-4">
-              <span className="text-lg font-medium text-gray-700">
-                Updated Order Total
-              </span>
-              <span className="text-xl font-bold">
-                ₱{finalTotal.toFixed(2)}
-              </span>
-            </div>
+    <>
+      {/* Render LoadingScreen in a portal so it stays even after this component is unmounted */}
+      {showPortalLoading &&
+        createPortal(<LoadingScreen message={loadingMessage} />, document.body)}
 
-            {/* Display Extra Payment Required */}
-            <div className="flex items-center justify-between border-b pb-4">
-              <span className="text-lg font-medium text-gray-700">
-                Extra Payment Required
-              </span>
-              <span className="text-xl font-bold">
-                ₱{extraPaymentRequired.toFixed(2)}
-              </span>
-            </div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="bg-white rounded-lg shadow-lg w-full max-w-lg mx-4 overflow-hidden max-h-[90vh]">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b">
+            <h2 className="text-xl font-semibold">Payment</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 focus:outline-none"
+              disabled={isProcessing}
+            >
+              &times;
+            </button>
+          </div>
+          {/* Content */}
+          <div className="p-4">
+            {/* Scrollable section */}
+            <div className="space-y-6 max-h-[60vh] overflow-y-auto">
+              {/* Display Current Order Total */}
+              <div className="flex items-center justify-between border-b pb-4">
+                <span className="text-lg font-medium text-gray-700">
+                  Updated Order Total
+                </span>
+                <span className="text-xl font-bold">
+                  ₱{finalTotal.toFixed(2)}
+                </span>
+              </div>
 
-            {/* Employee Display - Read-only */}
-            {transaction.employee && (
-              <div className="space-y-2 border-b pb-4">
-                <label className="text-sm font-medium">Employee</label>
-                <div className="w-full p-2 border rounded-md bg-gray-50 text-gray-700">
-                  {transaction.employee.first_name}{" "}
-                  {transaction.employee.last_name}
+              {/* Display Extra Payment Required */}
+              <div className="flex items-center justify-between border-b pb-4">
+                <span className="text-lg font-medium text-gray-700">
+                  Extra Payment Required
+                </span>
+                <span className="text-xl font-bold">
+                  ₱{extraPaymentRequired.toFixed(2)}
+                </span>
+              </div>
+
+              {/* Employee Display - Read-only */}
+              {transaction.employee && (
+                <div className="space-y-2 border-b pb-4">
+                  <label className="text-sm font-medium">Employee</label>
+                  <div className="w-full p-2 border rounded-md bg-gray-50 text-gray-700">
+                    {transaction.employee.first_name}{" "}
+                    {transaction.employee.last_name}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Payment Method Display (non-editable) */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Payment Method</label>
-              <div className="w-full p-4 border rounded-md bg-gray-50 flex items-center gap-2">
-                {isCash ? (
-                  <FaMoneyBill className="text-green-600" />
-                ) : isGcash ? (
-                  <FaCreditCard className="text-blue-600" />
-                ) : (
-                  <FaCreditCard className="text-gray-600" />
-                )}
-                <span className="font-medium">{paymentMethodName}</span>
-              </div>
-            </div>
-
-            {/* Fields for Cash Payment */}
-            {isCash && extraPaymentRequired > 0 && (
+              {/* Payment Method Display (non-editable) */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="cash-received"
-                    className="text-sm font-medium"
-                  >
-                    Cash Received
-                  </label>
+                <label className="text-sm font-medium">Payment Method</label>
+                <div className="w-full p-4 border rounded-md bg-gray-50 flex items-center gap-2">
+                  {isCash ? (
+                    <FaMoneyBill className="text-green-600" />
+                  ) : isGcash ? (
+                    <FaCreditCard className="text-blue-600" />
+                  ) : (
+                    <FaCreditCard className="text-gray-600" />
+                  )}
+                  <span className="font-medium">{paymentMethodName}</span>
                 </div>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-                    ₱
-                  </span>
-                  <input
-                    id="cash-received"
-                    type="number"
-                    value={cashReceived}
-                    onChange={(e) => setCashReceived(e.target.value)}
-                    className="w-full pl-8 pr-4 py-2 border rounded-md text-right text-lg font-medium focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder="0.00"
-                    step="0.01"
-                  />
-                </div>
-                {/* Show total payment amount and change after edit */}
-                <div className="border-t pt-4">
+              </div>
+
+              {/* Fields for Cash Payment */}
+              {isCash && extraPaymentRequired > 0 && (
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">
-                      Cash Amount
-                    </span>
-                    <span className="text-sm font-bold">
-                      ₱{parseFloat(cashReceived || 0).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">
-                      Change
-                    </span>
-                    <span
-                      className={`text-sm font-bold ${
-                        change >= 0 ? "text-green-600" : "text-red-600"
-                      }`}
+                    <label
+                      htmlFor="cash-received"
+                      className="text-sm font-medium"
                     >
-                      ₱{change.toFixed(2)}
-                    </span>
+                      Cash Received
+                    </label>
                   </div>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                      ₱
+                    </span>
+                    <input
+                      id="cash-received"
+                      type="number"
+                      value={cashReceived}
+                      onChange={(e) => setCashReceived(e.target.value)}
+                      className="w-full pl-8 pr-4 py-2 border rounded-md text-right text-lg font-medium focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      placeholder="0.00"
+                      step="0.01"
+                    />
+                  </div>
+                  {/* Show total payment amount and change after edit */}
+                  <div className="border-t pt-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">
+                        Cash Amount
+                      </span>
+                      <span className="text-sm font-bold">
+                        ₱{parseFloat(cashReceived || 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">
+                        Change
+                      </span>
+                      <span
+                        className={`text-sm font-bold ${
+                          change >= 0 ? "text-green-600" : "text-red-600"
+                        }`}
+                      >
+                        ₱{change.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-2 border-t pt-2">
+                      <span className="text-sm font-medium text-gray-700">
+                        Total Payment After Edit
+                      </span>
+                      <span className="text-sm font-bold text-blue-600">
+                        ₱
+                        {(
+                          transaction.payment_amount +
+                          (Number.parseFloat(cashReceived) || 0) -
+                          change
+                        ).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Fields for GCash Payment */}
+              {isGcash && extraPaymentRequired > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label
+                      htmlFor="gcash-reference"
+                      className="text-sm font-medium"
+                    >
+                      GCash Reference No.
+                    </label>
+                  </div>
+                  <input
+                    id="gcash-reference"
+                    type="text"
+                    value={gcashReferenceNo}
+                    onChange={(e) => setGcashReferenceNo(e.target.value)}
+                    className="w-full px-4 py-2 border rounded-md text-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter GCash reference number"
+                  />
                   <div className="flex items-center justify-between mt-2 border-t pt-2">
                     <span className="text-sm font-medium text-gray-700">
                       Total Payment After Edit
@@ -357,92 +408,57 @@ const OrderEditPayment = ({
                     <span className="text-sm font-bold text-blue-600">
                       ₱
                       {(
-                        transaction.payment_amount +
-                        (Number.parseFloat(cashReceived) || 0) -
-                        change
+                        transaction.payment_amount + extraPaymentRequired
                       ).toFixed(2)}
                     </span>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          </div>
 
-            {/* Fields for GCash Payment */}
-            {isGcash && extraPaymentRequired > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="gcash-reference"
-                    className="text-sm font-medium"
-                  >
-                    GCash Reference No.
-                  </label>
-                </div>
-                <input
-                  id="gcash-reference"
-                  type="text"
-                  value={gcashReferenceNo}
-                  onChange={(e) => setGcashReferenceNo(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-md text-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter GCash reference number"
-                />
-                <div className="flex items-center justify-between mt-2 border-t pt-2">
-                  <span className="text-sm font-medium text-gray-700">
-                    Total Payment After Edit
-                  </span>
-                  <span className="text-sm font-bold text-blue-600">
-                    ₱
-                    {(
-                      transaction.payment_amount + extraPaymentRequired
-                    ).toFixed(2)}
-                  </span>
-                </div>
-              </div>
+          {/* Footer - Only show the Edit Order button if there is extra payment */}
+          <div className="p-4 border-t">
+            {extraPaymentRequired > 0 ? (
+              <button
+                onClick={handleSubmit}
+                className={`w-full py-3 rounded-lg text-white text-lg font-medium transition-colors ${
+                  isProcessing ||
+                  (isCash &&
+                    (Number.parseFloat(cashReceived) || 0) < finalPayment) ||
+                  (isGcash && !gcashReferenceNo)
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-green-500 hover:bg-green-600"
+                }`}
+                disabled={
+                  isProcessing ||
+                  (isCash &&
+                    (Number.parseFloat(cashReceived) || 0) < finalPayment) ||
+                  (isGcash && !gcashReferenceNo)
+                }
+              >
+                Edit Order
+              </button>
+            ) : (
+              <button
+                onClick={onClose}
+                className="w-full py-3 rounded-lg bg-gray-200 text-gray-700 text-lg font-medium hover:bg-gray-300"
+              >
+                Close
+              </button>
             )}
           </div>
         </div>
 
-        {/* Footer - Only show the Edit Order button if there is extra payment */}
-        <div className="p-4 border-t">
-          {extraPaymentRequired > 0 ? (
-            <button
-              onClick={handleSubmit}
-              className={`w-full py-3 rounded-lg text-white text-lg font-medium transition-colors ${
-                isProcessing ||
-                (isCash &&
-                  (Number.parseFloat(cashReceived) || 0) < finalPayment) ||
-                (isGcash && !gcashReferenceNo)
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-green-500 hover:bg-green-600"
-              }`}
-              disabled={
-                isProcessing ||
-                (isCash &&
-                  (Number.parseFloat(cashReceived) || 0) < finalPayment) ||
-                (isGcash && !gcashReferenceNo)
-              }
-            >
-              {isProcessing ? "Processing..." : "Edit Order"}
-            </button>
-          ) : (
-            <button
-              onClick={onClose}
-              className="w-full py-3 rounded-lg bg-gray-200 text-gray-700 text-lg font-medium hover:bg-gray-300"
-            >
-              Close
-            </button>
-          )}
-        </div>
+        {/* Verification Modal */}
+        <EmployeeVerification
+          isOpen={isVerificationModalOpen}
+          closeModal={() => setIsVerificationModalOpen(false)}
+          employee={transaction.employee}
+          onVerificationSuccess={handleVerificationSuccess}
+        />
       </div>
-
-      {/* Verification Modal */}
-      <EmployeeVerification
-        isOpen={isVerificationModalOpen}
-        closeModal={() => setIsVerificationModalOpen(false)}
-        employee={transaction.employee}
-        onVerificationSuccess={handleVerificationSuccess}
-      />
-    </div>
+    </>
   );
 };
 

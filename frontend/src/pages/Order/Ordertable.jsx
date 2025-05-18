@@ -25,7 +25,6 @@ const OrderTable = () => {
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [inventoryData, setInventoryData] = useState(null);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const statusDropdownRef = useRef(null);
@@ -56,52 +55,6 @@ const OrderTable = () => {
         : [...prevFilters, filter]
     );
   };
-
-  const fetchInventoryData = async () => {
-    try {
-      const response = await axios.get(
-        "http://127.0.0.1:8000/fetch-inventory-order-data/"
-      );
-      setInventoryData(response.data);
-    } catch (err) {
-      console.error("Error fetching inventory data:", err);
-    }
-  };
-
-  // After orderData is fetched:
-  const unliWingsCategory = orderData?.instore_categories?.find(
-    (cat) => Number(cat.id) === 2
-  );
-  console.log("Unli Wings Category:", unliWingsCategory);
-
-  const filteredTransactions =
-    orderData?.transactions?.filter((order) => {
-      if (!orderData) return []; // Ensure orderData is available
-
-      // Search by Transaction ID
-      const searchLower = searchQuery.toLowerCase();
-      const transactionIdMatch =
-        !searchQuery ||
-        (order.id && order.id.toString().toLowerCase().includes(searchLower));
-
-      // Filter by order status
-      const statusMatch =
-        statusFilters.includes("All") ||
-        statusFilters.includes(order.order_status?.name);
-
-      // Map type_id to its corresponding name using orderData.menu_types
-      const transactionTypes = order.order_details?.map((order_details) => {
-        const typeId = order_details.menu_item?.type_id;
-        return orderData.menu_types.find((type) => type.id === typeId)?.name;
-      });
-
-      // Filter by transaction type
-      const transactionTypeMatch =
-        selectedFilters.length === 0 || // If no filter is selected, show all
-        transactionTypes?.some((type) => selectedFilters.includes(type));
-
-      return transactionIdMatch && statusMatch && transactionTypeMatch;
-    }) || [];
 
   const toggleStatus = (status) => {
     setStatusFilters((prev) => {
@@ -139,14 +92,11 @@ const OrderTable = () => {
     console.log("Location state:", location.state);
     if (location.state?.refresh) {
       fetchOrderData();
-      fetchInventoryData();
     } else {
       fetchOrderData();
-      fetchInventoryData();
     }
   }, [location.state]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -162,6 +112,10 @@ const OrderTable = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    console.log("Status filters changed:", statusFilters);
+  }, [statusFilters, selectedFilters, searchQuery]);
 
   if (loading) {
     return <LoadingScreen message={"Loading orders"} />;
@@ -195,6 +149,202 @@ const OrderTable = () => {
     }
     return `${statusFilters.length} selected`;
   };
+
+  const filteredTransactions =
+    orderData?.transactions?.filter((order) => {
+      if (!orderData) return false;
+
+      // Search by Transaction ID
+      const searchLower = searchQuery.toLowerCase();
+      const transactionIdMatch =
+        !searchQuery ||
+        (order.id && order.id.toString().toLowerCase().includes(searchLower));
+
+      // Filter by order status
+      const statusMatch =
+        statusFilters.includes("All") ||
+        statusFilters.includes(order.order_status?.name);
+
+      // Map type_id to its corresponding name using orderData.menu_types
+      const transactionTypes = order.order_details?.map((order_details) => {
+        const typeId = order_details.menu_item?.type_id;
+        return orderData.menu_types.find((type) => type.id === typeId)?.name;
+      });
+
+      // Filter by transaction type
+      const transactionTypeMatch =
+        selectedFilters.length === 0 || // If no filter is selected, show all
+        transactionTypes?.some((type) => selectedFilters.includes(type));
+
+      return transactionIdMatch && statusMatch && transactionTypeMatch;
+    }) || [];
+
+  const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+    // Define status priority
+    const getStatusPriority = (status) => {
+      if (status === "Pending") return 1;
+      if (status === "Completed") return 2;
+      if (status === "Cancelled") return 3;
+      if (status === "Complimentary") return 4;
+      return 5; // Any other status
+    };
+
+    const statusA = a.order_status?.name || "";
+    const statusB = b.order_status?.name || "";
+
+    // Compare by status priority first
+    const priorityDiff =
+      getStatusPriority(statusA) - getStatusPriority(statusB);
+    if (priorityDiff !== 0) return priorityDiff;
+
+    // If same status, sort by date
+    const dateA = new Date(a.date);
+    const dateB = new Date(b.date);
+
+    // For Pending and Cancelled: earliest to latest
+    if (statusA === "Pending" || statusA === "Cancelled") {
+      return dateA - dateB;
+    }
+    // For Completed: latest to earliest
+    else if (statusA === "Completed") {
+      return dateB - dateA;
+    }
+
+    // Default sort by date ascending
+    return dateA - dateB;
+  });
+
+  const tableData = sortedTransactions.map((order) => {
+    // Calculate order summary
+    const orderSummary =
+      order.order_details?.map(
+        (order_details) =>
+          `${order_details.quantity}x - ${order_details.menu_item?.name}`
+      ) || [];
+
+    let formattedOrderSummary;
+    if (orderSummary.length === 1) {
+      formattedOrderSummary = orderSummary[0];
+    } else if (orderSummary.length === 2) {
+      formattedOrderSummary = (
+        <>
+          {orderSummary[0]} <br />
+          {orderSummary[1]}
+        </>
+      );
+    } else if (orderSummary.length > 2) {
+      formattedOrderSummary = (
+        <>
+          {orderSummary[0]} <br />
+          {orderSummary[1]} ...
+        </>
+      );
+    } else {
+      formattedOrderSummary = "N/A";
+    }
+
+    // Get status color
+    let statusColor = "text-gray-700";
+    const status = order.order_status?.name || "N/A";
+
+    if (status === "Pending") {
+      statusColor = "text-yellow-400 font-medium";
+    } else if (status === "Completed") {
+      statusColor = "text-green-500 font-medium";
+    } else if (status === "Cancelled") {
+      statusColor = "text-red-500 font-medium";
+    } else if (status === "Complimentary") {
+      statusColor = "text-blue-500 font-medium";
+    }
+
+    // Determine order type
+    const orderTypeId = order.order_details?.[0]?.menu_item?.type_id;
+    const orderTypeObj = orderData.menu_types.find(
+      (type) => type.id === orderTypeId
+    );
+    const orderType = orderTypeObj?.name || "Unknown";
+
+    // Set color based on order type
+    let orderTypeColor = "text-gray-700";
+    if (orderType === "In-Store") {
+      orderTypeColor = "text-[#CC5500] font-medium";
+    } else if (orderType === "Grab") {
+      orderTypeColor = "text-green-500 font-medium";
+    } else if (orderType === "FoodPanda") {
+      orderTypeColor = "text-pink-500 font-medium";
+    }
+
+    // Calculate total with discount
+    const calculateTotalWithDiscount = () => {
+      const orderDetails = order.order_details || [];
+
+      // For In-Store orders
+      if (orderDetails.length > 0 && orderDetails[0].menu_item?.type_id === 1) {
+        // Group by unli wings orders
+        const unliWingsOrders = orderDetails.filter(
+          (detail) => Number(detail.instore_category?.id) === 2
+        );
+        const alaCarteOrders = orderDetails.filter(
+          (detail) =>
+            Number(detail.instore_category?.id) === 1 ||
+            !detail.instore_category
+        );
+
+        // Calculate ala carte total with discounts
+        const alaCarteTotal = alaCarteOrders.reduce((sum, detail) => {
+          const quantity = detail?.quantity || 0;
+          const price = detail?.menu_item?.price || 0;
+          const discountPercentage = detail?.discount?.percentage || 0;
+          return sum + quantity * price * (1 - discountPercentage);
+        }, 0);
+
+        // Get unique unli wings groups to calculate base amount
+        const uniqueGroups = [
+          ...new Set(unliWingsOrders.map((d) => d.unli_wings_group)),
+        ];
+
+        const unliWingsCategory = orderData?.instore_categories?.find(
+          (cat) => Number(cat.id) === 2
+        );
+
+        const unliWingsTotal =
+          uniqueGroups.length * (unliWingsCategory?.base_amount || 0);
+
+        return (alaCarteTotal + unliWingsTotal).toFixed(2);
+      }
+      // For delivery orders (Grab/FoodPanda)
+      else {
+        const subtotal = orderDetails.reduce((sum, detail) => {
+          const quantity = detail?.quantity || 0;
+          const price = detail?.menu_item?.price || 0;
+          return sum + quantity * price;
+        }, 0);
+
+        // Find the menu type for deduction percentage
+        const menuTypeId = orderDetails[0]?.menu_item?.type_id;
+        const menuTypeData = orderData.menu_types.find(
+          (type) => type.id === menuTypeId
+        );
+        const deductionPercentage = menuTypeData?.deduction_percentage || 0;
+
+        // Only deduct for delivery apps
+        const total =
+          menuTypeId !== 1 ? subtotal * (1 - deductionPercentage) : subtotal;
+
+        return total.toFixed(2);
+      }
+    };
+
+    // Return a row array with the data
+    return [
+      order.id || "N/A",
+      formatDate(order.date) || "N/A",
+      <span className={orderTypeColor}>{orderType}</span>,
+      formattedOrderSummary,
+      `₱${calculateTotalWithDiscount()}`,
+      <span className={statusColor}>{status}</span>,
+    ];
+  });
 
   return (
     <div className="h-screen p-4 bg-[#fcf4dc]">
@@ -371,174 +521,9 @@ const OrderTable = () => {
             "Total Amount",
             "Order Status",
           ]}
-          data={filteredTransactions
-            .sort((a, b) => {
-              // Define status priority
-              const getStatusPriority = (status) => {
-                if (status === "Pending") return 1;
-                if (status === "Completed") return 2;
-                if (status === "Cancelled") return 3;
-                if (status === "Complimentary") return 4;
-                return 5; // Any other status
-              };
-
-              const statusA = a.order_status?.name || "";
-              const statusB = b.order_status?.name || "";
-
-              // Compare by status priority first
-              const priorityDiff =
-                getStatusPriority(statusA) - getStatusPriority(statusB);
-              if (priorityDiff !== 0) return priorityDiff;
-
-              // If same status, sort by date
-              const dateA = new Date(a.date);
-              const dateB = new Date(b.date);
-
-              // For Pending and Cancelled: earliest to latest
-              if (statusA === "Pending" || statusA === "Cancelled") {
-                return dateA - dateB;
-              }
-              // For Completed: latest to earliest
-              else if (statusA === "Completed") {
-                return dateB - dateA;
-              }
-
-              // Default sort by date ascending
-              return dateA - dateB;
-            })
-            .map((order) => {
-              const orderSummary =
-                order.order_details?.map(
-                  (order_details) =>
-                    `${order_details.quantity}x - ${order_details.menu_item?.name}`
-                ) || [];
-
-              let formattedOrderSummary;
-              if (orderSummary.length === 1) {
-                formattedOrderSummary = orderSummary[0];
-              } else if (orderSummary.length === 2) {
-                formattedOrderSummary = (
-                  <>
-                    {orderSummary[0]} <br />
-                    {orderSummary[1]}
-                  </>
-                );
-              } else if (orderSummary.length > 2) {
-                formattedOrderSummary = (
-                  <>
-                    {orderSummary[0]} <br />
-                    {orderSummary[1]} ...
-                  </>
-                );
-              } else {
-                formattedOrderSummary = "N/A";
-              }
-
-              // Get the appropriate color for the status
-              let statusColor = "text-gray-700";
-              const status = order.order_status?.name || "N/A";
-
-              if (status === "Pending") {
-                statusColor = "text-yellow-400 font-medium";
-              } else if (status === "Completed") {
-                statusColor = "text-green-500 font-medium";
-              } else if (status === "Cancelled") {
-                statusColor = "text-red-500 font-medium";
-              } else if (status === "Complimentary") {
-                statusColor = "text-blue-500 font-medium";
-              }
-
-              // Determine order type and its color
-              const orderTypeId = order.order_details?.[0]?.menu_item?.type_id;
-              const orderTypeObj = orderData.menu_types.find(
-                (type) => type.id === orderTypeId
-              );
-              const orderType = orderTypeObj?.name || "Unknown";
-
-              // Set color based on order type
-              let orderTypeColor = "text-gray-700";
-              if (orderType === "In-Store") {
-                orderTypeColor = "text-[#CC5500] font-medium";
-              } else if (orderType === "Grab") {
-                orderTypeColor = "text-green-500 font-medium";
-              } else if (orderType === "FoodPanda") {
-                orderTypeColor = "text-pink-500 font-medium";
-              }
-
-              // Calculate total with discount
-              const calculateTotalWithDiscount = () => {
-                const orderDetails = order.order_details || [];
-
-                // For In-Store orders
-                if (
-                  orderDetails.length > 0 &&
-                  orderDetails[0].menu_item?.type_id === 1
-                ) {
-                  // Group by unli wings orders
-                  const unliWingsOrders = orderDetails.filter(
-                    (detail) => Number(detail.instore_category?.id) === 2
-                  );
-                  const alaCarteOrders = orderDetails.filter(
-                    (detail) =>
-                      Number(detail.instore_category?.id) === 1 ||
-                      !detail.instore_category
-                  );
-
-                  // Calculate ala carte total with discounts
-                  const alaCarteTotal = alaCarteOrders.reduce((sum, detail) => {
-                    const quantity = detail?.quantity || 0;
-                    const price = detail?.menu_item?.price || 0;
-                    const discountPercentage =
-                      detail?.discount?.percentage || 0;
-                    return sum + quantity * price * (1 - discountPercentage);
-                  }, 0);
-
-                  // Get unique unli wings groups to calculate base amount
-                  const uniqueGroups = [
-                    ...new Set(unliWingsOrders.map((d) => d.unli_wings_group)),
-                  ];
-                  const unliWingsTotal =
-                    uniqueGroups.length * (unliWingsCategory?.base_amount || 0);
-
-                  return (alaCarteTotal + unliWingsTotal).toFixed(2);
-                }
-                // For delivery orders (Grab/FoodPanda)
-                else {
-                  const subtotal = orderDetails.reduce((sum, detail) => {
-                    const quantity = detail?.quantity || 0;
-                    const price = detail?.menu_item?.price || 0;
-                    return sum + quantity * price;
-                  }, 0);
-
-                  // Find the menu type for deduction percentage
-                  const menuTypeId = orderDetails[0]?.menu_item?.type_id;
-                  const menuTypeData = orderData.menu_types.find(
-                    (type) => type.id === menuTypeId
-                  );
-                  const deductionPercentage =
-                    menuTypeData?.deduction_percentage || 0;
-
-                  // Only deduct for delivery apps
-                  const total =
-                    menuTypeId !== 1
-                      ? subtotal * (1 - deductionPercentage)
-                      : subtotal;
-
-                  return total.toFixed(2);
-                }
-              };
-
-              return [
-                order.id || "N/A",
-                formatDate(order.date) || "N/A",
-                <span className={orderTypeColor}>{orderType}</span>,
-                formattedOrderSummary,
-                `₱${calculateTotalWithDiscount()}`,
-                <span className={statusColor}>{status}</span>,
-              ];
-            })}
+          data={tableData}
           rowOnClick={(rowIndex) =>
-            openTransactionModal(filteredTransactions[rowIndex])
+            openTransactionModal(sortedTransactions[rowIndex])
           }
           maxHeight="500px"
           sortableColumns={[0, 1]}
@@ -563,12 +548,12 @@ const OrderTable = () => {
         discountsData={orderData.discounts}
         menuItems={orderData.menu_items}
         menuCategories={orderData.menu_categories}
-        unliWingsCategory={unliWingsCategory}
+        unliWingsCategory={orderData?.instore_categories?.find(
+          (cat) => Number(cat.id) === 2
+        )}
         employees={orderData.employees}
         fetchOrderData={fetchOrderData}
-        fetchInventoryData={fetchInventoryData}
         payment_methods={orderData.payment_methods}
-        inventoryData={inventoryData}
       />
     </div>
   );

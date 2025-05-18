@@ -12,6 +12,7 @@ const EditTransactionMenu = ({
   setSelectedMenuCategory,
   filteredMenuItems,
   onItemSelect, // callback when a menu item is selected
+  isHighlighted, // new prop
 }) => {
   const [inventoryWarnings, setInventoryWarnings] = useState({});
   const { alert } = useModal();
@@ -23,8 +24,14 @@ const EditTransactionMenu = ({
   };
 
   return (
-    <div className="w-400 overflow-y-auto flex flex-col h-full">
-      <h3 className="font-bold text-xl mb-4">Menu</h3>
+    <div className="w-full overflow-y-auto flex flex-col h-full">
+      <h3
+        className={`font-semibold text-xl mb-4 ${
+          isHighlighted ? "text-orange-500" : ""
+        }`}
+      >
+        {isHighlighted ? "Select an Item for Unli Wings" : "Menu"}
+      </h3>
       {/* Select Category Dropdown */}
       <div className="relative inline-block text-left mb-4">
         <button

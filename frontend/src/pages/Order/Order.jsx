@@ -308,6 +308,22 @@ const Order = () => {
           );
           return;
         }
+
+        // Make sure currentUnliOrderNumber is actually set
+        if (currentUnliOrderNumber <= 0) {
+          // Find the highest existing order number
+          const existingOrderNumbers = selectedItems
+            .filter((i) => i.instoreCategory === "Unli Wings" && i.orderNumber)
+            .map((i) => i.orderNumber);
+
+          // Set to highest + 1, or 1 if no orders exist
+          const orderNumber =
+            existingOrderNumbers.length > 0
+              ? Math.max(...existingOrderNumbers)
+              : 1;
+
+          setCurrentUnliOrderNumber(orderNumber);
+        }
       } else {
         // For Ala Carte mode.
         defaultCategory = "Ala Carte";
@@ -385,23 +401,51 @@ const Order = () => {
     }
   };
 
-  // Prevent adding a new Unli order if the current Unli order is empty.
+  // Fix the handleAddNewUnliOrder function to properly handle adding new unli orders
   const handleAddNewUnliOrder = async () => {
-    const hasItemsInCurrentOrder = selectedItems.some(
-      (i) =>
-        i.orderNumber === currentUnliOrderNumber &&
-        i.instoreCategory === "Unli Wings"
+    // First, make sure we're in the unli wings section
+    setActiveSection("unliWings");
+
+    // Find existing unli wings orders
+    const unliItems = selectedItems.filter(
+      (item) =>
+        item.instoreCategory === "Unli Wings" && item.orderNumber !== undefined
     );
 
-    if (!hasItemsInCurrentOrder) {
-      await alert(
-        "Please add at least one item to the current Unli Order before adding a new order.",
-        "Empty Order"
-      );
+    // If there are no existing orders, start with order number 1
+    if (unliItems.length === 0) {
+      setCurrentUnliOrderNumber(1);
       return;
     }
 
-    setCurrentUnliOrderNumber(currentUnliOrderNumber + 1);
+    // Find all unique order numbers
+    const existingOrderNumbers = [
+      ...new Set(unliItems.map((item) => item.orderNumber)),
+    ];
+
+    // If currently editing an order, check if it has items
+    if (currentUnliOrderNumber > 0) {
+      const hasItemsInCurrentOrder = unliItems.some(
+        (item) => item.orderNumber === currentUnliOrderNumber
+      );
+
+      if (!hasItemsInCurrentOrder) {
+        await alert(
+          "Please add at least one item to the current Unli Order before adding a new order.",
+          "Empty Order"
+        );
+        return;
+      }
+    }
+
+    // Calculate the next order number (highest existing + 1)
+    const nextOrderNumber =
+      existingOrderNumbers.length > 0
+        ? Math.max(...existingOrderNumbers) + 1
+        : 1;
+
+    // Set the new order number and ensure unli wings section is open
+    setCurrentUnliOrderNumber(nextOrderNumber);
   };
 
   // Update discount only for the targeted card.
@@ -419,11 +463,11 @@ const Order = () => {
     );
   };
 
-  // Similarly, simplify the handleQuantityChange function to skip inventory checking
+  // Update handleQuantityChange in Order.jsx to trigger renumbering after items are removed
   const handleQuantityChange = (id, groupIdentifier, discount, newQuantity) => {
     if (newQuantity <= 0) {
-      setSelectedItems((prevItems) =>
-        prevItems.filter((item) => {
+      setSelectedItems((prevItems) => {
+        const updatedItems = prevItems.filter((item) => {
           if (item.id !== id) return true;
           if (item.instoreCategory === "Unli Wings") {
             return !(
@@ -435,8 +479,12 @@ const Order = () => {
             item.instoreCategory === groupIdentifier &&
             Number(item.discount || 0) === Number(discount)
           );
-        })
-      );
+        });
+
+        // After removing items, we need to renumber the Unli Wings orders
+        // This will be handled in the next render cycle by the useEffect in OrderSummary
+        return updatedItems;
+      });
       return;
     }
 
@@ -553,6 +601,76 @@ const Order = () => {
       );
       // Make sure to set loading to false in case of error
       setLoading(false);
+    }
+  };
+
+  // Also fix the renumberUnliOrders function
+  const renumberUnliOrders = () => {
+    if (selectedMenuType?.id === 1) {
+      // Get all unli wings items
+      const unliItems = selectedItems.filter(
+        (item) =>
+          item.instoreCategory === "Unli Wings" &&
+          item.orderNumber !== undefined
+      );
+
+      // If no Unli Wings items exist, reset current order number
+      if (unliItems.length === 0) {
+        setCurrentUnliOrderNumber(0);
+        return;
+      }
+
+      // Find unique order numbers and sort them
+      const orderNumbers = [
+        ...new Set(unliItems.map((item) => item.orderNumber)),
+      ].sort((a, b) => a - b);
+
+      // Check if we need to renumber (if there are gaps or non-sequential numbers)
+      const needsRenumbering = orderNumbers.some(
+        (num, index) => num !== index + 1
+      );
+
+      if (needsRenumbering && orderNumbers.length > 0) {
+        console.log("Renumbering Unli Wings orders");
+
+        // Create a mapping from old to new order numbers
+        const orderNumberMap = {};
+        orderNumbers.forEach((oldNum, index) => {
+          orderNumberMap[oldNum] = index + 1;
+        });
+
+        // Update all items with new order numbers
+        const updatedItems = selectedItems.map((item) => {
+          if (
+            item.instoreCategory === "Unli Wings" &&
+            item.orderNumber !== undefined &&
+            orderNumberMap[item.orderNumber] !== undefined
+          ) {
+            return {
+              ...item,
+              orderNumber: orderNumberMap[item.orderNumber],
+            };
+          }
+          return item;
+        });
+
+        // Update the state
+        setSelectedItems(updatedItems);
+
+        // Update current unli order number if it's active
+        if (currentUnliOrderNumber > 0) {
+          const newOrderNumber = orderNumberMap[currentUnliOrderNumber];
+          if (newOrderNumber !== undefined) {
+            setCurrentUnliOrderNumber(newOrderNumber);
+          } else {
+            // If the current order number is no longer valid, set to the highest available
+            const highestOrderNumber = Math.max(
+              ...Object.values(orderNumberMap)
+            );
+            setCurrentUnliOrderNumber(highestOrderNumber);
+          }
+        }
+      }
     }
   };
 
@@ -716,11 +834,13 @@ const Order = () => {
         setActiveSection={setActiveSection}
         handleAddNewUnliOrder={handleAddNewUnliOrder}
         currentUnliOrderNumber={currentUnliOrderNumber}
+        setCurrentUnliOrderNumber={setCurrentUnliOrderNumber}
         discounts={discounts}
         paymentMethods={paymentMethods}
         inStoreCategories={inStoreCategories}
         employees={employees}
         onPlaceOrder={handlePlaceOrder}
+        renumberUnliOrders={renumberUnliOrders}
       />
     </div>
   );

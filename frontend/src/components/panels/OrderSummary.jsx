@@ -36,8 +36,10 @@ const OrderSummary = ({
   onPlaceOrder,
   paymentMethods,
   currentUnliOrderNumber,
+  setCurrentUnliOrderNumber,
   inStoreCategories,
   employees,
+  renumberUnliOrders,
 }) => {
   const [localQuantities, setLocalQuantities] = useState({});
   const [isAlaCarteOpen, setIsAlaCarteOpen] = useState(false);
@@ -73,6 +75,12 @@ const OrderSummary = ({
       setIsAlaCarteOpen(true);
     }
   }, [menuType]);
+
+  useEffect(() => {
+    if (menuType?.id === 1 && renumberUnliOrders) {
+      renumberUnliOrders();
+    }
+  }, [selectedItems, menuType?.id, renumberUnliOrders]);
 
   // Group Unli Wings items
   const unliItems = selectedItems.filter(
@@ -333,22 +341,64 @@ const OrderSummary = ({
           </div>
         ) : (
           <>
-            {/* Ala Carte Accordion for In-Store */}
+            {/* Ala Carte Accordion for In-Store - with active section indicator */}
             <div className="mt-3">
-              <button
-                onClick={() => {
-                  setIsAlaCarteOpen(!isAlaCarteOpen);
-                  setActiveSection("alaCarte");
-                }}
-                className="w-full flex justify-between items-center px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-sm transition-all duration-200"
+              <div
+                className={`flex rounded-sm overflow-hidden ${
+                  activeSection === "alaCarte" ? "ring-2 ring-[#CC5500]" : ""
+                }`}
               >
-                <span className="font-semibold">Ala Carte</span>
-                {isAlaCarteOpen ? (
-                  <FaMinus className="text-gray-600" />
-                ) : (
-                  <FaPlus className="text-gray-600" />
-                )}
-              </button>
+                {/* Section selector button - always sets active section */}
+                <button
+                  onClick={() => {
+                    setActiveSection("alaCarte");
+                    if (!isAlaCarteOpen) setIsAlaCarteOpen(true);
+                  }}
+                  className={`flex-1 py-3 px-4 text-left ${
+                    activeSection === "alaCarte"
+                      ? "bg-[#CC5500] text-white"
+                      : "bg-gray-100 hover:bg-gray-200"
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <span className="font-semibold">Ala Carte</span>
+                    {activeSection === "alaCarte" && (
+                      <span className="ml-2 text-xs bg-white text-[#CC5500] px-2 py-0.5 rounded-full">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                </button>
+
+                {/* Separate toggle button for accordion */}
+                <button
+                  onClick={() => setIsAlaCarteOpen(!isAlaCarteOpen)}
+                  className={`px-3 ${
+                    activeSection === "alaCarte"
+                      ? "bg-[#CC5500] text-white"
+                      : "bg-gray-100 hover:bg-gray-200"
+                  }`}
+                >
+                  {isAlaCarteOpen ? (
+                    <FaMinus
+                      className={
+                        activeSection === "alaCarte"
+                          ? "text-white"
+                          : "text-gray-600"
+                      }
+                    />
+                  ) : (
+                    <FaPlus
+                      className={
+                        activeSection === "alaCarte"
+                          ? "text-white"
+                          : "text-gray-600"
+                      }
+                    />
+                  )}
+                </button>
+              </div>
+
               {isAlaCarteOpen && (
                 <div className="p-3 space-y-3 mt-2">
                   {alaCarteItems.length === 0 ? (
@@ -382,46 +432,121 @@ const OrderSummary = ({
                 </div>
               )}
             </div>
-            {/* Unli Wings Accordion for In-Store */}
-            {menuType?.id === 1 && (
-              <div className="mt-3 mb-4">
+            {/* Unli Wings Accordion for In-Store - with active section indicator */}
+            <div className="mt-3 mb-4">
+              <div
+                className={`flex rounded-sm overflow-hidden ${
+                  activeSection === "unliWings" ? "ring-2 ring-[#CC5500]" : ""
+                }`}
+              >
+                {/* Section selector button - always sets active section */}
                 <button
                   onClick={() => {
-                    setIsUnliWingsOpen(!isUnliWingsOpen);
-                    setActiveSection(
-                      isUnliWingsOpen ? "alaCarte" : "unliWings"
-                    );
+                    setActiveSection("unliWings");
+                    if (!isUnliWingsOpen) setIsUnliWingsOpen(true);
                   }}
-                  className="w-full flex justify-between items-center px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-sm transition-all duration-200"
+                  className={`flex-1 py-3 px-4 text-left ${
+                    activeSection === "unliWings"
+                      ? "bg-[#CC5500] text-white"
+                      : "bg-gray-100 hover:bg-gray-200"
+                  }`}
                 >
-                  <span className="font-semibold">Unli Wings</span>
+                  <div className="flex items-center">
+                    <span className="font-semibold">Unli Wings</span>
+                    {activeSection === "unliWings" && (
+                      <span className="ml-2 text-xs bg-white text-[#CC5500] px-2 py-0.5 rounded-full">
+                        Active
+                      </span>
+                    )}
+                  </div>
+                </button>
+
+                {/* Separate toggle button for accordion */}
+                <button
+                  onClick={() => setIsUnliWingsOpen(!isUnliWingsOpen)}
+                  className={`px-3 ${
+                    activeSection === "unliWings"
+                      ? "bg-[#CC5500] text-white"
+                      : "bg-gray-100 hover:bg-gray-200"
+                  }`}
+                >
                   {isUnliWingsOpen ? (
-                    <FaMinus className="text-gray-600" />
+                    <FaMinus
+                      className={
+                        activeSection === "unliWings"
+                          ? "text-white"
+                          : "text-gray-600"
+                      }
+                    />
                   ) : (
-                    <FaPlus className="text-gray-600" />
+                    <FaPlus
+                      className={
+                        activeSection === "unliWings"
+                          ? "text-white"
+                          : "text-gray-600"
+                      }
+                    />
                   )}
                 </button>
-                {isUnliWingsOpen && (
-                  <div className="p-3 space-y-3 mt-2">
-                    {activeSection === "unliWings" && (
-                      <button
-                        className="w-full py-2 bg-[#CC5500] text-white rounded-sm font-medium hover:bg-[#B34A00] transition-colors duration-200"
-                        onClick={handleAddNewUnliOrder}
-                      >
-                        Add New Unli Order
-                      </button>
-                    )}
-                    {allOrderKeys.map((orderNumber) => (
+              </div>
+
+              {isUnliWingsOpen && (
+                <div className="p-3 space-y-3 mt-2">
+                  <button
+                    className="w-full py-2 bg-[#CC5500] text-white rounded-sm font-medium hover:bg-[#B34A00] transition-colors duration-200"
+                    onClick={handleAddNewUnliOrder}
+                  >
+                    Add New Unli Order
+                  </button>
+                  {allOrderKeys.map((orderNumber) => {
+                    const isActive =
+                      Number(orderNumber) === Number(currentUnliOrderNumber);
+                    return (
                       <div
                         key={orderNumber}
-                        className="mb-4 border-b-[1px] pb-3 last:border-0"
+                        className={`mb-4 border-b-[1px] pb-3 last:border-0 ${
+                          isActive ? "border-green-900" : "border-gray-300"
+                        }`}
                       >
                         <div className="flex justify-between items-center">
                           <h4 className="font-bold text-sm mb-2">
                             Unli Wings #{orderNumber}
                           </h4>
-                          <div className="px-2 py-1 bg-[#CC5500] bg-opacity-10 text-[#B34A00] text-xs rounded-sm font-medium">
-                            ₱{UNLI_BASE_AMOUNT}
+                          <div className="flex items-center gap-2">
+                            <div className="px-2 py-1 bg-[#CC5500] bg-opacity-10 text-[#B34A00] text-xs rounded-sm font-medium">
+                              ₱{UNLI_BASE_AMOUNT}
+                            </div>
+                            {isActive ? (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    setCurrentUnliOrderNumber(0);
+                                  }}
+                                  className="px-2 py-1 rounded text-xs bg-red-500 text-white"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setCurrentUnliOrderNumber(0);
+                                  }}
+                                  className="px-2 py-1 rounded text-xs bg-green-500 text-white"
+                                >
+                                  Done
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setCurrentUnliOrderNumber(
+                                    Number(orderNumber)
+                                  );
+                                }}
+                                className="px-2 py-1 rounded text-xs bg-[#CC5500] text-white"
+                              >
+                                Update
+                              </button>
+                            )}
                           </div>
                         </div>
                         {groupedUnliOrders[orderNumber] &&
@@ -465,11 +590,11 @@ const OrderSummary = ({
                           </div>
                         )}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>

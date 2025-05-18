@@ -22,16 +22,16 @@ const TransactionModal = ({
   unliWingsCategory,
   fetchOrderData,
   payment_methods,
-  inventoryData,
-  fetchInventoryData,
 }) => {
-  if (!isOpen || !transaction) return null;
+  if (!isOpen) return null;
 
   const navigate = useNavigate();
   const { alert, confirm } = useModal();
 
   // State to track expansion
   const [isExpanded, setIsExpanded] = useState(false);
+  const [inventoryData, setInventoryData] = useState(null);
+  const [isLoadingInventory, setIsLoadingInventory] = useState(true);
 
   // States for category dropdown
   const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
@@ -155,6 +155,27 @@ const TransactionModal = ({
       console.log("Final status set to:", orderStatus);
     }
   }, [transaction]);
+
+  // Fetch inventory data on modal open
+  useEffect(() => {
+    if (isOpen && transaction) {
+      fetchInventoryData();
+    }
+  }, [isOpen, transaction]);
+
+  const fetchInventoryData = async () => {
+    setIsLoadingInventory(true);
+    try {
+      const response = await axios.get(
+        "http://127.0.0.1:8000/fetch-inventory-order-data/"
+      );
+      setInventoryData(response.data);
+    } catch (err) {
+      console.error("Error fetching inventory data:", err);
+    } finally {
+      setIsLoadingInventory(false);
+    }
+  };
 
   const toggleAccordion = (groupKey) => {
     setOpenAccordion((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
@@ -458,8 +479,8 @@ const TransactionModal = ({
           // Format the inventory information message
           let inventoryMessage =
             statusId === 2
-              ? "Order completed successfully. Inventory updated:\n\n"
-              : "Complimentary order processed. Inventory updated:\n\n";
+              ? "Order completed successfully. Inventory updated:\n"
+              : "Complimentary order processed. Inventory updated:\n";
 
           deductedIngredients.forEach((item, index) => {
             // Get the item details
@@ -468,7 +489,7 @@ const TransactionModal = ({
             // Get item name
             const itemName = itemData ? itemData.name : `Item #${item.item_id}`;
 
-            // Get the original measurement from menu_ingredients (e.g., "12 g" for Chicken)
+            // Find the menu ingredient to get the proper unit
             const menuItem = menuItems.find((mi) =>
               mi.menu_ingredients?.some(
                 (ing) => ing.inventory_id === item.item_id
@@ -478,33 +499,70 @@ const TransactionModal = ({
               (ing) => ing.inventory_id === item.item_id
             );
 
-            const originalQuantity = menuIngredient?.quantity || 0;
-            const unitId = menuIngredient?.unit_id;
-            const unitSymbol =
-              unitId === 1
-                ? "mg"
-                : unitId === 2
-                ? "g"
-                : unitId === 3
-                ? "kg"
-                : unitId === 4
-                ? "ml"
-                : unitId === 5
-                ? "l"
-                : unitId === 7
-                ? "pc"
-                : "units";
+            // Get the deducted amount directly from the API response
+            const deductedAmount = item.deducted_amount || 0;
 
-            // Use the original unit for the deducted amount (e.g., "12 g" or "100 ml")
-            const deductedDisplay = `${originalQuantity} ${unitSymbol}`;
+            // Get the appropriate unit for display - using more human-readable units
+            let unitSymbol = "units";
+            let displayAmount = deductedAmount;
 
-            // Use the inventory's base unit for the remaining quantity (e.g., "kg" or "l")
-            const remainingUnitSymbol = itemData?.unit_symbol || "units";
+            // Use the itemData's unit_symbol for the base unit
+            const baseUnitSymbol = itemData?.unit_symbol || "units";
+
+            // Convert to more readable units based on the amount
+            if (baseUnitSymbol === "kg") {
+              if (deductedAmount < 0.001) {
+                // Very small amounts in kg to mg (less than 1g)
+                unitSymbol = "mg";
+                displayAmount = deductedAmount * 1000000; // Convert kg to mg
+              } else if (deductedAmount < 1) {
+                // Small kg amounts to grams
+                unitSymbol = "g";
+                displayAmount = deductedAmount * 1000; // Convert kg to g
+              } else {
+                unitSymbol = "kg";
+              }
+            } else if (baseUnitSymbol === "g") {
+              if (deductedAmount < 1) {
+                // Small gram amounts to mg
+                unitSymbol = "mg";
+                displayAmount = deductedAmount * 1000; // Convert g to mg
+              } else {
+                unitSymbol = "g";
+              }
+            } else if (baseUnitSymbol === "mg") {
+              unitSymbol = "mg";
+            } else if (baseUnitSymbol === "l") {
+              if (deductedAmount < 1) {
+                // Small liter amounts to ml
+                unitSymbol = "ml";
+                displayAmount = deductedAmount * 1000; // Convert l to ml
+              } else {
+                unitSymbol = "l";
+              }
+            } else if (baseUnitSymbol === "ml") {
+              unitSymbol = "ml";
+            } else {
+              // For other units (pc, units, etc.), use as is
+              unitSymbol = baseUnitSymbol;
+            }
+
+            // Format the amount for display with appropriate precision
+            // Round to whole numbers for g/ml/mg, keep decimal for kg/l
+            const formattedAmount =
+              unitSymbol === "g" || unitSymbol === "ml" || unitSymbol === "mg"
+                ? Math.round(displayAmount)
+                : displayAmount.toFixed(2);
+
+            // Use the converted unit for the deducted amount
+            const deductedDisplay = `${formattedAmount} ${unitSymbol}`;
+
+            // For the remaining quantity, use the original base unit
             const newQuantity = parseFloat(item.new_quantity).toFixed(2);
 
             inventoryMessage += `${
               index + 1
-            }. ${itemName}: -${deductedDisplay} (Remaining: ${newQuantity} ${remainingUnitSymbol})\n`;
+            }. ${itemName}: -${deductedDisplay} (Remaining: ${newQuantity} ${baseUnitSymbol})\n`;
           });
 
           // Display the detailed inventory alert
@@ -523,11 +581,8 @@ const TransactionModal = ({
         await alert("Order has been cancelled.", "Status Updated");
       }
 
-      // Refresh both inventory and order data
-      await Promise.all([
-        fetchOrderData(),
-        fetchInventoryData && fetchInventoryData(),
-      ]);
+      // Refresh order data
+      await fetchOrderData();
 
       // Close the modal after data refresh is complete
       onClose();
@@ -544,6 +599,34 @@ const TransactionModal = ({
       return false;
     }
   };
+
+  if (isLoadingInventory) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 overflow-y-auto">
+        <div className="bg-white rounded-lg shadow-lg w-[1280px] h-[680px] flex flex-col overflow-y-auto">
+          {/* Header */}
+          <div className="flex justify-between items-center p-4 border-b">
+            <h2 className="text-lg font-medium">Transaction Details</h2>
+            <button
+              onClick={onClose}
+              className="p-1 rounded hover:bg-gray-100 w-8 h-8 flex items-center justify-center"
+            >
+              &times;
+            </button>
+          </div>
+
+          <div className="flex-1 flex justify-center items-center">
+            <div className="flex flex-col items-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#CC5500]"></div>
+              <p className="mt-4 font-medium">Loading transaction details...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!transaction) return null;
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 overflow-y-auto">

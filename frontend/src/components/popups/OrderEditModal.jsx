@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import EditTransactionMenu from "../panels/EditTransactionMenu";
 import EditTransactionOrderSummary from "../panels/EditTransactionOrderSummary";
-import { FaChevronUp, FaChevronDown } from "react-icons/fa";
+import { FaChevronUp, FaChevronDown, FaArrowLeft } from "react-icons/fa";
 import { useModal } from "../utils/modalUtils";
 
 const OrderEditModal = ({
@@ -43,6 +43,10 @@ const OrderEditModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [inventoryWarnings, setInventoryWarnings] = useState({});
 
+  // Add this to the existing component
+  const [isAddingUnliWings, setIsAddingUnliWings] = useState(false);
+  const [pendingUnliGroupNumber, setPendingUnliGroupNumber] = useState(null);
+
   // Filter menu items based on the current menu type and selected category.
   const filteredMenuItems = menuItems.filter((item) => {
     const matchesType = menuTypeData ? item.type_id === menuTypeData.id : true;
@@ -69,61 +73,139 @@ const OrderEditModal = ({
   // When a menu item is clicked in the menu panel, either add it to or update the local order details.
   // We now directly call onItemSelect without checking inventory first
   const onItemSelect = (menuItem) => {
-    // First check if this item is already unavailable
+    // Early return if the item is unavailable.
     if (menuItem.status_id === 2) {
-      alert("This item is currently unavailable!", "Error");
+      alert("This item is unavailable!");
       return;
     }
 
+    // Check if we're in "Add Unli Wings" mode
+    if (isAddingUnliWings && pendingUnliGroupNumber) {
+      // For Unli mode, only allow items in allowed category IDs: 1 (Wings), 4 (Sides), 5 (Drinks)
+      if (
+        menuItem.category_id === 1 ||
+        menuItem.category_id === 5 ||
+        menuItem.category_id === 4
+      ) {
+        // For Sides, only allow Rice items
+        if (
+          menuItem.category_id === 4 &&
+          !menuItem.name.toLowerCase().includes("rice")
+        ) {
+          alert("Only Rice items can be added for Sides in the Unli section.");
+          return;
+        }
+
+        // Get the base_amount for Unli Wings
+        const baseAmount = unliWingsCategory?.base_amount || 0;
+
+        // Create a new detail for the new Unli Wings group
+        const newDetail = {
+          id: Date.now(),
+          menu_item: menuItem,
+          quantity: 1,
+          discount: { id: 0, type: "None", percentage: 0 },
+          unli_wings_group: pendingUnliGroupNumber,
+          instore_category: { id: 2, base_amount: baseAmount },
+          base_amount: baseAmount,
+        };
+
+        // Add the item to the order
+        setLocalOrderDetails((prev) => [...prev, newDetail]);
+
+        // Set the active group to the new group
+        setActiveUnliWingsGroup(pendingUnliGroupNumber);
+
+        // Exit "Add Unli Wings" mode
+        setIsAddingUnliWings(false);
+        setPendingUnliGroupNumber(null);
+
+        return;
+      } else {
+        // Show error if item type isn't allowed
+        alert(
+          "Only Wings, Drinks, or Rice items can be added to the Unli section."
+        );
+        return;
+      }
+    }
+
+    // Default discount ID (usually 0 or None)
+    const defaultDiscountId = 0;
+
     setLocalOrderDetails((prevDetails) => {
-      const defaultDiscountId = 0;
       // If there is an active Unli Wings group, add the item to that group.
       if (activeUnliWingsGroup) {
-        // Look for an existing item in the same group with the same menu item and default discount.
-        const existingIndex = prevDetails.findIndex(
-          (detail) =>
-            detail.menu_item.id === menuItem.id &&
-            detail.unli_wings_group === activeUnliWingsGroup &&
-            (detail.discount?.id ?? 0) === defaultDiscountId
-        );
-        if (existingIndex !== -1) {
-          const updated = [...prevDetails];
-          updated[existingIndex] = {
-            ...updated[existingIndex],
-            quantity: updated[existingIndex].quantity + 1,
-          };
-          return updated;
-        } else {
-          // Get the base_amount from the existing group.
-          const groupBaseAmount =
-            prevDetails.find(
-              (detail) =>
-                detail.unli_wings_group === activeUnliWingsGroup &&
-                detail.instore_category?.id === 2
-            )?.base_amount ||
-            prevDetails.find(
-              (detail) =>
-                detail.unli_wings_group === activeUnliWingsGroup &&
-                detail.instore_category?.id === 2
-            )?.instore_category?.base_amount ||
-            unliWingsCategory?.base_amount ||
-            0;
+        // Validate the menu item type for Unli Wings
+        // For Unli mode, only allow items in allowed category IDs: 1 (Wings), 4 (Sides), 5 (Drinks)
+        if (
+          menuItem.category_id === 1 ||
+          menuItem.category_id === 5 ||
+          menuItem.category_id === 4
+        ) {
+          // For Sides, only allow Rice items
+          if (
+            menuItem.category_id === 4 &&
+            !menuItem.name.toLowerCase().includes("rice")
+          ) {
+            alert(
+              "Only Rice items can be added for Sides in the Unli section."
+            );
+            return prevDetails; // Return unchanged details
+          }
 
-          // Create a new detail for Unli Wings group using the group's base amount.
-          const newDetail = {
-            id: Date.now(),
-            menu_item: menuItem,
-            quantity: 1,
-            discount: { id: 0, type: "None", percentage: 0 },
-            // Assign the active Unli Wings group and use the group's base_amount.
-            unli_wings_group: activeUnliWingsGroup,
-            instore_category: { id: 2, base_amount: groupBaseAmount },
-            base_amount: groupBaseAmount, // Also store directly on the detail
-          };
-          return [...prevDetails, newDetail];
+          // Look for an existing item in the same group with the same menu item and default discount.
+          const existingIndex = prevDetails.findIndex(
+            (detail) =>
+              detail.menu_item.id === menuItem.id &&
+              detail.unli_wings_group === activeUnliWingsGroup &&
+              (detail.discount?.id ?? 0) === defaultDiscountId
+          );
+
+          if (existingIndex !== -1) {
+            const updated = [...prevDetails];
+            updated[existingIndex] = {
+              ...updated[existingIndex],
+              quantity: updated[existingIndex].quantity + 1,
+            };
+            return updated;
+          } else {
+            // Get the base_amount from the existing group.
+            const groupBaseAmount =
+              prevDetails.find(
+                (detail) =>
+                  detail.unli_wings_group === activeUnliWingsGroup &&
+                  detail.instore_category?.id === 2
+              )?.base_amount ||
+              prevDetails.find(
+                (detail) =>
+                  detail.unli_wings_group === activeUnliWingsGroup &&
+                  detail.instore_category?.id === 2
+              )?.instore_category?.base_amount ||
+              unliWingsCategory?.base_amount ||
+              0;
+
+            // Create a new detail for Unli Wings group using the group's base amount.
+            const newDetail = {
+              id: Date.now(),
+              menu_item: menuItem,
+              quantity: 1,
+              discount: { id: 0, type: "None", percentage: 0 },
+              // Assign the active Unli Wings group and use the group's base_amount.
+              unli_wings_group: activeUnliWingsGroup,
+              instore_category: { id: 2, base_amount: groupBaseAmount },
+              base_amount: groupBaseAmount, // Also store directly on the detail
+            };
+            return [...prevDetails, newDetail];
+          }
+        } else {
+          // Show error if item type isn't allowed
+          alert(
+            "Only Wings, Drinks, or Sides items can be added to the Unli section."
+          );
+          return prevDetails; // Return unchanged details
         }
       }
-
       // Otherwise, proceed as before.
       let existingIndex = -1;
       if (menuType === "In-Store") {
@@ -164,16 +246,85 @@ const OrderEditModal = ({
   };
 
   const handleQuantityChange = (changedItem, newQty) => {
+    console.log(
+      "handleQuantityChange called with item:",
+      changedItem,
+      "newQty:",
+      newQty
+    );
+
     const quantity = Number(newQty);
+
+    // Special handling for container items - we keep these with minimal quantity
+    if (changedItem.is_container === true) {
+      console.log("Handling special container item");
+
+      if (changedItem.unli_wings_group) {
+        // Set the active group
+        setActiveUnliWingsGroup(changedItem.unli_wings_group);
+
+        // Add or update the container in localOrderDetails
+        setLocalOrderDetails((prevDetails) => {
+          // Look for existing container with this group
+          const existingContainer = prevDetails.find(
+            (item) =>
+              item.is_container === true &&
+              item.unli_wings_group === changedItem.unli_wings_group
+          );
+
+          if (existingContainer) {
+            // Already exists, make sure it has the minimal quantity
+            return prevDetails.map((item) =>
+              item.id === existingContainer.id
+                ? { ...item, quantity: 0.01 }
+                : item
+            );
+          }
+
+          // Add new container
+          return [...prevDetails, { ...changedItem, quantity: 0.01 }];
+        });
+      }
+      return; // Don't continue with regular item processing
+    }
+
+    // Special handling for Unli Wings orders
+    if (
+      changedItem.instore_category?.id === 2 &&
+      changedItem.unli_wings_group
+    ) {
+      // If this is a new Unli Wings group, make sure the activeUnliWingsGroup is set
+      if (activeUnliWingsGroup !== changedItem.unli_wings_group) {
+        console.log(
+          "Setting active unli wings group to:",
+          changedItem.unli_wings_group
+        );
+        setActiveUnliWingsGroup(changedItem.unli_wings_group);
+      }
+    }
+
+    // Normal handling for regular items
     setLocalOrderDetails((prevDetails) => {
       if (quantity <= 0) {
-        // Remove the item if quantity is zero or less.
+        // Remove the item if quantity is zero or less
         return prevDetails.filter((item) => item.id !== changedItem.id);
       }
-      // Otherwise update the quantity.
-      return prevDetails.map((item) =>
-        item.id === changedItem.id ? { ...item, quantity } : item
+
+      // Look for an existing identical item first
+      const existingItem = prevDetails.find(
+        (item) => item.id === changedItem.id
       );
+
+      if (existingItem) {
+        // Update existing item
+        return prevDetails.map((item) =>
+          item.id === changedItem.id ? { ...item, quantity } : item
+        );
+      } else {
+        // Add new item
+        console.log("Adding new item to localOrderDetails:", changedItem);
+        return [...prevDetails, changedItem];
+      }
     });
   };
 
@@ -302,9 +453,16 @@ const OrderEditModal = ({
         return;
       }
 
-      // Always use localOrderDetails as the base
+      // Always use localOrderDetails as the base, but filter more carefully
+      // Keep Unli Wings placeholder/container items even with id 0
       const validOrderDetails = localOrderDetails.filter(
-        (detail) => detail.menu_item && detail.menu_item.id !== 0
+        (detail) =>
+          // Keep items with real menu items
+          (detail.menu_item && detail.menu_item.id > 0) ||
+          // Or keep Unli Wings container items (keep the group structure)
+          (detail.instore_category?.id === 2 &&
+            detail.unli_wings_group &&
+            !detail.is_container)
       );
 
       // Format the order details to match backend expectations
@@ -504,12 +662,16 @@ const OrderEditModal = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-6 relative">
           <div className="grid grid-cols-2 gap-6 h-full">
-            {/* Left Panel: Menu */}
+            {/* Left Panel: Menu - Highlighted with orange border when adding unli wings */}
             <div
-              className={`flex flex-col space-y-6 h-[475px] overflow-y-auto p-4 rounded-lg border ${
+              className={`flex flex-col space-y-6 h-[475px] overflow-y-auto p-4 rounded-lg ${
                 isLoading ? "opacity-50" : ""
+              } ${
+                isAddingUnliWings
+                  ? "border-2 border-orange-500 shadow-lg z-20 bg-white"
+                  : "border"
               }`}
             >
               <EditTransactionMenu
@@ -520,36 +682,63 @@ const OrderEditModal = ({
                 setSelectedMenuCategory={setSelectedMenuCategory}
                 filteredMenuItems={filteredMenuItems}
                 onItemSelect={onItemSelect}
+                isHighlighted={isAddingUnliWings}
               />
             </div>
 
-            {/* Right Panel: Order Summary */}
+            {/* Right Panel: Order Summary - Contains the Unli Wings instruction */}
             <div
               className={`flex flex-col space-y-6 h-[475px] overflow-y-auto p-4 rounded-lg border ${
                 isLoading ? "opacity-50" : ""
               }`}
             >
-              <EditTransactionOrderSummary
-                orderDetails={localOrderDetails}
-                finalTotal={newTotal}
-                totalAmount={originalPaymentAmount}
-                transaction={transaction}
-                handleEditOrder={handleEditOrder}
-                menuType={menuType}
-                discounts={discountsData}
-                openDropdownId={null}
-                onQuantityChange={handleQuantityChange}
-                onDiscountChange={handleDiscountChange}
-                setOpenDropdownId={() => {}}
-                deductionPercentage={deductionPercentage}
-                activeUnliWingsGroup={activeUnliWingsGroup}
-                setActiveUnliWingsGroup={setActiveUnliWingsGroup}
-                alaCarteOrders={localOrderDetails.filter(
-                  (detail) => detail.instore_category?.id === 1
-                )}
-                unliWingsCategory={unliWingsCategory}
-                employees={employees}
-              />
+              {/* Display instruction overlay inside the right panel when adding Unli Wings */}
+              {isAddingUnliWings ? (
+                <div className="bg-white p-4 rounded-lg border-gray-200 border shadow-sm">
+                  <h3 className="text-lg font-bold mb-3">
+                    Creating New Unli Wings Order
+                  </h3>
+                  <p className="mb-4">
+                    Please select a Wings, Rice, or Drink item from the menu to
+                    start your Unli Wings Order #{pendingUnliGroupNumber}.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setIsAddingUnliWings(false);
+                      setPendingUnliGroupNumber(null);
+                    }}
+                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <EditTransactionOrderSummary
+                  orderDetails={localOrderDetails}
+                  finalTotal={newTotal}
+                  totalAmount={originalPaymentAmount}
+                  transaction={transaction}
+                  handleEditOrder={handleEditOrder}
+                  menuType={menuType}
+                  discounts={discountsData}
+                  openDropdownId={null}
+                  onQuantityChange={handleQuantityChange}
+                  onDiscountChange={handleDiscountChange}
+                  setOpenDropdownId={() => {}}
+                  deductionPercentage={deductionPercentage}
+                  activeUnliWingsGroup={activeUnliWingsGroup}
+                  setActiveUnliWingsGroup={setActiveUnliWingsGroup}
+                  alaCarteOrders={localOrderDetails.filter(
+                    (detail) => detail.instore_category?.id === 1
+                  )}
+                  unliWingsCategory={unliWingsCategory}
+                  employees={employees}
+                  isAddingUnliWings={isAddingUnliWings}
+                  setIsAddingUnliWings={setIsAddingUnliWings}
+                  pendingUnliGroupNumber={pendingUnliGroupNumber}
+                  setPendingUnliGroupNumber={setPendingUnliGroupNumber}
+                />
+              )}
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import EditableProductCard from "../cards/EditableProductCard";
 import OrderEditPayment from "../popups/OrderEditPayment";
 import axios from "axios";
 import { useModal } from "../utils/modalUtils";
+import { FaArrowLeft } from "react-icons/fa";
 
 const EditTransactionOrderSummary = ({
   orderDetails,
@@ -27,6 +28,10 @@ const EditTransactionOrderSummary = ({
   paymentMethods,
   employees,
   fetchOrderData,
+  isAddingUnliWings,
+  setIsAddingUnliWings,
+  pendingUnliGroupNumber,
+  setPendingUnliGroupNumber,
 }) => {
   const [openAccordion, setOpenAccordion] = useState({});
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -50,8 +55,9 @@ const EditTransactionOrderSummary = ({
     return acc;
   }, {});
 
-  // Ensure the active group is always present—even if empty.
+  // Ensure the active group is always present—even if empty
   if (activeUnliWingsGroup && !groupedUnliWingsOrders[activeUnliWingsGroup]) {
+    console.log("Creating empty group container for:", activeUnliWingsGroup);
     groupedUnliWingsOrders[activeUnliWingsGroup] = [];
   }
 
@@ -329,6 +335,158 @@ const EditTransactionOrderSummary = ({
     }
   };
 
+  // Updated handleAddItemToUnliWings function
+  const handleAddItemToUnliWings = async (item, groupId) => {
+    // Check if item is unavailable
+    if (item.status_id === 2) {
+      await alert("This item is unavailable!", "Unavailable Item");
+      return;
+    }
+
+    // For Unli mode, only allow items in allowed category IDs: 1 (Wings), 4 (Sides), 5 (Drinks)
+    if (
+      item.category_id === 1 ||
+      item.category_id === 5 ||
+      item.category_id === 4
+    ) {
+      // For Sides, only allow Rice items
+      if (item.category_id === 4 && !item.name.toLowerCase().includes("rice")) {
+        await alert(
+          "Only Rice items can be added for Sides in the Unli section.",
+          "Invalid Selection"
+        );
+        return;
+      }
+
+      // Create a new order detail for the unli wings group
+      const newDetail = {
+        id: Date.now(), // Temporary ID
+        unli_wings_group: groupId,
+        instore_category: {
+          id: 2,
+          base_amount: unliWingsCategory?.base_amount,
+        },
+        base_amount: unliWingsCategory?.base_amount,
+        quantity: 1,
+        menu_item: item,
+        discount: { id: 0, type: "None", percentage: 0 },
+      };
+
+      // Add to order details through the quantity change function
+      onQuantityChange(newDetail, newDetail.quantity);
+    } else {
+      // Show error if item type isn't allowed
+      await alert(
+        "Only Wings, Drinks, or Sides items can be added to the Unli section.",
+        "Invalid Selection"
+      );
+    }
+  };
+
+  // Improved useEffect for renumbering Unli Wings groups
+  useEffect(() => {
+    // Only proceed if this is an In-Store order
+    if (menuType === "In-Store") {
+      // Get all unli wings items
+      const unliItems = orderDetails.filter(
+        (item) => item.instore_category?.id === 2 && item.unli_wings_group
+      );
+
+      // If no Unli Wings items exist, reset the active group
+      if (unliItems.length === 0) {
+        if (activeUnliWingsGroup) {
+          setActiveUnliWingsGroup(null);
+        }
+        return;
+      }
+
+      // Find unique group numbers
+      const groupNumbers = [
+        ...new Set(unliItems.map((item) => item.unli_wings_group)),
+      ]
+        .filter((num) => num) // Filter out undefined/null
+        .sort((a, b) => a - b);
+
+      // Check if numbering is already sequential and starts with 1
+      const isSequential = groupNumbers.every(
+        (num, index) => num === index + 1
+      );
+
+      // Only perform renumbering if necessary
+      if (!isSequential && groupNumbers.length > 0) {
+        console.log(
+          "Renumbering Unli Wings groups from",
+          groupNumbers,
+          "to sequential numbers"
+        );
+
+        // Create a mapping from old to new group numbers
+        const groupNumberMap = {};
+        groupNumbers.forEach((oldNum, index) => {
+          groupNumberMap[oldNum] = index + 1;
+        });
+
+        // Create a new array with updated group numbers
+        const updatedOrderDetails = orderDetails.map((item) => {
+          if (item.instore_category?.id === 2 && item.unli_wings_group) {
+            return {
+              ...item,
+              unli_wings_group:
+                groupNumberMap[item.unli_wings_group] || item.unli_wings_group,
+            };
+          }
+          return item;
+        });
+
+        // Update items in the parent component by calling onQuantityChange for each item
+        // that needs to be updated
+        updatedOrderDetails.forEach((item) => {
+          if (item.instore_category?.id === 2 && item.unli_wings_group) {
+            const originalItem = orderDetails.find(
+              (orig) => orig.id === item.id
+            );
+            if (
+              originalItem &&
+              originalItem.unli_wings_group !== item.unli_wings_group
+            ) {
+              onQuantityChange(item, item.quantity);
+            }
+          }
+        });
+
+        // Update active group if needed
+        if (activeUnliWingsGroup > 0) {
+          const newGroupNumber = groupNumberMap[activeUnliWingsGroup];
+          if (newGroupNumber && newGroupNumber !== activeUnliWingsGroup) {
+            setActiveUnliWingsGroup(newGroupNumber);
+          } else if (!newGroupNumber && groupNumbers.length > 0) {
+            // If the active group was removed but others remain,
+            // set to the highest available group
+            setActiveUnliWingsGroup(Math.max(...Object.values(groupNumberMap)));
+          }
+        }
+      }
+    }
+  }, [orderDetails, menuType, activeUnliWingsGroup, onQuantityChange]);
+
+  // Make sure both accordions start open by default
+  useEffect(() => {
+    setOpenAccordion({
+      alaCarte: true,
+      unliWings: true,
+    });
+  }, []);
+
+  // Also add this to ensure unliWings is open when activeUnliWingsGroup changes
+  useEffect(() => {
+    if (activeUnliWingsGroup) {
+      setOpenAccordion((prev) => ({
+        ...prev,
+        unliWings: true,
+      }));
+    }
+  }, [activeUnliWingsGroup]);
+
   return (
     <div className="relative w-full h-full flex flex-col">
       <div className="p-4 flex-1 overflow-y-auto">
@@ -407,6 +565,33 @@ const EditTransactionOrderSummary = ({
                             <div className="flex gap-2">
                               <button
                                 onClick={() => {
+                                  // Get the original items for this group from the transaction data
+                                  const originalGroupItems =
+                                    transaction.order_details.filter(
+                                      (detail) =>
+                                        detail.instore_category?.id === 2 &&
+                                        detail.unli_wings_group ===
+                                          activeUnliWingsGroup
+                                    );
+
+                                  if (originalGroupItems.length > 0) {
+                                    // Remove all current items in this group
+                                    const updatedDetails = orderDetails.filter(
+                                      (detail) =>
+                                        !(
+                                          detail.instore_category?.id === 2 &&
+                                          detail.unli_wings_group ===
+                                            activeUnliWingsGroup
+                                        )
+                                    );
+
+                                    // Add back the original items
+                                    originalGroupItems.forEach((item) => {
+                                      onQuantityChange(item, item.quantity);
+                                    });
+                                  }
+
+                                  // Exit edit mode
                                   setActiveUnliWingsGroup(null);
                                 }}
                                 className="px-2 py-1 rounded text-xs bg-red-500 text-white"
@@ -415,8 +600,21 @@ const EditTransactionOrderSummary = ({
                               </button>
                               <button
                                 onClick={() => {
-                                  // Don't call handleEditOrder here - just exit edit mode
-                                  setActiveUnliWingsGroup(null);
+                                  // Check if the current group has any items
+                                  const currentGroupItems =
+                                    groupedUnliWingsOrders[
+                                      activeUnliWingsGroup
+                                    ] || [];
+                                  if (currentGroupItems.length === 0) {
+                                    // Show alert requiring at least one item in the Unli Wings order
+                                    alert(
+                                      "Please add at least one Unli Wings item before completing this group.",
+                                      "Required Item"
+                                    );
+                                  } else {
+                                    // Don't call handleEditOrder here - just exit edit mode
+                                    setActiveUnliWingsGroup(null);
+                                  }
                                 }}
                                 className="px-2 py-1 rounded text-xs bg-green-500 text-white"
                               >
@@ -455,38 +653,42 @@ const EditTransactionOrderSummary = ({
                   <div className="mb-2">
                     <button
                       onClick={() => {
-                        // Ensure the Unli Wings accordion is open.
-                        setOpenAccordion((prev) => ({
-                          ...prev,
+                        console.log("Add New Unli Wings Order button clicked");
+
+                        // Force the unliWings accordion to be open
+                        setOpenAccordion({
+                          alaCarte: openAccordion.alaCarte,
                           unliWings: true,
-                        }));
-                        const currentGroups = unliWingsOrders
-                          .map((detail) => detail.unli_wings_group)
-                          .filter((g) => g !== undefined)
-                          .map(Number);
+                        });
+
+                        // Get current group numbers
+                        const currentGroups = orderDetails
+                          .filter(
+                            (item) =>
+                              item.instore_category?.id === 2 &&
+                              item.unli_wings_group
+                          )
+                          .map((item) => item.unli_wings_group)
+                          .filter(Boolean);
+
+                        console.log("Current unli groups:", currentGroups);
+
+                        // Calculate next group number
                         const newGroupNumber =
                           currentGroups.length > 0
                             ? Math.max(...currentGroups) + 1
                             : 1;
-                        // Always use the base_amount from unliWingsCategory (retrieved from backend)
-                        const baseAmount = unliWingsCategory?.base_amount;
-                        const newDetail = {
-                          id: Date.now(),
-                          unli_wings_group: newGroupNumber,
-                          instore_category: { id: 2, base_amount: baseAmount },
-                          base_amount: baseAmount, // Store directly as well
-                          quantity: 1,
-                          menu_item: {
-                            id: 0,
-                            name: "New Unli Wings Order",
-                            price: 0,
-                          },
-                          discount: { id: 0, type: "None", percentage: 0 },
-                        };
-                        onQuantityChange(newDetail, newDetail.quantity);
-                        setActiveUnliWingsGroup(newGroupNumber);
+
+                        console.log(
+                          "Creating new Unli Wings group #",
+                          newGroupNumber
+                        );
+
+                        // Enter "Add Unli Wings" mode
+                        setIsAddingUnliWings(true);
+                        setPendingUnliGroupNumber(newGroupNumber);
                       }}
-                      className="w-full px-3 py-2 bg-[#E88504] text-white rounded"
+                      className="w-full px-3 py-2 bg-[#CC5500] text-white rounded"
                     >
                       Add New Unli Wings Order
                     </button>
@@ -503,6 +705,7 @@ const EditTransactionOrderSummary = ({
               ) : (
                 orderDetails.map((item) => (
                   <EditableProductCard
+                    E88504
                     key={getItemKey(item, { id: 2, name: "Delivery" })}
                     item={item}
                     onQuantityChange={onQuantityChange}
