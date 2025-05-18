@@ -663,6 +663,11 @@ const TransactionModal = ({
                     <strong>Time:</strong> {formatTime(transaction.date)}
                   </p>
                   <p>
+                    <strong>Processed by:</strong>{" "}
+                    {transaction.employee.first_name}{" "}
+                    {transaction.employee.last_name}
+                  </p>
+                  <p>
                     <strong>Menu Type:</strong>{" "}
                     <span
                       className={`font-medium ${getMenuTypeClass(menuType)}`}
