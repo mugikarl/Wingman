@@ -2820,9 +2820,9 @@ def fetch_order_data(request, transactionId=None):
                 return Response({"error": f"Error fetching transaction data: {str(e)}"}, status=500)
         
         # For the main list view, implement pagination
-        page = int(request.query_params.get('page', 1))
-        page_size = int(request.query_params.get('page_size', 50))  # Default to 50 items per page
-        offset = (page - 1) * page_size
+        # page = int(request.query_params.get('page', 1))
+        # page_size = int(request.query_params.get('page_size', 50))  # Default to 50 items per page
+        # offset = (page - 1) * page_size
         
         # Fetch essential reference data first
         try:
@@ -2843,7 +2843,9 @@ def fetch_order_data(request, transactionId=None):
             # Only fetch and process transactions with pagination
             transactions = supabase_anon.table("transaction").select(
                 "id, date, payment_amount, order_status(id, name), payment_method, employee_id"
-            ).order("date", desc=True).range(offset, offset + page_size - 1).execute().data or []
+            ).order("date", desc=True).execute().data or []
+            
+            # If using pagination: ("date", desc=True).range(offset, offset + page_size - 1)
             
             # Only fetch order details for these transactions
             transaction_ids = [tx.get("id") for tx in transactions]

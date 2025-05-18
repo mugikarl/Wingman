@@ -237,7 +237,7 @@ const DisposedInventory = ({
             >
               <option value="" hidden></option>
               {reason
-                .filter((r) => r.id !== 1) // Exclude "Ordered"
+                .filter((r) => r.id !== 1 && r.id !== 5) // Exclude "Ordered" (id: 1) and "Complimentary" (id: 5)
                 .map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name}

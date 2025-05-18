@@ -895,7 +895,7 @@ const TransactionModal = ({
                               </div>
                               {openAccordion[groupKey] && (
                                 <div className="px-3 py-2 w-full">
-                                  <div className="h-[200px] overflow-y-auto overflow-x-hidden w-full">
+                                  <div className="w-full">
                                     <Table
                                       columns={["Menu Item", "Quantity"]}
                                       data={
@@ -935,50 +935,36 @@ const TransactionModal = ({
                       <h4 className="text-md font-medium mb-2">
                         Ala Carte Orders
                       </h4>
-                      <div className="w-full overflow-y-auto overflow-x-hidden">
-                        {alaCarteOrders.length > 0 ? (
-                          <Table
-                            columns={[
-                              "Menu Item",
-                              "Quantity",
-                              "Price",
-                              "Discounts",
-                              "Total",
-                            ]}
-                            data={
-                              alaCarteOrders && alaCarteOrders.length > 0
-                                ? alaCarteOrders.map((detail) => {
-                                    const quantity = detail?.quantity || 0;
-                                    const price = detail?.menu_item?.price || 0;
-                                    const discount =
-                                      detail?.discount?.percentage || 0;
-                                    const computedTotal =
-                                      quantity * price * (1 - discount);
-                                    return [
-                                      detail?.menu_item?.name || "N/A",
-                                      detail?.quantity || 0,
-                                      `₱${price.toFixed(2)}`,
-                                      `${(discount * 100).toFixed(0)}%`,
-                                      `₱${computedTotal.toFixed(2)}`,
-                                    ];
-                                  })
-                                : []
-                            }
-                            sortableColumns={[0]}
-                          />
-                        ) : (
-                          <div className="bg-gray-100 p-4 rounded-lg text-gray-500 text-center">
-                            No Orders added
-                          </div>
-                        )}
-                        {/* {!isOrderNonEditable && (
-                          <button
-                            onClick={handleUpdateClick}
-                            className="w-full mt-3 px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                          >
-                            Update
-                          </button>
-                        )} */}
+                      <div className="w-full">
+                        <Table
+                          columns={[
+                            "Menu Item",
+                            "Quantity",
+                            "Price",
+                            "Discounts",
+                            "Total",
+                          ]}
+                          data={
+                            alaCarteOrders && alaCarteOrders.length > 0
+                              ? alaCarteOrders.map((detail) => {
+                                  const quantity = detail?.quantity || 0;
+                                  const price = detail?.menu_item?.price || 0;
+                                  const discount =
+                                    detail?.discount?.percentage || 0;
+                                  const computedTotal =
+                                    quantity * price * (1 - discount);
+                                  return [
+                                    detail?.menu_item?.name || "N/A",
+                                    detail?.quantity || 0,
+                                    `₱${price.toFixed(2)}`,
+                                    `${(discount * 100).toFixed(0)}%`,
+                                    `₱${computedTotal.toFixed(2)}`,
+                                  ];
+                                })
+                              : []
+                          }
+                          sortableColumns={[0]}
+                        />
                       </div>
                     </div>
                   </div>
