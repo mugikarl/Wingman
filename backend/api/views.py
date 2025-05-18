@@ -2867,13 +2867,10 @@ def fetch_order_data(request, transactionId=None):
                 "id, quantity, menu_id, discount_id, instore_category, transaction_id, unli_wings_group"
             ).in_("transaction_id", transaction_ids).execute().data or []
             
-            # Extract all unique IDs needed for related data
-            menu_ids = list(set([od.get("menu_id") for od in order_details if od.get("menu_id")]))
-            
-            # Fetch only the data needed for these transactions
+            # CHANGE 1: Fetch ALL menu items instead of only those in existing orders
             menus = supabase_anon.table("menu_items").select(
                 "id, name, type_id, price, status_id, category_id, image"
-            ).in_("id", menu_ids).execute().data or []
+            ).execute().data or []
             
             # Only add image URLs for menus that have images
             formatted_menus = []
@@ -2890,10 +2887,10 @@ def fetch_order_data(request, transactionId=None):
                     menu_data["image"] = supabase_anon.storage.from_("menu-images").get_public_url(menu["image"])
                 formatted_menus.append(menu_data)
             
-            # Fetch menu ingredients for the specific menu items only if needed
+            # CHANGE 2: Fetch ALL menu ingredients instead of only those for menu items in existing orders
             menu_ingredients = supabase_anon.table("menu_ingredients").select(
                 "id, menu_id, inventory_id, quantity, unit_id"
-            ).in_("menu_id", menu_ids).execute().data or []
+            ).execute().data or []
             
             # Organize menu ingredients by menu_id for faster lookup
             menu_ingredients_dict = {}
