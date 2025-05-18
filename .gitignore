@@ -1,0 +1,11 @@
+# Ignore environment files
+**/.env
+
+# Django-specific ignores (if applicable)
+__pycache__
+*.pyc
+
+# Node/Vite/React-specific ignores (if applicable)
+frontend/node_modules/
+frontend/dist/
+frontend/.env*
