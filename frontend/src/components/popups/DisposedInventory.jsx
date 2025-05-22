@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import EmployeeVerification from "./EmployeeVerification";
 
 const DisposedInventory = ({
   isOpen,
@@ -34,6 +35,12 @@ const DisposedInventory = ({
   const [isDisposing, setIsDisposing] = useState(false);
   const [loadingDots, setLoadingDots] = useState("");
 
+  // Verification modal state
+  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState("");
+  const [adminEmployee, setAdminEmployee] = useState(null);
+
   // Get the category ID of the current unit
   const currentUnitCategory = currentUnitObject
     ? currentUnitObject.unit_category
@@ -44,6 +51,77 @@ const DisposedInventory = ({
   const filteredUnits = currentUnitCategory
     ? units.filter((unit) => unit.unit_category === currentUnitCategory)
     : units;
+
+  // This function fetches currently logged-in admin data
+  const fetchCurrentAdminData = async (token, userEmail) => {
+    try {
+      const response = await axios.get(
+        "http://127.0.0.1:8000/fetch-employee-data/",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (response.data && response.data.employees) {
+        const allEmployees = response.data.employees;
+
+        // Find the employee that matches the logged-in user's email
+        const currentAdmin = allEmployees.find(
+          (emp) =>
+            emp.email && emp.email.toLowerCase() === userEmail.toLowerCase()
+        );
+
+        if (currentAdmin) {
+          return currentAdmin;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Error fetching current admin data:", error);
+      return null;
+    }
+  };
+
+  // Check if user is admin on component mount and set selected disposer
+  useEffect(() => {
+    if (isOpen) {
+      const role = localStorage.getItem("role");
+      const token = localStorage.getItem("access_token");
+      const userEmail = localStorage.getItem("user_email");
+      setCurrentUserEmail(userEmail || "");
+
+      const isAdminUser = role === "Admin" && token;
+      setIsAdmin(isAdminUser);
+
+      if (isAdminUser && userEmail) {
+        // For admin users, find the logged-in admin in the employees array
+        const admin = employees.find(
+          (emp) =>
+            emp.email && emp.email.toLowerCase() === userEmail.toLowerCase()
+        );
+
+        if (admin) {
+          // Admin found in the provided employees list
+          setSelectedDisposer(admin.id);
+          setAdminEmployee(admin);
+        } else if (token) {
+          // If admin not found in employees list, fetch directly from API
+          fetchCurrentAdminData(token, userEmail).then((adminData) => {
+            if (adminData) {
+              setSelectedDisposer(adminData.id);
+              setAdminEmployee(adminData);
+            }
+          });
+        }
+      } else {
+        // Reset disposer for non-admin users
+        setSelectedDisposer("");
+        setAdminEmployee(null);
+      }
+    }
+  }, [isOpen, employees]);
 
   // Loading animation effect
   useEffect(() => {
@@ -69,18 +147,22 @@ const DisposedInventory = ({
     setSelectedReason(selectedValue);
 
     // Clear the other reason text if a different option is selected
-    if (selectedValue === "4") {
+    if (selectedValue !== "4") {
       setOtherReason("");
     }
   };
 
-  const handleDispose = async () => {
-    if (!selectedInventory || !selectedReason || !selectedDisposer) {
-      alert("Please select a reason and disposer.");
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Validation checks
+    if (!selectedDisposer) {
+      alert("Please select a disposer.");
       return;
     }
 
-    if (!disposalQuantity || disposalQuantity <= 0) {
+    if (!disposalQuantity || parseFloat(disposalQuantity) <= 0) {
       alert("Please enter a valid disposal quantity.");
       return;
     }
@@ -90,30 +172,67 @@ const DisposedInventory = ({
       return;
     }
 
-    if (selectedReason === "4" && !otherReason.trim()) {
-      alert("Please specify the other reason for disposal.");
+    if (!selectedReason) {
+      alert("Please select a reason for disposal.");
       return;
     }
 
-    // Check if disposal unit is the same as current unit and compare quantities directly
-    if (parseInt(selectedDisposalUnit) === measurementId) {
-      if (parseFloat(disposalQuantity) > parseFloat(currentQuantity)) {
-        alert("Disposal quantity cannot be greater than current quantity.");
-        return;
-      }
+    if (selectedReason === "4" && !otherReason) {
+      alert("Please specify the other reason.");
+      return;
     }
-    // If units are different, the backend will handle the conversion and validation
 
+    // For admin users, process directly
+    // For non-admin users, open verification modal
+    if (isAdmin) {
+      // Admin can dispose items directly without verification
+      processDisposal();
+    } else {
+      // For non-admin, open verification modal
+      setIsVerificationModalOpen(true);
+    }
+  };
+
+  // Handle verification success
+  const handleVerificationSuccess = (email, passcode) => {
+    // Close verification modal
+    setIsVerificationModalOpen(false);
+
+    // Process disposal with verification credentials
+    processDisposal(email, passcode);
+  };
+
+  // Process the actual disposal
+  const processDisposal = async (email, passcode) => {
     setIsDisposing(true);
+
+    // Setup payload
+    const payload = {
+      inventory_id: selectedInventory.id,
+      disposed_quantity: disposalQuantity,
+      disposed_unit: selectedDisposalUnit,
+      reason_of_disposal: selectedReason,
+      other_reason: selectedReason === "4" ? otherReason : "",
+      disposer: selectedDisposer,
+    };
+
+    // Add verification credentials if provided
+    if (email && passcode) {
+      payload.email = email;
+      payload.passcode = passcode;
+    }
+
+    // For admin users, ensure Authorization header is sent
+    if (isAdmin) {
+      const token = localStorage.getItem("access_token");
+      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    }
+
     try {
-      const response = await axios.post("http://127.0.0.1:8000/dispose-item/", {
-        inventory_id: selectedInventory.id,
-        disposed_quantity: disposalQuantity,
-        disposed_unit: selectedDisposalUnit,
-        reason_of_disposal: selectedReason,
-        other_reason: selectedReason === "4" ? otherReason : "", // Only include if "Other" is selected
-        disposer: selectedDisposer, // Send disposer ID
-      });
+      const response = await axios.post(
+        "http://127.0.0.1:8000/dispose-item/",
+        payload
+      );
 
       alert("Item disposed successfully.");
       closeModal();
@@ -146,25 +265,34 @@ const DisposedInventory = ({
 
         {/* Modal Body */}
         <div className="space-y-4">
-          {/* Disposer Dropdown */}
+          {/* Disposer Display/Selection */}
           <div>
             <label className="block text-sm font-medium">Disposer</label>
-            <select
-              className="w-full p-2 border rounded-lg"
-              value={selectedDisposer}
-              onChange={(e) => {
-                console.log("Selected disposer:", e.target.value);
-                setSelectedDisposer(e.target.value);
-              }}
-              disabled={isDisposing}
-            >
-              <option value="" hidden></option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.first_name} {employee.last_name}
-                </option>
-              ))}
-            </select>
+            {isAdmin ? (
+              // For admin, show their name without dropdown
+              <div className="w-full p-2 border rounded-lg bg-gray-50 font-medium text-gray-800">
+                {adminEmployee
+                  ? `${adminEmployee.first_name || ""} ${
+                      adminEmployee.last_name || ""
+                    } (Admin)`
+                  : "Admin User"}
+              </div>
+            ) : (
+              // For non-admin, show dropdown
+              <select
+                className="w-full p-2 border rounded-lg"
+                value={selectedDisposer}
+                onChange={(e) => setSelectedDisposer(e.target.value)}
+                disabled={isDisposing}
+              >
+                <option value="" hidden></option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.first_name} {employee.last_name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Current Quantity & Current Unit (Side by Side) */}
@@ -262,18 +390,28 @@ const DisposedInventory = ({
         {/* Modal Footer */}
         <div className="flex justify-end mt-4 space-x-2">
           <button
-            onClick={handleDispose}
+            onClick={handleSubmit}
             disabled={isDisposing}
-            className={`bg-red-500 text-white px-4 py-2 rounded-lg w-[120px] ${
-              isDisposing ? "opacity-70 cursor-not-allowed" : "hover:bg-red-600"
+            className={`mt-4 w-full p-2 rounded-lg text-white transition-colors ${
+              isDisposing
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-orange-500 hover:bg-orange-600"
             }`}
           >
-            <span className="inline-block text-center w-full">
-              {isDisposing ? `Disposing${loadingDots}` : "Dispose"}
-            </span>
+            {isDisposing ? `Disposing${loadingDots}` : "Dispose Item"}
           </button>
         </div>
       </div>
+
+      {/* Employee Verification Modal */}
+      <EmployeeVerification
+        isOpen={isVerificationModalOpen}
+        closeModal={() => setIsVerificationModalOpen(false)}
+        employee={employees.find(
+          (emp) => String(emp.id) === String(selectedDisposer)
+        )}
+        onVerificationSuccess={handleVerificationSuccess}
+      />
     </div>
   );
 };

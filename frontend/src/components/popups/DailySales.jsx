@@ -788,6 +788,7 @@ const DailySales = ({
             (cat) => cat.id === 2
           )}
           fetchOrderData={fetchSalesData || fetchSalesDataFromApi}
+          payment_methods={localSalesData?.payment_methods || []}
         />
       )}
 

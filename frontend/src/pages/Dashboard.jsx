@@ -177,7 +177,15 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
       0
     ).getDate();
 
-    return Array.from({ length: daysInMonth }, (_, i) => (i + 1).toString());
+    // Create labels with day and month format (e.g., "1 Jan")
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const date = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        i + 1
+      );
+      return `${i + 1} ${date.toLocaleString("default", { month: "short" })}`;
+    });
   };
 
   // Prepare chart data to match the reference style
@@ -237,7 +245,17 @@ const Dashboard = ({ isAdmin, setIsAdmin }) => {
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false,
+        display: true,
+        position: "top",
+        align: "end",
+        labels: {
+          usePointStyle: true,
+          pointStyle: "circle",
+          padding: 15,
+          boxWidth: 8,
+          boxHeight: 8,
+          color: "#333",
+        },
       },
       tooltip: {
         mode: "index",

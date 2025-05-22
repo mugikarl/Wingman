@@ -16,6 +16,7 @@ const AddExpense = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingDots, setLoadingDots] = useState("");
   const [isOthersSelected, setIsOthersSelected] = useState(false);
+  const token = localStorage.getItem("access_token");
 
   useEffect(() => {
     if (defaultDate) {
@@ -87,12 +88,16 @@ const AddExpense = ({
 
     try {
       // Send data to the API
-      const response = await axios.post("http://127.0.0.1:8000/add-expense/", {
-        date: expenseDetails.date,
-        cost: expenseDetails.amount,
-        expense_type_id: expenseDetails.expenseType,
-        note: expenseDetails.note || null, // Allow null for note
-      });
+      const response = await axios.post(
+        "http://127.0.0.1:8000/add-expense/",
+        {
+          date: expenseDetails.date,
+          cost: expenseDetails.amount,
+          expense_type_id: expenseDetails.expenseType,
+          note: expenseDetails.note || null, // Allow null for note
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
       console.log("Expense Added:", response.data);
 

@@ -664,8 +664,11 @@ const TransactionModal = ({
                   </p>
                   <p>
                     <strong>Processed by:</strong>{" "}
-                    {transaction.employee.first_name}{" "}
-                    {transaction.employee.last_name}
+                    {transaction.employee
+                      ? `${transaction.employee.first_name || ""} ${
+                          transaction.employee.last_name || ""
+                        }`
+                      : `Employee #${transaction.employee_id || "Unknown"}`}
                   </p>
                   <p>
                     <strong>Menu Type:</strong>{" "}

@@ -2323,6 +2323,95 @@ def dispose_item(request):
         other_reason = data.get("other_reason", "")
         disposer_id = int(data.get("disposer"))  # Get disposer ID
 
+        # Employee verification data
+        provided_email = data.get("email")
+        entered_passcode = data.get("passcode")
+        
+        # Check if we need to verify the employee (skip verification for admin users)
+        is_admin = False
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            if token and is_valid_supabase_token(token):
+                # Check if this token belongs to an admin user
+                try:
+                    user_response = supabase_service.auth.get_user(token)
+                    if user_response and user_response.user:
+                        auth_user_uuid = user_response.user.id
+                        
+                        # Look up the employee by user_id
+                        employee_lookup = supabase_service.table("employee") \
+                            .select("id") \
+                            .eq("user_id", auth_user_uuid) \
+                            .single() \
+                            .execute()
+                        
+                        if employee_lookup.data:
+                            admin_employee_pk = employee_lookup.data["id"]
+                            
+                            # Check if this employee has admin role
+                            role_mapping = supabase_service.table("employee_role") \
+                                .select("role_id") \
+                                .eq("employee_id", admin_employee_pk) \
+                                .execute()
+                            
+                            if role_mapping.data:
+                                role_ids = [entry["role_id"] for entry in role_mapping.data]
+                                
+                                # Get admin role ID
+                                admin_role = supabase_service.table("role") \
+                                    .select("id") \
+                                    .eq("role_name", "Admin") \
+                                    .single() \
+                                    .execute()
+                                
+                                if admin_role.data and admin_role.data["id"] in role_ids:
+                                    is_admin = True
+                except Exception as e:
+                    print(f"Error checking admin status: {str(e)}")
+        
+        # Skip verification for admin users
+        if not is_admin:
+            # Verify employee credentials - similar to add_order function
+            if not disposer_id or not entered_passcode or not provided_email:
+                return Response({"error": "Missing employee verification fields."}, status=400)
+            
+            # Query the employee record
+            employee_response = (
+                supabase_service.table("employee")
+                .select("id, user_id, first_name, last_name")
+                .eq("id", disposer_id)
+                .single()
+                .execute()
+            )
+            if not employee_response.data:
+                return Response({"error": "Employee not found."}, status=404)
+                
+            employee = employee_response.data
+            if not employee.get("user_id"):
+                return Response({"error": "Employee not linked to an auth user."}, status=400)
+                
+            # Fetch user details using the admin client
+            user_response = supabase_service.auth.admin.get_user_by_id(employee["user_id"])
+            if not (user_response and user_response.user):
+                return Response({"error": "Unable to fetch user authentication details."}, status=404)
+                
+            # Ensure the provided email matches the employee's registered email
+            if provided_email.lower() != user_response.user.email.lower():
+                return Response(
+                    {"error": "Provided email does not match the selected employee's email."},
+                    status=400,
+                )
+                
+            # Attempt to sign in using the provided email and passcode
+            sign_in_response = supabase_service.auth.sign_in_with_password({
+                "email": provided_email,
+                "password": entered_passcode
+            })
+            
+            if not sign_in_response or not sign_in_response.user:
+                return Response({"error": "Invalid email or passcode."}, status=401)
+
         # 1. Fetch the inventory record.
         inv_response = supabase_anon.table("inventory").select("*").eq("id", inventory_id).execute()
         if not inv_response.data:

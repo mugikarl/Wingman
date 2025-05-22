@@ -19,6 +19,7 @@ const EditExpense = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [savingText, setSavingText] = useState("Save Changes");
   const [deletingText, setDeletingText] = useState("Delete");
+  const token = localStorage.getItem("access_token");
 
   // Initialize form with expense data when component mounts or expense changes
   useEffect(() => {
@@ -96,7 +97,8 @@ const EditExpense = ({
           cost: expenseDetails.amount,
           expense_type_id: expenseDetails.expenseType,
           note: expenseDetails.note || null,
-        }
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       console.log("Expense Updated:", response.data);
